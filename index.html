@@ -1520,10 +1520,22 @@ window.addEventListener('storage', (ev) => {
   resyncFromStorage();
 });
 
-// PWA: サービスワーカー登録（file:// では使えないため http(s) の時だけ）
+// PWA: Service Worker 登録＋更新検知
+// GitHub Pages 差し替え後も、新 SW が入ったらページを一度だけ再読み込みして反映する
 if ('serviceWorker' in navigator && (location.protocol === 'http:' || location.protocol === 'https:')) {
+  let swRefreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (swRefreshing) return;
+    swRefreshing = true;
+    location.reload();
+  });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    navigator.serviceWorker.register('./sw.js').then((reg) => {
+      // 起動時に更新チェック（放置中に GitHub を更新した場合向け）
+      try { reg.update(); } catch (e) {}
+      // 定期的にも確認（タブを開きっぱなしのとき）
+      setInterval(() => { try { reg.update(); } catch (e) {} }, 30 * 60 * 1000);
+    }).catch(() => {});
   });
 }
 </script>
