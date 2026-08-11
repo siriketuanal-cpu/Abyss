@@ -1,11 +1,13 @@
 /* 深淵タイマー Service Worker */
 /* デプロイのたびに CACHE_NAME を上げると、古いキャッシュを捨てて新版へ切り替わる */
-const CACHE_NAME = 'dotabyss-timer-v4';
+const CACHE_NAME = 'dotabyss-timer-v5';
 const PRECACHE = [
   './',
   './index.html',
   './manifest.json',
-  './icon-192.png'
+  './icon-192.png',
+  './icon-512.png',
+  './icon-maskable-512.png'
 ];
 
 self.addEventListener('install', (event) => {
