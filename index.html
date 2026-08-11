@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>深淵タイマー | ドットアビス</title>
 
 <!-- PWA -->
@@ -10,13 +10,13 @@
 <meta name="theme-color" content="#0a0d14">
 <link rel="icon" href="icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="icon-192.png">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="深淵タイマー">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap"></noscript>
 <style>
 :root{
   --bg:#0a0d14; --bg-panel:#131826; --bg-card:#171d2d; --bg-inset:#0e1320;
@@ -27,12 +27,12 @@
   --stam-cur-c:#6fe8ff; --idle-c:#ffd166;
 }
 *{box-sizing:border-box;}
-html,body{margin:0;padding:0;overscroll-behavior:none;}
+html,body{margin:0;padding:0;overscroll-behavior:none;background-color:#0a0d14;}
 body{
   background:radial-gradient(ellipse at 20% -10%,#1a2035 0%,transparent 55%),
              radial-gradient(ellipse at 90% 10%,#201530 0%,transparent 50%), var(--bg);
   color:var(--ink);
-  font-family:"M PLUS Rounded 1c",sans-serif;
+  font-family:"M PLUS Rounded 1c","Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
   min-height:100vh;
   padding:12px 10px 32px;
   -webkit-tap-highlight-color:transparent;
@@ -47,9 +47,9 @@ input,textarea{
 }
 .wrap{max-width:820px;margin:0 auto;}
 header{margin-bottom:10px;text-align:center;}
-header .eyebrow{font-family:Cinzel,serif;letter-spacing:.35em;font-size:9px;color:var(--ink-dim);text-transform:uppercase;}
+header .eyebrow{font-family:Cinzel,Georgia,"Times New Roman",serif;letter-spacing:.35em;font-size:9px;color:var(--ink-dim);text-transform:uppercase;}
 header h1{
-  font-family:Cinzel,serif;font-weight:700;font-size:22px;margin:2px 0 0;
+  font-family:Cinzel,Georgia,"Times New Roman",serif;font-weight:700;font-size:22px;margin:2px 0 0;
   background:linear-gradient(135deg,#fff 0%,#b9c0d8 60%,var(--violet) 130%);
   -webkit-background-clip:text;background-clip:text;color:transparent;
 }
@@ -80,35 +80,37 @@ header h1{
 .pdot.d2,.pdot.d3{--dotcolor:var(--g1);}
 .pdot.d4,.pdot.d5{--dotcolor:var(--g2);}
 .pdot.filled{background:var(--dotcolor);border-color:var(--dotcolor);color:#fff;}
-.rainbow-badge{
-  font-size:22px;font-weight:900;line-height:1;
+.complete-badge{
   display:inline-flex;align-items:center;justify-content:center;
-  width:28px;height:28px;
-  background:conic-gradient(from 0deg,#ff5e5e,#ffb35e,#f5e05e,#7bdc7b,#5ec8ff,#a389ff,#ff5e5e);
-  -webkit-background-clip:text;background-clip:text;color:transparent;
-  /* 強いぼかしはレイアウトと視認性を崩すので控えめに */
-  filter:drop-shadow(0 0 2px rgba(255,255,255,.35));
+  height:20px;padding:0 6px;border-radius:4px;
+  font-size:9px;font-weight:800;letter-spacing:.04em;
+  line-height:1;white-space:nowrap;
+  color:#1a1408;
+  background:#ffc94a;
+  border:1px solid #e0a82e;
 }
 .grid{display:grid;grid-template-columns:1fr;gap:6px;margin-top:6px;}
 @media (min-width:620px){.grid{grid-template-columns:1fr 1fr;}}
 .card-row{display:flex;align-items:center;gap:11px;}
 .card-row:nth-child(3),.card-row:nth-child(5){
-  margin-top:9px;padding-top:9px;border-top:1px dashed #333f5c;
+  margin-top:1px;padding-top:7px;border-top:1px solid #333f5c;
 }
 .card{
   background:var(--bg-card);border:1px solid var(--line);border-radius:12px;padding:7px 11px;
   cursor:pointer;position:relative;-webkit-tap-highlight-color:transparent;
   touch-action:manipulation;
   flex:1 1 auto;min-width:0;
+  transition:border-color .12s ease;
+  contain:layout style;
 }
 .card.g0{border:1.5px solid var(--g0);}
 .card.g1{border:1.5px solid var(--g1);}
 .card.g2{border:1.5px solid var(--g2);}
 .card.open{z-index:30;}
 
-.card.g0.open{border-color:var(--g0);box-shadow:0 0 0 1.5px var(--g0),0 8px 28px rgba(124,95,214,.3);}
-.card.g1.open{border-color:var(--g1);box-shadow:0 0 0 1.5px var(--g1),0 8px 28px rgba(91,157,255,.3);}
-.card.g2.open{border-color:var(--g2);box-shadow:0 0 0 1.5px var(--g2),0 8px 28px rgba(143,163,196,.3);}
+.card.g0.open{border-color:var(--g0);box-shadow:0 0 0 1.5px var(--g0);}
+.card.g1.open{border-color:var(--g1);box-shadow:0 0 0 1.5px var(--g1);}
+.card.g2.open{border-color:var(--g2);box-shadow:0 0 0 1.5px var(--g2);}
 .row-top{display:flex;align-items:center;gap:7px;margin-bottom:3px;}
 .rank-disp,.rank-input{
   margin-left:auto;flex-shrink:0;width:4.2em;max-width:38%;
@@ -176,7 +178,7 @@ header h1{
 .ttag.stam{color:var(--ok);}
 .ttag.idle{color:var(--idle-c);}
 .tval{
-  font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;font-family:"M PLUS Rounded 1c",sans-serif;
+  font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;font-family:"M PLUS Rounded 1c","Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;
   line-height:1.05;white-space:nowrap;overflow:hidden;min-width:7.2ch;display:inline-block;letter-spacing:.01em;
 }
 .tval.stam{color:var(--ok);}
@@ -184,7 +186,9 @@ header h1{
 .tval.full{color:var(--stam-full-c)!important;}
 .tval.urgent{color:var(--stam-full-c)!important;}
 .tsub{font-size:10px;color:var(--ink);height:13px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-variant-numeric:tabular-nums;}
-.tsub-cur{font-weight:700;color:var(--stam-cur-c);font-family:"M PLUS Rounded 1c",sans-serif;}
+.tsub-cur{font-weight:700;color:#ffb35e;font-family:"M PLUS Rounded 1c","Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;}
+.tsub-sep{font-weight:600;color:var(--ink-dim);margin:0 1px;}
+.tsub-max{font-weight:700;color:var(--stam-cur-c);font-family:"M PLUS Rounded 1c","Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;}
 .tsub-clock{margin-left:4px;}
 .pbar{height:3px;background:var(--line);border-radius:2px;overflow:hidden;margin-top:3px;}
 .pbar-fill{height:100%;border-radius:2px;transition:width .3s linear;}
@@ -196,13 +200,29 @@ header h1{
 .edit-panel{
   display:none;position:absolute;left:0;right:0;top:calc(100% + 6px);background:var(--bg-card);
   border:1px solid var(--violet);border-radius:12px;padding:10px 12px;
-  box-shadow:0 12px 28px rgba(0,0,0,.55);z-index:31;
+  z-index:31;
+  contain:layout style;
 }
 .card.g0 .edit-panel{border-color:var(--g0);}
 .card.g1 .edit-panel{border-color:var(--g1);}
 .card.g2 .edit-panel{border-color:var(--g2);}
 .card.open .edit-panel{display:block;}
-.backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:25;}
+.backdrop{
+  display:none;
+  position:fixed;
+  z-index:25;
+  /* ブラウザのメニューバー出し入れで足りなくなるのを防ぐため、表示領域より大きく被せる */
+  top:-30vh;
+  left:0;
+  right:0;
+  height:160vh;
+  width:100%;
+  background:#000;
+  opacity:.72;
+  pointer-events:auto;
+  -webkit-transform:translateZ(0);
+  transform:translateZ(0);
+}
 .backdrop.show{display:block;}
 .ebtn.idle.armed{background:linear-gradient(135deg,#ffb4b4,#ff6b6b);color:#2a0a0a;animation:armPulse .8s ease-in-out infinite;}
 @keyframes armPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.06);}}
@@ -219,6 +239,73 @@ header h1{
 .ebtn.idle{background:linear-gradient(135deg,#c4b5fd,#9c86ff);color:#1a1030;}
 .ebtn-gap{flex:1;}
 footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;display:none;}
+
+.gsection{margin-top:14px;}
+.gsection-title{
+  font-size:11px;color:var(--ink-dim);font-weight:700;margin:0 0 6px 2px;
+  display:flex;align-items:baseline;gap:6px;
+}
+.gsection-note{font-size:9.5px;font-weight:400;color:#5c6785;}
+.gwrap{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.gcard{
+  background:var(--bg-card);border:1.5px solid #4a5578;border-radius:12px;padding:7px 9px;
+  cursor:pointer;position:relative;-webkit-tap-highlight-color:transparent;
+}
+.gcard.open{border-color:var(--stam-cur-c);z-index:30;}
+.grow-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;}
+.gname-disp,.gname-input{
+  font-size:10.5px;font-weight:700;color:var(--ink);
+  font-family:inherit;line-height:1.2;max-width:70%;min-width:2.5em;
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+}
+.gname-disp{
+  display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  border-bottom:1px dashed transparent;cursor:pointer;
+  -webkit-user-select:none!important;user-select:none!important;
+  -webkit-touch-callout:none!important;touch-action:manipulation;
+}
+.gname-disp.empty{color:var(--ink-dim);font-weight:500;}
+.gname-input{
+  display:none;background:transparent;border:none;border-bottom:1px dashed var(--violet);
+  outline:none;caret-color:var(--ink);width:6em;max-width:75%;
+  -webkit-user-select:text;user-select:text;-webkit-touch-callout:default;
+}
+.gname-input.editing{display:inline-block;}
+.gedit-row-oneline{display:flex;align-items:center;gap:5px;flex-wrap:nowrap;}
+.gedit-row-oneline > input[type="number"]{width:42px;flex-shrink:0;}
+.gedit-max{margin-left:auto;display:flex;align-items:center;gap:4px;flex-shrink:0;opacity:.85;}
+.gedit-max label{font-size:9.5px;color:var(--ink-dim);white-space:nowrap;}
+.gedit-max input[type="number"]{width:42px;}
+.gval{
+  font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;font-family:"M PLUS Rounded 1c","Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;
+  color:var(--ok);line-height:1.1;
+}
+.gval.full{color:var(--stam-full-c)!important;}
+.gsub{font-size:10px;color:var(--ink);margin-top:1px;}
+.gsub .gsub-cur{font-weight:700;color:#ffb35e;font-family:"M PLUS Rounded 1c","Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;}
+.gsub .gsub-sep{font-weight:600;color:var(--ink-dim);margin:0 1px;}
+.gsub .gsub-max{font-weight:700;color:var(--stam-cur-c);font-family:"M PLUS Rounded 1c","Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;}
+.gsub .gsub-clock{color:var(--ink);margin-left:3px;}
+.gbar{height:3px;background:var(--line);border-radius:2px;overflow:hidden;margin-top:5px;}
+.gbar-fill{height:100%;border-radius:2px;background:var(--ok);transition:width .3s linear;}
+.gbar-fill.full{background:var(--stam-full-c)!important;}
+.gmark{
+  width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:900;color:transparent;cursor:pointer;
+  border:1.5px solid var(--line);background:transparent;opacity:.45;outline:none;user-select:none;
+  flex-shrink:0;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;
+  appearance:none;-webkit-appearance:none;font-family:inherit;padding:0;
+}
+.gmark.show{opacity:1;color:#fff;border-color:var(--stam-cur-c);background:transparent;}
+.gedit{display:none;margin-top:7px;padding-top:7px;border-top:1px dashed var(--line);}
+.gcard.open .gedit{display:block;}
+.gedit-row{display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
+.gedit-row label{font-size:9.5px;color:var(--ink-dim);}
+.gedit-row input[type="number"]{
+  width:42px;background:var(--bg-inset);border:1px solid var(--line);border-radius:6px;
+  color:var(--ink);padding:4px 5px;font-size:11.5px;font-family:inherit;
+}
+.gedit-row .ebtn{padding:5px 8px;font-size:10.5px;}
 </style>
 </head>
 <body>
@@ -229,6 +316,10 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
     <span class="daily-progress" id="dailyProgress"></span>
   </div>
   <div class="grid" id="grid"></div>
+  <div class="gsection">
+    <div class="gsection-title">Gジェネ エターナル<span class="gsection-note">(テスト・深夜1時リセット)</span></div>
+    <div class="gwrap" id="gwrap"></div>
+  </div>
   <div class="backdrop" id="backdrop" onclick="closeAllPanels()"></div>
 </div>
 <footer><span id="saveStamp">読み込み中…</span></footer>
@@ -265,7 +356,19 @@ function rankFromStamMax(max){
   return Math.max(RANK_MIN, Math.min(RANK_MAX, r));
 }
 
-let state = { slots: Array.from({ length: N }, defaultSlot), dailyDate: '' };
+// ---- Gジェネエターナル（テスト） ----
+const GN = 2;
+const G_STAM_INTERVAL = 5 * 60 * 1000; // APは5分ごとに1回復
+const G_RESET_HOUR = 1; // デイリーは深夜1時にリセット（本体の6枠とは別）
+const defaultGSlot = () => ({
+  label: '',
+  stamCurrent: 0, stamMax: 130, stamStart: null, stamRunning: false, missionDone: false
+});
+let gOpenIdx = -1;
+let gRefs = [];
+
+let state = { slots: Array.from({ length: N }, defaultSlot), dailyDate: '', g: { slots: Array.from({ length: GN }, defaultGSlot), dailyDate: '' } };
+
 let openIdx = -1;
 let storageOk = true;
 let textEditIdx = -1; // 名前 or ランク編集中の枠
@@ -278,11 +381,12 @@ let lastProgressSig = '';
 let lastDailyLabel = '';
 
 function groupClass(i){ return 'g' + (Math.floor(i / 2) % 3); }
-function gameDayStr(){
+function dayStrAt(resetHour){
   const d = new Date();
-  if (d.getHours() < 5) d.setDate(d.getDate() - 1);
+  if (d.getHours() < resetHour) d.setDate(d.getDate() - 1);
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
+function gameDayStr(){ return dayStrAt(5); }
 function formatDateJP(iso){
   if (!iso) return '—';
   const p = iso.split('-');
@@ -349,7 +453,7 @@ function renderDailyProgress(){
   if (sig === lastProgressSig) return;
   lastProgressSig = sig;
   if (count >= N) {
-    el.innerHTML = '<span class="rainbow-badge">◎</span>';
+    el.innerHTML = '<span class="complete-badge">COMPLETE</span>';
     return;
   }
   let html = '';
@@ -363,7 +467,7 @@ function renderDailyProgress(){
 function parseStoredState(){
   if (typeof localStorage === 'undefined') throw new Error('no localStorage');
   const raw = localStorage.getItem(STORAGE_KEY);
-  const result = { slots: null, dailyDate: gameDayStr() };
+  const result = { slots: null, dailyDate: gameDayStr(), g: { slots: null, dailyDate: dayStrAt(G_RESET_HOUR) } };
   if (raw) {
     const parsed = JSON.parse(raw);
     if (parsed.slots && Array.isArray(parsed.slots) && parsed.slots.length === N) {
@@ -404,6 +508,30 @@ function parseStoredState(){
       });
     }
     result.dailyDate = typeof parsed.dailyDate === 'string' ? parsed.dailyDate : gameDayStr();
+
+    result.g = result.g || { slots: null, dailyDate: dayStrAt(G_RESET_HOUR) };
+    if (parsed.g && Array.isArray(parsed.g.slots) && parsed.g.slots.length === GN) {
+      const now2 = Date.now();
+      result.g.slots = parsed.g.slots.map(s => {
+        const o = defaultGSlot();
+        if (!s || typeof s !== 'object') return o;
+        o.label = typeof s.label === 'string' ? s.label : '';
+        o.stamMax = Math.max(1, Math.min(999, safeNum(s.stamMax, 130)));
+        o.stamCurrent = Math.max(0, Math.min(o.stamMax, safeNum(s.stamCurrent, 0)));
+        const ss = safeNum(s.stamStart, null);
+        if (ss && ss > 0 && ss < Date.now() + 60000 && s.stamRunning) {
+          const elapsed = Math.max(0, now2 - ss);
+          const recovered = Math.floor(elapsed / G_STAM_INTERVAL);
+          o.stamCurrent = Math.min(o.stamMax, o.stamCurrent + recovered);
+          o.stamStart = ss + recovered * G_STAM_INTERVAL;
+          o.stamRunning = true;
+          if (o.stamCurrent >= o.stamMax) { o.stamCurrent = o.stamMax; o.stamStart = ss; }
+        }
+        o.missionDone = !!s.missionDone;
+        return o;
+      });
+      result.g.dailyDate = typeof parsed.g.dailyDate === 'string' ? parsed.g.dailyDate : dayStrAt(G_RESET_HOUR);
+    }
   }
   return result;
 }
@@ -413,6 +541,8 @@ function loadState(){
     const parsed = parseStoredState();
     if (parsed.slots) state.slots = parsed.slots;
     state.dailyDate = parsed.dailyDate;
+    if (parsed.g && parsed.g.slots) state.g.slots = parsed.g.slots;
+    if (parsed.g) state.g.dailyDate = parsed.g.dailyDate;
   } catch (e) {
     storageOk = false;
     setSaveStamp('このブラウザでは保存機能が使えません');
@@ -429,6 +559,8 @@ function resyncFromStorage(){
     const parsed = parseStoredState();
     if (parsed.slots) state.slots = parsed.slots;
     state.dailyDate = parsed.dailyDate;
+    if (parsed.g && parsed.g.slots) state.g.slots = parsed.g.slots;
+    if (parsed.g) state.g.dailyDate = parsed.g.dailyDate;
   } catch (e) { return; }
   for (let i = 0; i < N; i++) {
     const s = state.slots[i];
@@ -444,10 +576,18 @@ function resyncFromStorage(){
       }
       const rankDisp = document.getElementById('rank-disp-' + i);
       const rankEl = document.getElementById('rank-' + i);
-      if (rankDisp && document.activeElement !== rankEl) rankDisp.textContent = 'R.' + (s.rank || 1);
+      if (rankDisp && document.activeElement !== rankEl) rankDisp.textContent = 'Lv.' + (s.rank || 1);
       if (rankEl && document.activeElement !== rankEl) rankEl.value = String(s.rank || 1);
     }
     if (r.mark) { r.mark.classList.toggle('show', !!s.missionDone); r.mark.setAttribute('aria-pressed', s.missionDone ? 'true' : 'false'); }
+  }
+  for (let i = 0; i < GN; i++) {
+    const gs = state.g.slots[i];
+    const gr = gRefs[i];
+    if (!gr) continue;
+    const curEl = gr.curEl;
+    if (curEl && document.activeElement !== curEl) curEl.value = String(gs.stamCurrent);
+    if (gr.mark) gr.mark.classList.toggle('show', !!gs.missionDone);
   }
   lastProgressSig = '';
   lastDailyLabel = '';
@@ -478,6 +618,21 @@ function getStamInfo(s, now){
   const nextIn = STAM_INTERVAL - (elapsed % STAM_INTERVAL);
   const need = s.stamMax - current;
   const fullIn = (need - 1) * STAM_INTERVAL + nextIn;
+  return { current, fullIn, fullAt: now + fullIn, isFull: false, pct: s.stamMax ? Math.min(100, (current / s.stamMax) * 100) : 0 };
+}
+
+function getGStamInfo(s, now){
+  if (!s.stamRunning || !s.stamStart) {
+    const cur = s.stamCurrent;
+    return { current: cur, fullIn: null, fullAt: null, isFull: cur >= s.stamMax, pct: s.stamMax ? (cur / s.stamMax) * 100 : 0 };
+  }
+  const elapsed = Math.max(0, now - s.stamStart);
+  const recovered = Math.floor(elapsed / G_STAM_INTERVAL);
+  const current = Math.min(s.stamMax, s.stamCurrent + recovered);
+  if (current >= s.stamMax) return { current: s.stamMax, fullIn: 0, fullAt: null, isFull: true, pct: 100 };
+  const nextIn = G_STAM_INTERVAL - (elapsed % G_STAM_INTERVAL);
+  const need = s.stamMax - current;
+  const fullIn = (need - 1) * G_STAM_INTERVAL + nextIn;
   return { current, fullIn, fullAt: now + fullIn, isFull: false, pct: s.stamMax ? Math.min(100, (current / s.stamMax) * 100) : 0 };
 }
 
@@ -540,7 +695,7 @@ function build(){
           '<input class="name-input" id="name-' + i + '" value="' + escapeHtml(s.label) + '" placeholder="スロット ' + (i + 1) + '"' +
           ' inputmode="text" enterkeyhint="done" aria-label="スロット' + (i + 1) + 'の名前">' +
 
-          '<span class="rank-disp" id="rank-disp-' + i + '">R.' + (s.rank || 1) + '</span>' +
+          '<span class="rank-disp" id="rank-disp-' + i + '">Lv.' + (s.rank || 1) + '</span>' +
           '<input class="rank-input" id="rank-' + i + '" value="' + (s.rank || 1) + '"' +
           ' inputmode="numeric" enterkeyhint="done" aria-label="プレイヤレベル">' +
 
@@ -550,7 +705,7 @@ function build(){
           '<div class="tblock">' +
             '<div class="ttag stam">スタミナ</div>' +
             '<div class="tval stam" id="stam-val-' + i + '">—:—</div>' +
-            '<div class="tsub"><span class="tsub-cur" id="stam-subcur-' + i + '"></span><span class="tsub-clock" id="stam-subclock-' + i + '"></span></div>' +
+            '<div class="tsub"><span class="tsub-cur" id="stam-subcur-' + i + '"></span><span class="tsub-sep" id="stam-subsep-' + i + '">/</span><span class="tsub-max" id="stam-submax-' + i + '"></span><span class="tsub-clock" id="stam-subclock-' + i + '"></span></div>' +
             '<div class="pbar"><div class="pbar-fill stam" id="stam-bar-' + i + '" style="width:0%"></div></div>' +
           '</div>' +
           '<div class="tblock">' +
@@ -576,6 +731,59 @@ function build(){
   grid.innerHTML = html;
 
   cacheRefs();
+  _lastOpenIdx = -1;
+  buildG();
+}
+
+function buildG(){
+  const wrap = document.getElementById('gwrap');
+  if (!wrap) return;
+  let html = '';
+  for (let i = 0; i < GN; i++) {
+    const s = state.g.slots[i];
+    html +=
+      '<div class="gcard" id="gcard-' + i + '" data-gaction="card" data-idx="' + i + '">' +
+        '<div class="grow-top">' +
+          '<span class="gname-disp' + (s.label ? '' : ' empty') + '" id="g-name-disp-' + i + '">' +
+            (s.label ? escapeHtml(s.label) : ('G' + (i + 1))) + '</span>' +
+          '<input class="gname-input" id="g-name-' + i + '" value="' + escapeHtml(s.label || '') + '"' +
+          ' inputmode="text" enterkeyhint="done" aria-label="G' + (i + 1) + 'の名前">' +
+          '<button type="button" class="gmark' + (s.missionDone ? ' show' : '') + '" id="g-mark-' + i + '"' +
+          ' data-gaction="mark" data-idx="' + i + '" tabindex="-1" aria-label="G' + (i + 1) + 'のデイリー完了">✓</button>' +
+        '</div>' +
+        '<div class="gval" id="g-val-' + i + '">—:—</div>' +
+        '<div class="gsub"><span class="gsub-cur" id="g-subcur-' + i + '"></span><span class="gsub-sep" id="g-subsep-' + i + '">/</span><span class="gsub-max" id="g-submax-' + i + '"></span><span class="gsub-clock" id="g-subclock-' + i + '"></span></div>' +
+        '<div class="gbar"><div class="gbar-fill" id="g-bar-' + i + '" style="width:0%"></div></div>' +
+        '<div class="gedit" id="g-edit-' + i + '">' +
+          '<div class="gedit-row gedit-row-oneline">' +
+            '<input type="number" id="g-cur-' + i + '" value="' + s.stamCurrent + '" min="0" max="999" inputmode="numeric">' +
+            '<button type="button" class="ebtn stam" data-gaction="update" data-idx="' + i + '">更新</button>' +
+            '<span class="gedit-max">' +
+              '<label>上限</label>' +
+              '<input type="number" id="g-max-' + i + '" value="' + s.stamMax + '" min="1" max="999" inputmode="numeric">' +
+            '</span>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+  }
+  wrap.innerHTML = html;
+  cacheRefsG();
+}
+
+function cacheRefsG(){
+  gRefs = [];
+  for (let i = 0; i < GN; i++) {
+    gRefs.push({
+      card: document.getElementById('gcard-' + i),
+      val: document.getElementById('g-val-' + i),
+      subCur: document.getElementById('g-subcur-' + i),
+      subMax: document.getElementById('g-submax-' + i),
+      subClock: document.getElementById('g-subclock-' + i),
+      bar: document.getElementById('g-bar-' + i),
+      mark: document.getElementById('g-mark-' + i),
+      curEl: document.getElementById('g-cur-' + i)
+    });
+  }
 }
 
 function cacheRefs(){
@@ -585,6 +793,8 @@ function cacheRefs(){
       card: document.getElementById('card-' + i),
       stamVal: document.getElementById('stam-val-' + i),
       stamSubCur: document.getElementById('stam-subcur-' + i),
+      stamSubSep: document.getElementById('stam-subsep-' + i),
+      stamSubMax: document.getElementById('stam-submax-' + i),
       stamSubClock: document.getElementById('stam-subclock-' + i),
       stamBar: document.getElementById('stam-bar-' + i),
       idleVal: document.getElementById('idle-val-' + i),
@@ -596,55 +806,63 @@ function cacheRefs(){
   }
 }
 
+function softBlur(){
+  const ae = document.activeElement;
+  if (!ae || ae === document.body || !ae.blur) return;
+  requestAnimationFrame(() => { try { ae.blur(); } catch (e) {} });
+}
 function onCardClick(i, ev){
   const t = ev.target;
   if (t.closest && (t.closest('input') || t.closest('button') || t.closest('.name-disp') || t.closest('.rank-disp') || t.closest('.name-input') || t.closest('.rank-input'))) return;
-  // 名前・ランク編集中: テキスト編集だけ閉じる（タイマー編集は開かない）
   if (textEditIdx >= 0) {
-    const ae = document.activeElement;
-    if (ae && ae.classList && (ae.classList.contains('name-input') || ae.classList.contains('rank-input'))) {
-      ae.blur();
-    }
+    softBlur();
     textEditIdx = -1;
     suppressOpenAllUntil = Date.now() + 150;
     return;
   }
-  // blur 経由で閉じた直後の同一タップでも開かない
-  if (Date.now() < suppressOpenAllUntil) {
-    return;
-  }
+  if (Date.now() < suppressOpenAllUntil) return;
   disarmAllIdle();
-  // 開いている枠の上側タップで閉じる / パネル内は閉じない
   if (openIdx === i) {
     if (t.closest && t.closest('.edit-panel')) return;
-    if (document.activeElement) document.activeElement.blur();
     restoreEditInputs(i);
     openIdx = -1;
     updateOpenState();
+    softBlur();
     return;
   }
-  if (document.activeElement) document.activeElement.blur();
   const prevOpen = openIdx;
   openIdx = i;
   updateOpenState();
   if (prevOpen >= 0) restoreEditInputs(prevOpen);
   prefillsStamCur(i);
+  softBlur();
 }
 
+let _lastOpenIdx = -1;
 function updateOpenState(){
   const editing = openIdx >= 0;
-  for (let i = 0; i < N; i++) {
-    if (refs[i] && refs[i].card) {
-      refs[i].card.classList.toggle('open', openIdx === i);
-      refs[i].card.setAttribute('aria-expanded', openIdx === i ? 'true' : 'false');
-    }
-    // 編集中は右のデイリー✓を触れなくする（暗転より上にいる誤タップ対策）
-    if (refs[i] && refs[i].mark) {
-      refs[i].mark.classList.toggle('disabled-by-edit', editing);
+  const prev = _lastOpenIdx;
+  // 変化した枠だけ class を更新
+  if (prev >= 0 && prev !== openIdx && refs[prev] && refs[prev].card) {
+    refs[prev].card.classList.remove('open');
+    refs[prev].card.setAttribute('aria-expanded', 'false');
+  }
+  if (openIdx >= 0 && refs[openIdx] && refs[openIdx].card) {
+    refs[openIdx].card.classList.add('open');
+    refs[openIdx].card.setAttribute('aria-expanded', 'true');
+  }
+  // デイリー✓無効化は「編集中フラグ」が変わったときだけ
+  if ((prev >= 0) !== editing) {
+    for (let i = 0; i < N; i++) {
+      if (refs[i] && refs[i].mark) {
+        refs[i].mark.classList.toggle('disabled-by-edit', editing);
+      }
     }
   }
+  const anyOpen = editing || gOpenIdx >= 0;
   const bd = document.getElementById('backdrop');
-  if (bd) bd.classList.toggle('show', editing);
+  if (bd) bd.classList.toggle('show', anyOpen);
+  _lastOpenIdx = openIdx;
 }
 
 
@@ -653,7 +871,7 @@ function endRankEditVisual(i){
   const el = document.getElementById('rank-' + i);
   const disp = document.getElementById('rank-disp-' + i);
   if (el) { el.classList.remove('editing'); el.value = String(state.slots[i].rank || 1); }
-  if (disp) { disp.style.display = ''; disp.textContent = 'R.' + (state.slots[i].rank || 1); }
+  if (disp) { disp.style.display = ''; disp.textContent = 'Lv.' + (state.slots[i].rank || 1); }
 }
 function endNameEditVisual(i){
   const el = document.getElementById('name-' + i);
@@ -713,10 +931,165 @@ function onNameBlur(i){
 
 function closeAllPanels(){
   disarmAllIdle();
-  if (document.activeElement) document.activeElement.blur();
   if (openIdx >= 0) restoreEditInputs(openIdx);
   openIdx = -1;
   updateOpenState();
+  if (gOpenIdx >= 0) restoreGEditInputs(gOpenIdx);
+  gOpenIdx = -1;
+  updateGOpenState();
+  softBlur();
+}
+
+// ---- Gジェネエターナル操作 ----
+function updateGOpenState(){
+  for (let i = 0; i < GN; i++) {
+    if (gRefs[i] && gRefs[i].card) gRefs[i].card.classList.toggle('open', gOpenIdx === i);
+  }
+  const anyOpen = openIdx >= 0 || gOpenIdx >= 0;
+  const bd = document.getElementById('backdrop');
+  if (bd) bd.classList.toggle('show', anyOpen);
+}
+function restoreGEditInputs(i){
+  if (i < 0 || i >= GN) return;
+  const s = state.g.slots[i];
+  const now = Date.now();
+  const live = s.stamRunning ? getGStamInfo(s, now).current : s.stamCurrent;
+  const curEl = document.getElementById('g-cur-' + i);
+  const maxEl = document.getElementById('g-max-' + i);
+  if (curEl) { curEl.value = String(live); curEl.dataset.prev = String(live); }
+  if (maxEl) { maxEl.value = String(s.stamMax); maxEl.dataset.prev = String(s.stamMax); }
+}
+
+function endGNameEditVisual(i){
+  const el = document.getElementById('g-name-' + i);
+  const disp = document.getElementById('g-name-disp-' + i);
+  const val = (state.g.slots[i] && state.g.slots[i].label) || '';
+  if (el) { el.classList.remove('editing'); el.value = val; }
+  if (disp) {
+    disp.style.display = '';
+    if (val) { disp.textContent = val; disp.classList.remove('empty'); }
+    else { disp.textContent = 'G' + (i + 1); disp.classList.add('empty'); }
+  }
+}
+function beginGNameEdit(i){
+  if (openIdx >= 0) { restoreEditInputs(openIdx); openIdx = -1; updateOpenState(); }
+  if (gOpenIdx >= 0) { restoreGEditInputs(gOpenIdx); gOpenIdx = -1; updateGOpenState(); }
+  for (let j = 0; j < GN; j++) endGNameEditVisual(j);
+  for (let j = 0; j < N; j++) { endNameEditVisual(j); endRankEditVisual(j); }
+  const el = document.getElementById('g-name-' + i);
+  const disp = document.getElementById('g-name-disp-' + i);
+  if (!el) return;
+  if (disp) disp.style.display = 'none';
+  el.classList.add('editing');
+  el.value = state.g.slots[i].label || '';
+  textEditIdx = 1000 + i; // G枠は 1000+
+  el.focus({ preventScroll: true });
+  const collapseSel = () => {
+    try { const n = el.value.length; el.setSelectionRange(n, n); } catch (e) {}
+  };
+  collapseSel();
+  setTimeout(collapseSel, 0);
+  setTimeout(collapseSel, 40);
+}
+function onGNameBlur(i){
+  const el = document.getElementById('g-name-' + i);
+  const disp = document.getElementById('g-name-disp-' + i);
+  if (!el) return;
+  const val = el.value;
+  state.g.slots[i].label = val;
+  clearTimeout(labelSaveTimer);
+  labelSaveTimer = setTimeout(saveState, 300);
+  el.classList.remove('editing');
+  if (disp) {
+    disp.style.display = '';
+    if (val) { disp.textContent = val; disp.classList.remove('empty'); }
+    else { disp.textContent = 'G' + (i + 1); disp.classList.add('empty'); }
+  }
+  if (textEditIdx === 1000 + i) textEditIdx = -1;
+  suppressOpenAllUntil = Date.now() + 150;
+}
+
+function onGCardClick(i, ev){
+  const t = ev.target;
+  if (t.closest && (t.closest('input') || t.closest('button') || t.closest('.gname-disp') || t.closest('.gname-input'))) return;
+  if (textEditIdx >= 0) {
+    const ae = document.activeElement;
+    if (ae && ae.classList && (ae.classList.contains('gname-input') || ae.classList.contains('name-input') || ae.classList.contains('rank-input'))) ae.blur();
+    textEditIdx = -1;
+    suppressOpenAllUntil = Date.now() + 150;
+    return;
+  }
+  if (Date.now() < suppressOpenAllUntil) return;
+  if (gOpenIdx === i) {
+    if (t.closest && t.closest('.gedit')) return;
+    if (document.activeElement) document.activeElement.blur();
+    restoreGEditInputs(i);
+    gOpenIdx = -1;
+    updateGOpenState();
+    return;
+  }
+  if (document.activeElement) document.activeElement.blur();
+  const prevOpen = gOpenIdx;
+  if (openIdx >= 0) { restoreEditInputs(openIdx); openIdx = -1; updateOpenState(); }
+  gOpenIdx = i;
+  updateGOpenState();
+  if (prevOpen >= 0) restoreGEditInputs(prevOpen);
+  const s = state.g.slots[i];
+  const now = Date.now();
+  const live = s.stamRunning ? getGStamInfo(s, now).current : s.stamCurrent;
+  const curEl = document.getElementById('g-cur-' + i);
+  if (curEl) { curEl.value = String(live); curEl.dataset.prev = String(live); }
+}
+function onGCurFocus(el){ el.dataset.prev = el.value; el.value = ''; }
+function onGCurBlur(i, el){ if (el.value === '') el.value = el.dataset.prev || state.g.slots[i].stamCurrent; }
+function onGMaxFocus(el){ el.dataset.prev = el.value; el.value = ''; }
+function onGMaxBlur(i, el){ if (el.value === '') el.value = el.dataset.prev || state.g.slots[i].stamMax; }
+function applyG(i){
+  const curEl = document.getElementById('g-cur-' + i);
+  const maxEl = document.getElementById('g-max-' + i);
+  let cur = parseInt(curEl.value, 10);
+  const max = parseInt(maxEl.value, 10);
+  if (isNaN(cur)) cur = state.g.slots[i].stamCurrent;
+  if (isNaN(max) || max <= 0) {
+    maxEl.style.borderColor = 'var(--danger)';
+    maxEl.focus();
+    setTimeout(() => { maxEl.style.borderColor = ''; }, 1500);
+    return;
+  }
+  if (document.activeElement) document.activeElement.blur();
+  state.g.slots[i].stamCurrent = Math.max(0, Math.min(cur, max));
+  state.g.slots[i].stamMax = max;
+  state.g.slots[i].stamStart = Date.now();
+  state.g.slots[i].stamRunning = true;
+  curEl.value = String(state.g.slots[i].stamCurrent);
+  saveState();
+  gOpenIdx = -1;
+  updateGOpenState();
+  renderG();
+}
+function toggleGMark(i){
+  const s = state.g.slots[i];
+  const mark = gRefs[i] && gRefs[i].mark;
+  s.missionDone = !s.missionDone;
+  saveState();
+  if (mark) {
+    mark.classList.toggle('show', s.missionDone);
+    mark.classList.remove('armed');
+    if (document.activeElement === mark) mark.blur();
+  }
+}
+
+
+function ensureGDailyDate(){
+  const today = dayStrAt(G_RESET_HOUR);
+  if (state.g.dailyDate !== today) {
+    state.g.dailyDate = today;
+    state.g.slots.forEach(s => { s.missionDone = false; });
+    for (let i = 0; i < gRefs.length; i++) {
+      if (gRefs[i].mark) gRefs[i].mark.classList.remove('show');
+    }
+    saveState();
+  }
 }
 
 function setLabel(i, val){
@@ -725,34 +1098,20 @@ function setLabel(i, val){
   labelSaveTimer = setTimeout(saveState, 300);
 }
 
-let markUncheckArm = {};
 function toggleMissionMark(i){
   const s = state.slots[i];
   const mark = refs[i] && refs[i].mark;
-  if (!s.missionDone) {
-    // チェックを入れるのはワンタップでOK
-    s.missionDone = true;
-    saveState();
-    if (mark) { mark.classList.add('show'); mark.setAttribute('aria-pressed', 'true'); if (document.activeElement === mark) mark.blur(); }
-    renderDailyProgress();
-    return;
+  s.missionDone = !s.missionDone;
+  saveState();
+  if (mark) {
+    mark.classList.toggle('show', s.missionDone);
+    mark.classList.remove('armed');
+    mark.setAttribute('aria-pressed', s.missionDone ? 'true' : 'false');
+    if (document.activeElement === mark) mark.blur();
   }
-  // 外す時だけダブルタップ確認
-  if (markUncheckArm[i] !== undefined) {
-    clearTimeout(markUncheckArm[i]);
-    delete markUncheckArm[i];
-    s.missionDone = false;
-    saveState();
-    if (mark) { mark.classList.remove('show', 'armed'); mark.setAttribute('aria-pressed', 'false'); if (document.activeElement === mark) mark.blur(); }
-    renderDailyProgress();
-  } else {
-    if (mark) mark.classList.add('armed');
-    markUncheckArm[i] = setTimeout(() => {
-      delete markUncheckArm[i];
-      if (mark) mark.classList.remove('armed');
-    }, 800);
-  }
+  renderDailyProgress();
 }
+
 
 function onCurFocus(el){ el.dataset.prev = el.value; el.value = ''; }
 function onCurBlur(i, el){ if (el.value === '') el.value = el.dataset.prev || state.slots[i].stamCurrent; }
@@ -833,7 +1192,7 @@ function onRankBlur(i){
   el.value = String(r);
   if (disp) {
     disp.style.display = '';
-    disp.textContent = 'R.' + r;
+    disp.textContent = 'Lv.' + r;
   }
   saveState();
   render();
@@ -888,26 +1247,28 @@ function render(){
       if (!r || !r.stamVal) continue;
       const stam = getStamInfo(s, now);
       const idle = getIdleInfo(s, now);
-      let stamMain, stamCls, stamCurTxt, stamClockTxt, stamBarCls;
+      let stamMain, stamCls, stamCurTxt, stamMaxTxt, stamClockTxt, stamBarCls;
       if (s.stamRunning) {
         if (stam.isFull) {
           stamMain = 'MAX'; stamCls = 'tval stam full';
-          stamCurTxt = stam.current + '/' + s.stamMax; stamClockTxt = '';
+          stamCurTxt = String(stam.current); stamMaxTxt = String(s.stamMax); stamClockTxt = '';
           stamBarCls = 'pbar-fill stam full';
         } else {
           stamMain = formatTime(stam.fullIn);
           const stamUrgent = stam.fullIn != null && stam.fullIn < URGENT_MS;
           stamCls = 'tval stam' + (stamUrgent ? ' urgent' : '');
-          stamCurTxt = stam.current + '/' + s.stamMax;
+          stamCurTxt = String(stam.current); stamMaxTxt = String(s.stamMax);
           stamClockTxt = formatClock(stam.fullAt); stamBarCls = 'pbar-fill stam';
         }
       } else {
         stamMain = '—:—'; stamCls = 'tval stam';
-        stamCurTxt = s.stamCurrent + '/' + s.stamMax; stamClockTxt = '';
+        stamCurTxt = String(s.stamCurrent); stamMaxTxt = String(s.stamMax); stamClockTxt = '';
         stamBarCls = 'pbar-fill stam';
       }
       setText(r.stamVal, stamMain); setClass(r.stamVal, stamCls);
-      setText(r.stamSubCur, stamCurTxt); setText(r.stamSubClock, stamClockTxt);
+      setText(r.stamSubCur, stamCurTxt);
+      setText(r.stamSubMax, stamMaxTxt);
+      setText(r.stamSubClock, stamClockTxt);
       setWidth(r.stamBar, stam.pct); setClass(r.stamBar, stamBarCls);
       setText(r.idleVal, idle.display);
       let idleCls = 'tval idle';
@@ -917,6 +1278,41 @@ function render(){
       setText(r.idleSub, idle.meta);
       setWidth(r.idleBar, idle.pct);
       setClass(r.idleBar, 'pbar-fill idle' + (idle.isFull ? ' full' : (idleCls.indexOf('urgent') >= 0 ? ' urgent' : '')));
+    }
+  } catch (e) { console.warn(e); }
+  renderG();
+}
+
+function renderG(){
+  try {
+    ensureGDailyDate();
+    const now = Date.now();
+    if (!gRefs.length) return;
+    for (let i = 0; i < GN; i++) {
+      const s = state.g.slots[i];
+      const r = gRefs[i];
+      if (!r || !r.val) continue;
+      const stam = getGStamInfo(s, now);
+      let main, cls, curTxt, maxTxt, clockTxt, barCls;
+      if (s.stamRunning) {
+        if (stam.isFull) {
+          main = 'MAX'; cls = 'gval full';
+          curTxt = String(stam.current); maxTxt = String(s.stamMax); clockTxt = '';
+          barCls = 'gbar-fill full';
+        } else {
+          main = formatTime(stam.fullIn);
+          cls = 'gval';
+          curTxt = String(stam.current); maxTxt = String(s.stamMax);
+          clockTxt = formatClock(stam.fullAt); barCls = 'gbar-fill';
+        }
+      } else {
+        main = '—:—'; cls = 'gval';
+        curTxt = String(s.stamCurrent); maxTxt = String(s.stamMax); clockTxt = '';
+        barCls = 'gbar-fill';
+      }
+      setText(r.val, main); setClass(r.val, cls);
+      setText(r.subCur, curTxt); setText(r.subMax, maxTxt); setText(r.subClock, clockTxt);
+      setWidth(r.bar, stam.pct); setClass(r.bar, barCls);
     }
   } catch (e) { console.warn(e); }
 }
@@ -948,7 +1344,7 @@ function setupDelegatedEvents(){
     if (action === 'card') onCardClick(i, ev);
     else if (action === 'update') applyStam(i);
     else if (action === 'receive') onReceiveClick(i, el);
-    else if (action === 'mark') toggleMissionMark(i);
+    else if (action === 'mark') { /* 長押しのみ */ }
   });
 
   grid.addEventListener('focusin', (ev) => {
@@ -980,19 +1376,23 @@ function setupDelegatedEvents(){
   const clearLp = () => { if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; } };
   const lpStart = (ev) => {
     const el = ev.target;
-    if (!el || !el.classList) return;
+    if (!el) return;
+    const markEl = el.closest && el.closest('.daily-mark');
     let mode = null;
-    if (el.classList.contains('name-disp')) mode = 'name';
-    else if (el.classList.contains('rank-disp')) mode = 'rank';
+    if (markEl) mode = 'mark';
+    else if (el.classList && el.classList.contains('name-disp')) mode = 'name';
+    else if (el.classList && el.classList.contains('rank-disp')) mode = 'rank';
     else return;
-    const i = Number((el.id || '').split('-').pop());
+    const idEl = markEl || el;
+    const i = Number((idEl.dataset && idEl.dataset.idx != null) ? idEl.dataset.idx : (idEl.id || '').split('-').pop());
     if (!Number.isFinite(i)) return;
     clearLp();
     const pt = (ev.touches && ev.touches[0]) ? ev.touches[0] : ev;
     lpX = pt.clientX; lpY = pt.clientY;
     lpTimer = setTimeout(() => {
       lpTimer = null;
-      if (mode === 'name') beginNameEdit(i);
+      if (mode === 'mark') toggleMissionMark(i);
+      else if (mode === 'name') beginNameEdit(i);
       else beginRankEdit(i);
     }, LP_MS);
   };
@@ -1022,8 +1422,83 @@ document.addEventListener('contextmenu', (ev) => {
   ev.preventDefault();
 }, { capture: true });
 
+function setupGDelegatedEvents(){
+  const wrap = document.getElementById('gwrap');
+  if (!wrap || wrap.dataset.delegated) return;
+  wrap.dataset.delegated = '1';
+
+  wrap.addEventListener('click', (ev) => {
+    const t = ev.target;
+    if (t.classList && (t.classList.contains('gname-disp') || t.classList.contains('gname-input'))) return;
+    if (t.closest && t.closest('input')) return;
+    const el = t.closest('[data-gaction]');
+    if (!el) return;
+    const action = el.dataset.gaction;
+    const i = Number(el.dataset.idx);
+    if (action === 'card') onGCardClick(i, ev);
+    else if (action === 'update') applyG(i);
+    else if (action === 'mark') { /* 長押しのみ */ }
+  });
+
+  wrap.addEventListener('focusin', (ev) => {
+    const t = ev.target;
+    if (!t.id) return;
+    if (t.id.indexOf('g-cur-') === 0) onGCurFocus(t);
+    else if (t.id.indexOf('g-max-') === 0) onGMaxFocus(t);
+  });
+
+  wrap.addEventListener('focusout', (ev) => {
+    const t = ev.target;
+    if (!t.id) return;
+    if (t.id.indexOf('g-cur-') === 0) onGCurBlur(Number(t.id.split('-').pop()), t);
+    else if (t.id.indexOf('g-max-') === 0) onGMaxBlur(Number(t.id.split('-').pop()), t);
+    else if (t.classList && t.classList.contains('gname-input')) onGNameBlur(Number(t.id.split('-').pop()));
+  });
+
+  // G名前: 長押しで編集（ドットアビス側と同じ）
+  let glpTimer = null;
+  let glpX = 0, glpY = 0;
+  const GLP_MS = 500;
+  const GLP_MOVE2 = 12 * 12;
+  const clearGLp = () => { if (glpTimer) { clearTimeout(glpTimer); glpTimer = null; } };
+  const glpStart = (ev) => {
+    const el = ev.target;
+    if (!el) return;
+    const markEl = el.closest && el.closest('.gmark');
+    let mode = null;
+    if (markEl) mode = 'mark';
+    else if (el.classList && el.classList.contains('gname-disp')) mode = 'name';
+    else return;
+    const idEl = markEl || el;
+    const i = Number((idEl.dataset && idEl.dataset.idx != null) ? idEl.dataset.idx : (idEl.id || '').split('-').pop());
+    if (!Number.isFinite(i)) return;
+    clearGLp();
+    const pt = (ev.touches && ev.touches[0]) ? ev.touches[0] : ev;
+    glpX = pt.clientX; glpY = pt.clientY;
+    glpTimer = setTimeout(() => {
+      glpTimer = null;
+      if (mode === 'mark') toggleGMark(i);
+      else beginGNameEdit(i);
+    }, GLP_MS);
+  };
+  const glpMove = (ev) => {
+    if (!glpTimer) return;
+    const pt = (ev.touches && ev.touches[0]) ? ev.touches[0] : ev;
+    const dx = pt.clientX - glpX, dy = pt.clientY - glpY;
+    if (dx * dx + dy * dy > GLP_MOVE2) clearGLp();
+  };
+  wrap.addEventListener('touchstart', glpStart, { passive: true });
+  wrap.addEventListener('touchmove', glpMove, { passive: true });
+  wrap.addEventListener('touchend', clearGLp, { passive: true });
+  wrap.addEventListener('touchcancel', clearGLp, { passive: true });
+  wrap.addEventListener('mousedown', (ev) => { if (ev.button === 0) glpStart(ev); });
+  wrap.addEventListener('mousemove', glpMove);
+  wrap.addEventListener('mouseup', clearGLp);
+}
+
 loadState();
 setupDelegatedEvents();
+setupGDelegatedEvents();
 startTicking();
 const startupGraceUntil = Date.now() + 3000;
 document.addEventListener('visibilitychange', () => {
@@ -1035,17 +1510,6 @@ document.addEventListener('visibilitychange', () => {
     render();
   }
 });
-window.addEventListener('pageshow', () => {
-  startTicking();
-  render();
-});
-window.addEventListener('focus', () => {
-  if (!document.hidden) {
-    startTicking();
-    render();
-  }
-});
-
 // 同じアプリを別タブで開いている場合、片方の保存でもう片方が古いデータのまま
 // 上書きしてしまわないよう、他タブの保存を検知したらこのタブのデータも同期する
 window.addEventListener('storage', (ev) => {
