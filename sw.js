@@ -1,6 +1,6 @@
 /* 深淵タイマー Service Worker */
 /* デプロイのたびに CACHE_NAME を上げると、古いキャッシュを捨てて新版へ切り替わる */
-const CACHE_NAME = 'dotabyss-timer-v3';
+const CACHE_NAME = 'dotabyss-timer-v4';
 const PRECACHE = [
   './',
   './index.html',
@@ -33,29 +33,11 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
 
   const url = new URL(req.url);
+  // 同一オリジンのリソースのみを対象にする
   if (url.origin !== self.location.origin) return;
 
-  // HTML（画面本体）はネット優先 → 更新がすぐ見える。失敗時のみキャッシュ
-  const isHTML =
-    req.mode === 'navigate' ||
-    (req.headers.get('accept') || '').includes('text/html') ||
-    url.pathname.endsWith('.html') ||
-    url.pathname.endsWith('/');
-
-  if (isHTML) {
-    event.respondWith(
-      fetch(req).then((res) => {
-        if (res && res.ok) {
-          const copy = res.clone();
-          caches.open(CACHE_NAME).then((c) => c.put(req, copy));
-        }
-        return res;
-      }).catch(() => caches.match(req).then((c) => c || caches.match('./index.html')))
-    );
-    return;
-  }
-
-  // その他同一オリジン: キャッシュ優先、裏で更新
+  // 全リソース（HTML含む）：Stale-While-Revalidate 戦略
+  // キャッシュがあれば即表示し、裏で最新版を取得・更新する
   event.respondWith(
     caches.match(req).then((cached) => {
       const fetching = fetch(req).then((res) => {
@@ -64,8 +46,14 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_NAME).then((c) => c.put(req, copy));
         }
         return res;
-      }).catch(() => cached);
-      return cached || fetching;
+      }).catch(() => {
+        // オフライン等でネットワークエラーの場合、キャッシュを返す
+        return cached;
+      });
+
+      // キャッシュがあれば即返却、無ければネットワーク取得を待つ
+      // （※画面遷移時のフォールバックとして ./index.html も用意）
+      return cached || fetching.catch(() => caches.match('./index.html'));
     })
   );
 });
