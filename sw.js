@@ -2,7 +2,7 @@
 // アプリ本体を端末にキャッシュして、電波が無い/機内モードでも開けるようにします。
 const CACHE_NAME = 'dotabyss-timer-v1';
 const ASSETS = [
-  './dotabyss-unified.html',
+  './index.html',
   './manifest.json',
   './icon-192.png',
   './icon-512.png',

@@ -27,7 +27,7 @@
   --stam-cur-c:#6fe8ff; --idle-c:#ffd166;
 }
 *{box-sizing:border-box;}
-html,body{margin:0;padding:0;}
+html,body{margin:0;padding:0;overscroll-behavior:none;}
 body{
   background:radial-gradient(ellipse at 20% -10%,#1a2035 0%,transparent 55%),
              radial-gradient(ellipse at 90% 10%,#201530 0%,transparent 50%), var(--bg);
@@ -37,6 +37,7 @@ body{
   padding:12px 10px 32px;
   -webkit-tap-highlight-color:transparent;
   touch-action:manipulation;
+  overscroll-behavior-y:none;
   -webkit-user-select:none;user-select:none;
   -webkit-touch-callout:none;
 }
@@ -91,6 +92,9 @@ header h1{
 .grid{display:grid;grid-template-columns:1fr;gap:6px;margin-top:6px;}
 @media (min-width:620px){.grid{grid-template-columns:1fr 1fr;}}
 .card-row{display:flex;align-items:center;gap:11px;}
+.card-row:nth-child(3),.card-row:nth-child(5){
+  margin-top:9px;padding-top:9px;border-top:1px dashed #333f5c;
+}
 .card{
   background:var(--bg-card);border:1px solid var(--line);border-radius:12px;padding:7px 11px;
   cursor:pointer;position:relative;-webkit-tap-highlight-color:transparent;
@@ -214,7 +218,7 @@ header h1{
 .ebtn.stam{background:linear-gradient(135deg,#8ec5ff,#5b9dff);color:#0b1220;}
 .ebtn.idle{background:linear-gradient(135deg,#c4b5fd,#9c86ff);color:#1a1030;}
 .ebtn-gap{flex:1;}
-footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;}
+footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;display:none;}
 </style>
 </head>
 <body>
