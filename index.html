@@ -1635,6 +1635,7 @@ loadState();
 setupDelegatedEvents();
 setupGDelegatedEvents();
 startTicking();
+const startupGraceUntil = Date.now() + 3000;
 
 // ---- 画面復帰時のタイマー同期処理 ----
 function resumeTicking(){
@@ -1644,6 +1645,7 @@ function resumeTicking(){
 
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
+    if (Date.now() < startupGraceUntil) return;
     stopTicking();
   } else {
     resumeTicking();
