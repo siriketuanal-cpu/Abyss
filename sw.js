@@ -30,7 +30,7 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// 同一オリジン: キャッシュ即表示 + 裏で更新（2回目以降の起動を速く）
+// 同一オリジン: キャッシュ即表示 + 裏で更新
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
