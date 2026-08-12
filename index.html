@@ -15,8 +15,6 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="深淵">
 
-<noscript>
-</noscript>
 <style>
 :root{
   --bg:#000000; --bg-panel:#000000; --bg-card:#000000; --bg-inset:#111111;
@@ -192,15 +190,77 @@ input,textarea{
 .pbar-fill.idle.full{background:var(--stam-full-c)!important;}
 .pbar-fill.idle.urgent{background:var(--stam-full-c)!important;}
 .edit-panel{
-  display:none;position:absolute;left:0;right:0;top:calc(100% + 6px);background:#000;
+  display:none;position:absolute;top:calc(100% + 6px);background:#000;
   border:1px solid var(--violet);border-radius:12px;padding:10px 12px;
   z-index:31;
   contain:layout style;
+  box-sizing:border-box;
+  width:calc(50% - 4px);
+  left:0;right:auto;
 }
 .card.g0 .edit-panel{border-color:var(--g0);}
 .card.g1 .edit-panel{border-color:var(--g1);}
 .card.g2 .edit-panel{border-color:var(--g2);}
 .card.open .edit-panel{display:block;}
+.edit-panel-split{display:flex;align-items:center;gap:6px;width:100%;}
+.edit-side{display:flex;align-items:center;width:100%;min-width:0;}
+.edit-side-divider{display:none;}
+/* スタミナ編集: 入力はGジェネと同じ黒ボックス・左寄せ / 更新は中央〜やや右 */
+.edit-side-stam{
+  justify-content:flex-start;
+  position:relative;
+  gap:0;
+  min-height:34px;
+}
+.edit-side-stam input[type="number"]{
+  width:42px;
+  flex:0 0 42px;
+  background:var(--bg-inset);
+  border:1px solid #4a5a78;
+  border-radius:6px;
+  color:var(--ink);
+  padding:4px 5px;
+  font-size:11.5px;
+  font-family:inherit;
+  text-align:center;
+  box-sizing:border-box;
+}
+.edit-side-stam .ebtn.stam{
+  position:absolute;
+  left:58%;
+  transform:translateX(-50%);
+  padding:6px 12px;
+  font-size:11.5px;
+  border-radius:8px;
+  white-space:nowrap;
+}
+/* 放置側は中央寄せのまま */
+.edit-side-idle{justify-content:center;}
+.edit-side-idle .ebtn.idle{
+  padding:6px 12px;
+  font-size:11.5px;
+  border-radius:8px;
+  white-space:nowrap;
+}
+/* 左右どちらか半分にパネルを出す */
+.card.open.mode-stam .edit-panel{
+  left:0;right:auto;width:calc(50% - 4px);
+  border-color:var(--ok);
+}
+.card.open.mode-idle .edit-panel{
+  left:auto;right:0;width:calc(50% - 4px);
+  border-color:var(--idle-c);
+}
+.card.open.mode-stam .edit-side-idle{display:none !important;}
+.card.open.mode-idle .edit-side-stam{display:none !important;}
+/* 名前行の左右タップ分割 */
+.row-top{position:relative;}
+.row-hit{position:absolute;top:0;bottom:0;z-index:1;}
+.row-hit-stam{left:0;width:50%;}
+.row-hit-idle{right:0;width:50%;}
+.row-top .name-disp,.row-top .name-input,
+.row-top .rank-disp,.row-top .rank-input{position:relative;z-index:2;}
+
 .backdrop{
   display:none;
   position:fixed;
@@ -266,7 +326,7 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 }
 .gname-input.editing{display:inline-block;}
 .gedit-row-oneline{display:flex;align-items:center;gap:5px;flex-wrap:nowrap;}
-.gedit-row-oneline > input[type="number"]{width:42px;flex-shrink:0;}
+.gedit-row-oneline > input[type="number"]{width:42px;flex-shrink:0;text-align:center;}
 .gedit-max{margin-left:auto;display:flex;align-items:center;gap:3px;flex-shrink:0;}
 .gmax-btn{
   width:26px;height:26px;border:1px solid #5a6a8a;border-radius:6px;
@@ -306,7 +366,7 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 .gedit-row label{font-size:9.5px;color:var(--ink-dim);}
 .gedit-row input[type="number"]{
   width:42px;background:var(--bg-inset);border:1px solid var(--line);border-radius:6px;
-  color:var(--ink);padding:4px 5px;font-size:11.5px;font-family:inherit;
+  color:var(--ink);padding:4px 5px;font-size:11.5px;font-family:inherit;text-align:center;
 }
 .gedit-row .ebtn{padding:5px 8px;font-size:10.5px;}
 </style>
@@ -320,7 +380,7 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   </div>
   <div class="grid" id="grid"></div>
   <div class="gsection">
-    <div class="gsection-title">Gジェネ エターナル<span class="gsection-note">(テスト・深夜1時リセット)</span></div>
+    <div class="gsection-title">Gジェネ<span class="gsection-note">深夜1時更新</span></div>
     <div class="gwrap" id="gwrap"></div>
   </div>
   <div class="backdrop" id="backdrop" onclick="closeAllPanels()"></div>
@@ -359,7 +419,7 @@ function rankFromStamMax(max){
   return Math.max(RANK_MIN, Math.min(RANK_MAX, r));
 }
 
-// ---- Gジェネエターナル（テスト） ----
+// ---- Gジェネ ----
 const GN = 2;
 const G_STAM_INTERVAL = 5 * 60 * 1000; // APは5分ごとに1回復
 const G_RESET_HOUR = 1; // デイリーは深夜1時にリセット（本体の6枠とは別）
@@ -373,6 +433,7 @@ let gRefs = [];
 let state = { slots: Array.from({ length: N }, defaultSlot), dailyDate: '', g: { slots: Array.from({ length: GN }, defaultGSlot), dailyDate: '' } };
 
 let openIdx = -1;
+let openMode = null;
 let storageOk = true;
 let textEditIdx = -1; // 名前 or ランク編集中の枠
 let suppressOpenAllUntil = 0; // テキスト編集を閉じた同一タップでタイマー編集が開くのを防ぐ
@@ -704,6 +765,8 @@ function build(){
       '<div class="card ' + groupClass(i) + '" id="card-' + i + '" data-action="card" data-idx="' + i + '"' +
       ' aria-expanded="false">' +
         '<div class="row-top">' +
+          '<span class="row-hit row-hit-stam" aria-hidden="true"></span>' +
+          '<span class="row-hit row-hit-idle" aria-hidden="true"></span>' +
           '<span class="name-disp' + (s.label ? '' : ' empty') + '" id="name-disp-' + i + '">' +
           (s.label ? escapeHtml(s.label) : ('スロット ' + (i + 1))) + '</span>' +
           '<input class="name-input" id="name-' + i + '" value="' + escapeHtml(s.label) + '" placeholder="スロット ' + (i + 1) + '"' +
@@ -716,13 +779,13 @@ function build(){
 
         '</div>' +
         '<div class="timers-row">' +
-          '<div class="tblock">' +
+          '<div class="tblock tblock-stam">' +
             '<div class="ttag stam">スタミナ</div>' +
             '<div class="tval stam" id="stam-val-' + i + '">—:—</div>' +
             '<div class="tsub"><span class="tsub-cur" id="stam-subcur-' + i + '"></span><span class="tsub-sep" id="stam-subsep-' + i + '">/</span><span class="tsub-max" id="stam-submax-' + i + '"></span><span class="tsub-clock" id="stam-subclock-' + i + '"></span></div>' +
             '<div class="pbar"><div class="pbar-fill stam" id="stam-bar-' + i + '" style="width:0%"></div></div>' +
           '</div>' +
-          '<div class="tblock">' +
+          '<div class="tblock tblock-idle">' +
             '<div class="ttag idle">放置報酬</div>' +
             '<div class="tval idle" id="idle-val-' + i + '">—:—</div>' +
             '<div class="tsub" id="idle-sub-' + i + '" class="idle-meta"></div>' +
@@ -730,11 +793,15 @@ function build(){
           '</div>' +
         '</div>' +
         '<div class="edit-panel" id="edit-' + i + '">' +
-          '<div class="edit-row edit-row-oneline">' +
-            '<input type="number" id="stam-cur-' + i + '" value="' + s.stamCurrent + '" min="0" max="999" inputmode="numeric" aria-label="現在のスタミナ">' +
-            '<button type="button" class="ebtn stam" data-action="update" data-idx="' + i + '">更新</button>' +
-            '<span class="ebtn-gap"></span>' +
-            '<button type="button" class="ebtn idle" id="recv-btn-' + i + '" data-action="receive" data-idx="' + i + '">受取</button>' +
+          '<div class="edit-panel-split">' +
+            '<div class="edit-side edit-side-stam">' +
+              '<input type="number" id="stam-cur-' + i + '" value="' + s.stamCurrent + '" min="0" max="999" inputmode="numeric" aria-label="現在のスタミナ">' +
+              '<button type="button" class="ebtn stam" data-action="update" data-idx="' + i + '">更新</button>' +
+            '</div>' +
+            '<div class="edit-side-divider" aria-hidden="true"></div>' +
+            '<div class="edit-side edit-side-idle">' +
+              '<button type="button" class="ebtn idle" id="recv-btn-' + i + '" data-action="receive" data-idx="' + i + '">受取</button>' +
+            '</div>' +
           '</div>' +
         '</div>' +
       '</div>' +
@@ -837,23 +904,48 @@ function onCardClick(i, ev){
   }
   if (Date.now() < suppressOpenAllUntil) return;
   disarmAllIdle();
+
+  // 要素ヒット優先、なければカード内のX座標で左右判定（右端も放置側）
+  let side = null;
+  if (t.closest && (t.closest('.tblock-stam') || t.closest('.row-hit-stam'))) side = 'stam';
+  else if (t.closest && (t.closest('.tblock-idle') || t.closest('.row-hit-idle'))) side = 'idle';
+  else {
+    const cardEl = (refs[i] && refs[i].card) || (t.closest && t.closest('.card'));
+    const x = (ev.clientX != null) ? ev.clientX
+      : (ev.changedTouches && ev.changedTouches[0] ? ev.changedTouches[0].clientX : null);
+    if (cardEl && x != null) {
+      const r = cardEl.getBoundingClientRect();
+      side = (x - r.left) >= r.width * 0.5 ? 'idle' : 'stam';
+    } else {
+      side = 'stam';
+    }
+  }
+
   if (openIdx === i) {
     if (t.closest && t.closest('.edit-panel')) return;
+    if (side && side !== openMode) {
+      openMode = side;
+      updateOpenState();
+      if (side === 'stam') prefillsStamCur(i);
+      softBlur();
+      return;
+    }
     restoreEditInputs(i);
     openIdx = -1;
+    openMode = null;
     updateOpenState();
     softBlur();
     return;
   }
   const prevOpen = openIdx;
   openIdx = i;
+  openMode = side || 'stam';
   updateOpenState();
   if (prevOpen >= 0) restoreEditInputs(prevOpen);
-  prefillsStamCur(i);
+  if (openMode === 'stam') prefillsStamCur(i);
   softBlur();
 }
 
-let _lastOpenIdx = -1;
 function updateOpenState(){
   const editing = openIdx >= 0;
   const prev = _lastOpenIdx;
@@ -862,8 +954,14 @@ function updateOpenState(){
     refs[prev].card.classList.remove('open');
     refs[prev].card.setAttribute('aria-expanded', 'false');
   }
+  if (prev >= 0 && refs[prev] && refs[prev].card) {
+    refs[prev].card.classList.remove('mode-stam', 'mode-idle');
+  }
   if (openIdx >= 0 && refs[openIdx] && refs[openIdx].card) {
     refs[openIdx].card.classList.add('open');
+    refs[openIdx].card.classList.remove('mode-stam', 'mode-idle');
+    if (openMode === 'stam') refs[openIdx].card.classList.add('mode-stam');
+    else if (openMode === 'idle') refs[openIdx].card.classList.add('mode-idle');
     refs[openIdx].card.setAttribute('aria-expanded', 'true');
   }
   // デイリー✓無効化は「編集中フラグ」が変わったときだけ
@@ -900,7 +998,7 @@ function endNameEditVisual(i){
   }
 }
 function beginNameEdit(i){
-  if (openIdx >= 0) { restoreEditInputs(openIdx); openIdx = -1; updateOpenState(); }
+  if (openIdx >= 0) { restoreEditInputs(openIdx); openIdx = -1; openMode = null; updateOpenState(); }
   for (let j = 0; j < N; j++) endRankEditVisual(j);
   const el = document.getElementById('name-' + i);
   const disp = document.getElementById('name-disp-' + i);
@@ -948,6 +1046,7 @@ function closeAllPanels(){
   disarmAllIdle();
   if (openIdx >= 0) restoreEditInputs(openIdx);
   openIdx = -1;
+  openMode = null;
   updateOpenState();
   if (gOpenIdx >= 0) restoreGEditInputs(gOpenIdx);
   gOpenIdx = -1;
@@ -955,7 +1054,7 @@ function closeAllPanels(){
   softBlur();
 }
 
-// ---- Gジェネエターナル操作 ----
+// ---- Gジェネ操作 ----
 function updateGOpenState(){
   for (let i = 0; i < GN; i++) {
     if (gRefs[i] && gRefs[i].card) gRefs[i].card.classList.toggle('open', gOpenIdx === i);
@@ -987,7 +1086,7 @@ function endGNameEditVisual(i){
   }
 }
 function beginGNameEdit(i){
-  if (openIdx >= 0) { restoreEditInputs(openIdx); openIdx = -1; updateOpenState(); }
+  if (openIdx >= 0) { restoreEditInputs(openIdx); openIdx = -1; openMode = null; updateOpenState(); }
   if (gOpenIdx >= 0) { restoreGEditInputs(gOpenIdx); gOpenIdx = -1; updateGOpenState(); }
   for (let j = 0; j < GN; j++) endGNameEditVisual(j);
   for (let j = 0; j < N; j++) { endNameEditVisual(j); endRankEditVisual(j); }
@@ -1045,7 +1144,7 @@ function onGCardClick(i, ev){
   }
   if (document.activeElement) document.activeElement.blur();
   const prevOpen = gOpenIdx;
-  if (openIdx >= 0) { restoreEditInputs(openIdx); openIdx = -1; updateOpenState(); }
+  if (openIdx >= 0) { restoreEditInputs(openIdx); openIdx = -1; openMode = null; updateOpenState(); }
   gOpenIdx = i;
   updateGOpenState();
   if (prevOpen >= 0) restoreGEditInputs(prevOpen);
@@ -1164,12 +1263,13 @@ function applyStam(i){
   curEl.value = state.slots[i].stamCurrent;
   saveState();
   openIdx = -1;
+  openMode = null;
   updateOpenState();
   render();
 }
 
 function beginRankEdit(i){
-  if (openIdx >= 0) { restoreEditInputs(openIdx); openIdx = -1; updateOpenState(); }
+  if (openIdx >= 0) { restoreEditInputs(openIdx); openIdx = -1; openMode = null; updateOpenState(); }
   for (let j = 0; j < N; j++) endNameEditVisual(j);
   const el = document.getElementById('rank-' + i);
   const disp = document.getElementById('rank-disp-' + i);
@@ -1242,6 +1342,7 @@ function onReceiveClick(i, btnEl){
     btnEl.textContent = '受取';
     btnEl.classList.remove('armed');
     openIdx = -1;
+    openMode = null;
     updateOpenState();
     render();
   } else {
