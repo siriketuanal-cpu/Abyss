@@ -52,7 +52,6 @@ input,textarea{
 .bar-left{display:flex;align-items:center;gap:8px;justify-self:start;}
 .bar-note{font-size:10px;color:var(--ink-dim);}
 .daily-val{
-  /* 淡い水色系統 */
   color:#9fd1f5;font-weight:700;font-variant-numeric:tabular-nums;font-size:16px;
   justify-self:center;white-space:nowrap;line-height:1;
   height:28px;display:flex;align-items:center;
@@ -83,7 +82,7 @@ input,textarea{
 @media (min-width:620px){.grid{grid-template-columns:1fr 1fr;}}
 .card-row{display:flex;align-items:center;gap:11px;}
 .card-row:nth-child(3),.card-row:nth-child(5){
-  margin-top:1px;padding-top:7px;border-top:1px solid #333f5c;
+  margin-top:2px;padding-top:8px;border-top:1px solid #5a6a88;
 }
 .card{
   background:var(--bg-card);border:1px solid #2c2c2c;border-radius:12px;padding:7px 11px;
@@ -149,6 +148,7 @@ input,textarea{
   flex-shrink:0;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;
   position:relative;z-index:26;transition:opacity .15s ease;
   appearance:none;-webkit-appearance:none;font-family:inherit;padding:0;
+  margin-top:-2px;
 }
 .daily-mark.show{opacity:.85;font-weight:900;background:transparent;-webkit-font-smoothing:antialiased;}
 .daily-mark.g0.show{border-color:var(--g0);color:var(--g0);}
@@ -156,6 +156,25 @@ input,textarea{
 .daily-mark.g2.show{border-color:var(--g2);color:var(--g2);}
 .daily-mark.armed{animation:markShake .3s ease;}
 .daily-mark.disabled-by-edit{pointer-events:none;opacity:.25;}
+
+.mark-col{
+  display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+  gap:12px;flex-shrink:0;padding-top:0;
+}
+
+.weekly-mark{
+  width:30px;height:30px;display:flex;align-items:center;justify-content:center;
+  font-size:20px;font-weight:900;color:#3d485e;cursor:pointer;
+  border:none;background:transparent;opacity:.5;outline:none;user-select:none;
+  flex-shrink:0;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;
+  appearance:none;-webkit-appearance:none;font-family:inherit;padding:0;
+  position:relative;z-index:26;transition:opacity .15s ease, color .15s ease, transform .15s ease;
+}
+.weekly-mark.show{
+  opacity:1;color:#ffcc33;transform:scale(1.15);
+  text-shadow:0 0 6px rgba(255,204,51,0.5);
+}
+.weekly-mark.disabled-by-edit{pointer-events:none;opacity:.25;}
 
 @keyframes markShake{
   0%,100%{transform:translateX(0);}
@@ -205,7 +224,6 @@ input,textarea{
 .edit-panel-split{display:flex;align-items:center;gap:6px;width:100%;}
 .edit-side{display:flex;align-items:center;width:100%;min-width:0;}
 .edit-side-divider{display:none;}
-/* スタミナ編集: 入力はGジェネと同じ黒ボックス・左寄せ / 更新は中央〜やや右 */
 .edit-side-stam{
   justify-content:flex-start;
   position:relative;
@@ -234,7 +252,6 @@ input,textarea{
   border-radius:8px;
   white-space:nowrap;
 }
-/* 放置側は中央寄せのまま */
 .edit-side-idle{justify-content:center;}
 .edit-side-idle .ebtn.idle{
   padding:6px 12px;
@@ -242,7 +259,6 @@ input,textarea{
   border-radius:8px;
   white-space:nowrap;
 }
-/* 左右どちらか半分にパネルを出す */
 .card.open.mode-stam .edit-panel{
   left:0;right:auto;width:calc(50% - 4px);
   border-color:var(--ok);
@@ -253,7 +269,6 @@ input,textarea{
 }
 .card.open.mode-stam .edit-side-idle{display:none !important;}
 .card.open.mode-idle .edit-side-stam{display:none !important;}
-/* 名前行の左右タップ分割 */
 .row-top{position:relative;}
 .row-hit{position:absolute;top:0;bottom:0;z-index:1;}
 .row-hit-stam{left:0;width:50%;}
@@ -265,7 +280,6 @@ input,textarea{
   display:none;
   position:fixed;
   z-index:25;
-  /* ブラウザのメニューバー出し入れで足りなくなるのを防ぐため、表示領域より大きく被せる */
   top:-30vh;
   left:0;
   right:0;
@@ -391,9 +405,7 @@ const N = 6;
 const STAM_INTERVAL = 3 * 60 * 1000;
 const IDLE_DEFAULT_CAP_MS = 12 * 3600 * 1000;
 const IDLE_LEAD_MS = 2 * 60 * 1000;
-const URGENT_MS = 2 * 60 * 60 * 1000; // 満タンまで2時間未満で赤表示
-// 公式: Lv1の自然回復上限は240。レベル上昇で上限増加（攻略情報）。
-// 増加量+5/Lvは実測ベース（公式の詳細表は未公開）
+const URGENT_MS = 2 * 60 * 60 * 1000;
 const STAM_MAX_BASE = 240;
 const STAM_MAX_PER_LEVEL = 5;
 const RANK_MIN = 1;
@@ -406,7 +418,8 @@ const defaultSlot = () => ({
   rank: 1,
   stamCurrent: 0, stamMax: 240, stamStart: null, stamRunning: false,
   idleStart: null, idleCapMs: IDLE_DEFAULT_CAP_MS, idleRunning: false,
-  missionDone: false
+  missionDone: false,
+  weeklyDone: false
 });
 
 function stamMaxFromRank(rank){
@@ -421,8 +434,8 @@ function rankFromStamMax(max){
 
 // ---- Gジェネ ----
 const GN = 2;
-const G_STAM_INTERVAL = 5 * 60 * 1000; // APは5分ごとに1回復
-const G_RESET_HOUR = 1; // デイリーは深夜1時にリセット（本体の6枠とは別）
+const G_STAM_INTERVAL = 5 * 60 * 1000;
+const G_RESET_HOUR = 1;
 const defaultGSlot = () => ({
   label: '',
   stamCurrent: 0, stamMax: 130, stamStart: null, stamRunning: false, missionDone: false
@@ -430,19 +443,20 @@ const defaultGSlot = () => ({
 let gOpenIdx = -1;
 let gRefs = [];
 
-let state = { slots: Array.from({ length: N }, defaultSlot), dailyDate: '', g: { slots: Array.from({ length: GN }, defaultGSlot), dailyDate: '' } };
+let state = { slots: Array.from({ length: N }, defaultSlot), dailyDate: '', weeklyWeekId: '', g: { slots: Array.from({ length: GN }, defaultGSlot), dailyDate: '' } };
 
 let openIdx = -1;
 let openMode = null;
 let storageOk = true;
-let textEditIdx = -1; // 名前 or ランク編集中の枠
-let suppressOpenAllUntil = 0; // テキスト編集を閉じた同一タップでタイマー編集が開くのを防ぐ
+let textEditIdx = -1;
+let suppressOpenAllUntil = 0;
 let refs = [];
 let tickId = null;
 let armedIdle = {};
 let labelSaveTimer = null;
 let lastProgressSig = '';
 let lastDailyLabel = '';
+let _lastOpenIdx = -1;
 
 function groupClass(i){ return 'g' + (Math.floor(i / 2) % 3); }
 function dayStrAt(resetHour){
@@ -477,7 +491,7 @@ function setHTML(el, html){ if (el && el.dataset._h !== html) { el.innerHTML = h
 function setClass(el, cls){ if (el && el.className !== cls) el.className = cls; }
 function setWidth(el, pct){
   if (!el) return;
-  const rounded = Math.round((pct || 0) * 10) / 10; // 0.1%刻みに丸めて、無意味な微小変化での再描画を防ぐ
+  const rounded = Math.round((pct || 0) * 10) / 10;
   const w = rounded + '%';
   if (el.style.width !== w) el.style.width = w;
 }
@@ -486,13 +500,36 @@ function setSaveStamp(text){
   if (el) el.textContent = text;
 }
 
+function gameWeekId(){
+  const now = new Date();
+  const shifted = new Date(now.getTime() - 5 * 3600 * 1000);
+  const day = shifted.getDay();
+  const diffToMon = day === 0 ? -6 : 1 - day;
+  const mon = new Date(shifted.getFullYear(), shifted.getMonth(), shifted.getDate() + diffToMon);
+  const y = mon.getFullYear();
+  const m = String(mon.getMonth() + 1).padStart(2, '0');
+  const d = String(mon.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + d;
+}
+function ensureWeeklyDate(){
+  const wid = gameWeekId();
+  if (state.weeklyWeekId !== wid) {
+    state.weeklyWeekId = wid;
+    state.slots.forEach(s => { s.weeklyDone = false; });
+    for (let i = 0; i < refs.length; i++) {
+      if (refs[i] && refs[i].weeklyMark) refs[i].weeklyMark.classList.remove('show');
+    }
+    saveState();
+  }
+}
+
 function ensureDailyDate(){
   const today = gameDayStr();
   if (state.dailyDate !== today) {
     state.dailyDate = today;
     state.slots.forEach(s => { s.missionDone = false; });
     for (let i = 0; i < refs.length; i++) {
-      if (refs[i].mark) { refs[i].mark.classList.remove('show'); refs[i].mark.setAttribute('aria-pressed', 'false'); }
+      if (refs[i] && refs[i].mark) { refs[i].mark.classList.remove('show'); refs[i].mark.setAttribute('aria-pressed', 'false'); }
     }
     lastProgressSig = '';
     saveState();
@@ -532,7 +569,7 @@ function renderDailyProgress(){
 function parseStoredState(){
   if (typeof localStorage === 'undefined') throw new Error('no localStorage');
   const raw = localStorage.getItem(STORAGE_KEY);
-  const result = { slots: null, dailyDate: gameDayStr(), g: { slots: null, dailyDate: dayStrAt(G_RESET_HOUR) } };
+  const result = { slots: null, dailyDate: gameDayStr(), weeklyWeekId: '', g: { slots: null, dailyDate: dayStrAt(G_RESET_HOUR) } };
   if (raw) {
     const parsed = JSON.parse(raw);
     if (parsed.slots && Array.isArray(parsed.slots) && parsed.slots.length === N) {
@@ -569,10 +606,12 @@ function parseStoredState(){
           o.idleRunning = true;
         }
         o.missionDone = !!s.missionDone;
+        o.weeklyDone = !!s.weeklyDone;
         return o;
       });
     }
     result.dailyDate = typeof parsed.dailyDate === 'string' ? parsed.dailyDate : gameDayStr();
+    result.weeklyWeekId = typeof parsed.weeklyWeekId === 'string' ? parsed.weeklyWeekId : '';
 
     result.g = result.g || { slots: null, dailyDate: dayStrAt(G_RESET_HOUR) };
     if (parsed.g && Array.isArray(parsed.g.slots) && parsed.g.slots.length === GN) {
@@ -593,6 +632,7 @@ function parseStoredState(){
           if (o.stamCurrent >= o.stamMax) { o.stamCurrent = o.stamMax; o.stamStart = ss; }
         }
         o.missionDone = !!s.missionDone;
+        o.weeklyDone = !!s.weeklyDone;
         return o;
       });
       result.g.dailyDate = typeof parsed.g.dailyDate === 'string' ? parsed.g.dailyDate : dayStrAt(G_RESET_HOUR);
@@ -606,6 +646,7 @@ function loadState(){
     const parsed = parseStoredState();
     if (parsed.slots) state.slots = parsed.slots;
     state.dailyDate = parsed.dailyDate;
+    state.weeklyWeekId = parsed.weeklyWeekId || '';
     if (parsed.g && parsed.g.slots) state.g.slots = parsed.g.slots;
     if (parsed.g) state.g.dailyDate = parsed.g.dailyDate;
   } catch (e) {
@@ -616,47 +657,6 @@ function loadState(){
   build();
   render();
   if (storageOk) setSaveStamp('読み込み完了');
-}
-
-// 他タブの保存を検知した時用の軽い再同期（build()でDOMを作り直さない）
-function resyncFromStorage(){
-  try {
-    const parsed = parseStoredState();
-    if (parsed.slots) state.slots = parsed.slots;
-    state.dailyDate = parsed.dailyDate;
-    if (parsed.g && parsed.g.slots) state.g.slots = parsed.g.slots;
-    if (parsed.g) state.g.dailyDate = parsed.g.dailyDate;
-  } catch (e) { return; }
-  for (let i = 0; i < N; i++) {
-    const s = state.slots[i];
-    const r = refs[i];
-    if (!r) continue;
-    if (r.card) {
-      const nameEl = document.getElementById('name-' + i);
-      const nameDisp = document.getElementById('name-disp-' + i);
-      if (nameEl && document.activeElement !== nameEl) nameEl.value = s.label;
-      if (nameDisp && document.activeElement !== nameEl) {
-        if (s.label) { nameDisp.textContent = s.label; nameDisp.classList.remove('empty'); }
-        else { nameDisp.textContent = 'スロット ' + (i + 1); nameDisp.classList.add('empty'); }
-      }
-      const rankDisp = document.getElementById('rank-disp-' + i);
-      const rankEl = document.getElementById('rank-' + i);
-      if (rankDisp && document.activeElement !== rankEl) rankDisp.textContent = 'Lv.' + (s.rank || 1);
-      if (rankEl && document.activeElement !== rankEl) rankEl.value = String(s.rank || 1);
-    }
-    if (r.mark) { r.mark.classList.toggle('show', !!s.missionDone); r.mark.setAttribute('aria-pressed', s.missionDone ? 'true' : 'false'); }
-  }
-  for (let i = 0; i < GN; i++) {
-    const gs = state.g.slots[i];
-    const gr = gRefs[i];
-    if (!gr) continue;
-    const curEl = gr.curEl;
-    if (curEl && document.activeElement !== curEl) curEl.value = String(gs.stamCurrent);
-    if (gr.mark) gr.mark.classList.toggle('show', !!gs.missionDone);
-  }
-  lastProgressSig = '';
-  lastDailyLabel = '';
-  render();
 }
 
 function saveState(){
@@ -728,8 +728,6 @@ function getIdleInfo(s, now){
 }
 
 function stamRemainderAfter40s(current){
-  // 常に「使えるだけ40を消費してから開く」運用なので、40で割った余りを表示する
-  // 例: 250 → 40を6回使って10が残る → 10
   const c = Math.max(0, Math.floor(Number(current) || 0));
   return c % 40;
 }
@@ -775,8 +773,6 @@ function build(){
           '<span class="rank-disp" id="rank-disp-' + i + '">Lv.' + (s.rank || 1) + '</span>' +
           '<input class="rank-input" id="rank-' + i + '" value="' + (s.rank || 1) + '"' +
           ' inputmode="numeric" enterkeyhint="done" aria-label="プレイヤレベル">' +
-
-
         '</div>' +
         '<div class="timers-row">' +
           '<div class="tblock tblock-stam">' +
@@ -788,7 +784,7 @@ function build(){
           '<div class="tblock tblock-idle">' +
             '<div class="ttag idle">放置報酬</div>' +
             '<div class="tval idle" id="idle-val-' + i + '">—:—</div>' +
-            '<div class="tsub" id="idle-sub-' + i + '" class="idle-meta"></div>' +
+            '<div class="tsub idle-meta" id="idle-sub-' + i + '"></div>' +
             '<div class="pbar"><div class="pbar-fill idle" id="idle-bar-' + i + '" style="width:0%"></div></div>' +
           '</div>' +
         '</div>' +
@@ -805,8 +801,12 @@ function build(){
           '</div>' +
         '</div>' +
       '</div>' +
+      '<div class="mark-col">' +
       '<button type="button" class="daily-mark ' + groupClass(i) + (s.missionDone ? ' show' : '') + '" id="daily-mark-' + i + '"' +
       ' data-action="mark" data-idx="' + i + '" tabindex="-1" aria-label="スロット' + (i + 1) + 'のデイリー完了" aria-pressed="' + (s.missionDone ? 'true' : 'false') + '">✓</button>' +
+      '<button type="button" class="weekly-mark' + (s.weeklyDone ? ' show' : '') + '" id="weekly-mark-' + i + '"' +
+      ' data-action="weekly" data-idx="' + i + '" tabindex="-1" aria-label="スロット' + (i + 1) + 'のウィークリー" aria-pressed="' + (s.weeklyDone ? 'true' : 'false') + '">☆</button>' +
+      '</div>' +
       '</div>';
   }
   grid.innerHTML = html;
@@ -883,6 +883,7 @@ function cacheRefs(){
       idleSub: document.getElementById('idle-sub-' + i),
       idleBar: document.getElementById('idle-bar-' + i),
       mark: document.getElementById('daily-mark-' + i),
+      weeklyMark: document.getElementById('weekly-mark-' + i),
       curEl: document.getElementById('stam-cur-' + i)
     });
   }
@@ -893,6 +894,7 @@ function softBlur(){
   if (!ae || ae === document.body || !ae.blur) return;
   requestAnimationFrame(() => { try { ae.blur(); } catch (e) {} });
 }
+
 function onCardClick(i, ev){
   const t = ev.target;
   if (t.closest && (t.closest('input') || t.closest('button') || t.closest('.name-disp') || t.closest('.rank-disp') || t.closest('.name-input') || t.closest('.rank-input'))) return;
@@ -905,7 +907,6 @@ function onCardClick(i, ev){
   if (Date.now() < suppressOpenAllUntil) return;
   disarmAllIdle();
 
-  // 要素ヒット優先、なければカード内のX座標で左右判定（右端も放置側）
   let side = null;
   if (t.closest && (t.closest('.tblock-stam') || t.closest('.row-hit-stam'))) side = 'stam';
   else if (t.closest && (t.closest('.tblock-idle') || t.closest('.row-hit-idle'))) side = 'idle';
@@ -949,7 +950,6 @@ function onCardClick(i, ev){
 function updateOpenState(){
   const editing = openIdx >= 0;
   const prev = _lastOpenIdx;
-  // 変化した枠だけ class を更新
   if (prev >= 0 && prev !== openIdx && refs[prev] && refs[prev].card) {
     refs[prev].card.classList.remove('open');
     refs[prev].card.setAttribute('aria-expanded', 'false');
@@ -964,11 +964,13 @@ function updateOpenState(){
     else if (openMode === 'idle') refs[openIdx].card.classList.add('mode-idle');
     refs[openIdx].card.setAttribute('aria-expanded', 'true');
   }
-  // デイリー✓無効化は「編集中フラグ」が変わったときだけ
   if ((prev >= 0) !== editing) {
     for (let i = 0; i < N; i++) {
       if (refs[i] && refs[i].mark) {
         refs[i].mark.classList.toggle('disabled-by-edit', editing);
+      }
+      if (refs[i] && refs[i].weeklyMark) {
+        refs[i].weeklyMark.classList.toggle('disabled-by-edit', editing);
       }
     }
   }
@@ -977,8 +979,6 @@ function updateOpenState(){
   if (bd) bd.classList.toggle('show', anyOpen);
   _lastOpenIdx = openIdx;
 }
-
-
 
 function endRankEditVisual(i){
   const el = document.getElementById('rank-' + i);
@@ -1017,7 +1017,6 @@ function beginNameEdit(i){
   collapseSel();
   setTimeout(collapseSel, 0);
   setTimeout(collapseSel, 40);
-
 }
 function onNameBlur(i){
   const el = document.getElementById('name-' + i);
@@ -1037,10 +1036,8 @@ function onNameBlur(i){
     }
   }
   if (textEditIdx === i) textEditIdx = -1;
-  // 同一タップでカードのタイマー編集が開くのを防ぐ（短め）
   suppressOpenAllUntil = Date.now() + 150;
 }
-
 
 function closeAllPanels(){
   disarmAllIdle();
@@ -1096,7 +1093,7 @@ function beginGNameEdit(i){
   if (disp) disp.style.display = 'none';
   el.classList.add('editing');
   el.value = state.g.slots[i].label || '';
-  textEditIdx = 1000 + i; // G枠は 1000+
+  textEditIdx = 1000 + i;
   el.focus({ preventScroll: true });
   const collapseSel = () => {
     try { const n = el.value.length; el.setSelectionRange(n, n); } catch (e) {}
@@ -1185,7 +1182,6 @@ function applyG(i){
   renderG();
 }
 
-
 function toggleGMark(i){
   const s = state.g.slots[i];
   const mark = gRefs[i] && gRefs[i].mark;
@@ -1197,7 +1193,6 @@ function toggleGMark(i){
     if (document.activeElement === mark) mark.blur();
   }
 }
-
 
 function ensureGDailyDate(){
   const today = dayStrAt(G_RESET_HOUR);
@@ -1217,6 +1212,17 @@ function setLabel(i, val){
   labelSaveTimer = setTimeout(saveState, 300);
 }
 
+function toggleWeeklyMark(i){
+  const s = state.slots[i];
+  const mark = refs[i] && refs[i].weeklyMark;
+  s.weeklyDone = !s.weeklyDone;
+  saveState();
+  if (mark) {
+    mark.classList.toggle('show', s.weeklyDone);
+    mark.setAttribute('aria-pressed', s.weeklyDone ? 'true' : 'false');
+    if (document.activeElement === mark) mark.blur();
+  }
+}
 function toggleMissionMark(i){
   const s = state.slots[i];
   const mark = refs[i] && refs[i].mark;
@@ -1231,10 +1237,8 @@ function toggleMissionMark(i){
   renderDailyProgress();
 }
 
-
 function onCurFocus(el){ el.dataset.prev = el.value; el.value = ''; }
 function onCurBlur(i, el){ if (el.value === '') el.value = el.dataset.prev || state.slots[i].stamCurrent; }
-
 
 function applyStam(i){
   const curEl = document.getElementById('stam-cur-' + i);
@@ -1242,7 +1246,6 @@ function applyStam(i){
   const raw = (curEl.value == null ? '' : String(curEl.value)).trim();
   let cur;
   if (raw === '') {
-    // 空のまま更新 → 入力欄を開いた時点の候補（prev）があればそれ、なければリアルタイム値
     const prev = parseInt(curEl.dataset.prev, 10);
     if (!isNaN(prev)) cur = prev;
     else {
@@ -1288,7 +1291,6 @@ function beginRankEdit(i){
   collapseSel();
   setTimeout(collapseSel, 0);
   setTimeout(collapseSel, 40);
-
 }
 function onRankBlur(i){
   const el = document.getElementById('rank-' + i);
@@ -1299,7 +1301,6 @@ function onRankBlur(i){
   r = Math.max(RANK_MIN, Math.min(RANK_MAX, r));
   const now = Date.now();
   const s = state.slots[i];
-  // 稼働中は現在値を確定してから上限変更（上限アップでスタミナが跳ねるのを防ぐ）
   if (s.stamRunning && s.stamStart) {
     const info = getStamInfo(s, now);
     s.stamCurrent = info.current;
@@ -1320,9 +1321,8 @@ function onRankBlur(i){
   suppressOpenAllUntil = Date.now() + 150;
 }
 
-
 function disarmIdle(i){
-  if (armedIdle[i] !== undefined) {
+  if (Object.prototype.hasOwnProperty.call(armedIdle, i)) {
     clearTimeout(armedIdle[i]);
     delete armedIdle[i];
     const btn = document.getElementById('recv-btn-' + i);
@@ -1332,7 +1332,7 @@ function disarmIdle(i){
 function disarmAllIdle(){ Object.keys(armedIdle).forEach(k => disarmIdle(Number(k))); }
 
 function onReceiveClick(i, btnEl){
-  if (armedIdle[i] !== undefined) {
+  if (Object.prototype.hasOwnProperty.call(armedIdle, i)) {
     clearTimeout(armedIdle[i]);
     delete armedIdle[i];
     if (document.activeElement) document.activeElement.blur();
@@ -1360,6 +1360,7 @@ function onReceiveClick(i, btnEl){
 function render(){
   try {
     ensureDailyDate();
+    ensureWeeklyDate();
     const now = Date.now();
     if (!refs.length) return;
     for (let i = 0; i < N; i++) {
@@ -1458,7 +1459,6 @@ function stopTicking(){
   if (tickId) { clearInterval(tickId); tickId = null; }
 }
 
-// ---------- イベント委譲（#grid 1箇所でまとめて受け取る） ----------
 function setupDelegatedEvents(){
   const grid = document.getElementById('grid');
   if (!grid || grid.dataset.delegated) return;
@@ -1469,7 +1469,7 @@ function setupDelegatedEvents(){
     if (t.classList && (t.classList.contains('name-disp') || t.classList.contains('rank-disp'))) {
       return;
     }
-    if (t.closest && t.closest('input')) return; // 数値入力欄はネイティブのフォーカスに任せる
+    if (t.closest && t.closest('input')) return;
     const el = t.closest('[data-action]');
     if (!el) return;
     const action = el.dataset.action;
@@ -1477,7 +1477,7 @@ function setupDelegatedEvents(){
     if (action === 'card') onCardClick(i, ev);
     else if (action === 'update') applyStam(i);
     else if (action === 'receive') onReceiveClick(i, el);
-    else if (action === 'mark') { /* 長押しのみ */ }
+    else if (action === 'mark' || action === 'weekly') { /* 長押し判定で制御 */ }
   });
 
   grid.addEventListener('focusin', (ev) => {
@@ -1497,11 +1497,13 @@ function setupDelegatedEvents(){
   grid.addEventListener('input', (ev) => {
     const t = ev.target;
     if (t.classList && t.classList.contains('name-input')) {
-      setLabel(Number(t.id.split('-').pop()), t.value);
+      const idx = Number(t.id.split('-').pop());
+      state.slots[idx].label = t.value;
+      clearTimeout(labelSaveTimer);
+      labelSaveTimer = setTimeout(saveState, 300);
     }
   });
 
-  // 名前・ランク: span長押し成功後にだけ input へ切替（OSの選択メニューと分離）
   let lpTimer = null;
   let lpX = 0, lpY = 0;
   const LP_MS = 500;
@@ -1510,13 +1512,15 @@ function setupDelegatedEvents(){
   const lpStart = (ev) => {
     const el = ev.target;
     if (!el) return;
+    const weeklyEl = el.closest && el.closest('.weekly-mark');
     const markEl = el.closest && el.closest('.daily-mark');
     let mode = null;
-    if (markEl) mode = 'mark';
+    if (weeklyEl) mode = 'weekly';
+    else if (markEl) mode = 'mark';
     else if (el.classList && el.classList.contains('name-disp')) mode = 'name';
     else if (el.classList && el.classList.contains('rank-disp')) mode = 'rank';
     else return;
-    const idEl = markEl || el;
+    const idEl = weeklyEl || markEl || el;
     const i = Number((idEl.dataset && idEl.dataset.idx != null) ? idEl.dataset.idx : (idEl.id || '').split('-').pop());
     if (!Number.isFinite(i)) return;
     clearLp();
@@ -1524,7 +1528,8 @@ function setupDelegatedEvents(){
     lpX = pt.clientX; lpY = pt.clientY;
     lpTimer = setTimeout(() => {
       lpTimer = null;
-      if (mode === 'mark') toggleMissionMark(i);
+      if (mode === 'weekly') toggleWeeklyMark(i);
+      else if (mode === 'mark') toggleMissionMark(i);
       else if (mode === 'name') beginNameEdit(i);
       else beginRankEdit(i);
     }, LP_MS);
@@ -1539,17 +1544,14 @@ function setupDelegatedEvents(){
   grid.addEventListener('touchmove', lpMove, { passive: true });
   grid.addEventListener('touchend', clearLp, { passive: true });
   grid.addEventListener('touchcancel', clearLp, { passive: true });
+  grid.addEventListener('mouseleave', clearLp, { passive: true });
   grid.addEventListener('mousedown', (ev) => { if (ev.button === 0) lpStart(ev); });
   grid.addEventListener('mousemove', lpMove);
   grid.addEventListener('mouseup', clearLp);
 }
 
-
-
-// 長押しメニュー抑制（span表示化後は touch 監視は不要。軽量に contextmenu のみ）
 document.addEventListener('contextmenu', (ev) => {
   const el = ev.target;
-  // 編集中の input はペースト等を許可
   if (el && el.tagName === 'INPUT' && el.classList && el.classList.contains('editing')) return;
   if (el && el.tagName === 'INPUT' && el.type === 'number') return;
   ev.preventDefault();
@@ -1572,7 +1574,7 @@ function setupGDelegatedEvents(){
     else if (action === 'update') applyG(i);
     else if (action === 'max-up') adjustGMax(i, 1);
     else if (action === 'max-down') adjustGMax(i, -1);
-    else if (action === 'mark') { /* 長押しのみ */ }
+    else if (action === 'mark') { /* 長押し判定 */ }
   });
 
   wrap.addEventListener('focusin', (ev) => {
@@ -1588,7 +1590,6 @@ function setupGDelegatedEvents(){
     else if (t.classList && t.classList.contains('gname-input')) onGNameBlur(Number(t.id.split('-').pop()));
   });
 
-  // G名前: 長押しで編集（ドットアビス側と同じ）
   let glpTimer = null;
   let glpX = 0, glpY = 0;
   const GLP_MS = 500;
@@ -1624,6 +1625,7 @@ function setupGDelegatedEvents(){
   wrap.addEventListener('touchmove', glpMove, { passive: true });
   wrap.addEventListener('touchend', clearGLp, { passive: true });
   wrap.addEventListener('touchcancel', clearGLp, { passive: true });
+  wrap.addEventListener('mouseleave', clearGLp, { passive: true });
   wrap.addEventListener('mousedown', (ev) => { if (ev.button === 0) glpStart(ev); });
   wrap.addEventListener('mousemove', glpMove);
   wrap.addEventListener('mouseup', clearGLp);
@@ -1633,25 +1635,24 @@ loadState();
 setupDelegatedEvents();
 setupGDelegatedEvents();
 startTicking();
-const startupGraceUntil = Date.now() + 3000;
 
+// ---- 画面復帰時のタイマー同期処理 ----
 function resumeTicking(){
-  if (document.hidden) return;
   startTicking();
   render();
 }
+
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
-    if (Date.now() < startupGraceUntil) return;
     stopTicking();
   } else {
     resumeTicking();
   }
 });
-// PWA復帰の保険（bfcache 等）
+
 window.addEventListener('pageshow', resumeTicking);
-// PWA: Service Worker 登録＋更新検知
-// GitHub Pages 差し替え後も、新 SW が入ったらページを一度だけ再読み込みして反映する
+window.addEventListener('focus', resumeTicking);
+
 if ('serviceWorker' in navigator && (location.protocol === 'http:' || location.protocol === 'https:')) {
   let swRefreshing = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
