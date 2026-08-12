@@ -185,7 +185,8 @@ input,textarea{
 .tsub-cur{font-weight:700;color:#ffb35e;font-family:"M PLUS Rounded 1c","Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;}
 .tsub-sep{font-weight:600;color:var(--ink-dim);margin:0 1px;}
 .tsub-max{font-weight:700;color:var(--stam-cur-c);font-family:"M PLUS Rounded 1c","Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;}
-.tsub-clock{margin-left:4px;}
+.tsub-clock{margin-left:4px;color:#c9b8ff;font-weight:600;}
+.idle-meta{color:#c9b8ff;font-weight:600;}
 .pbar{height:3px;background:var(--line);border-radius:2px;overflow:hidden;margin-top:3px;}
 .pbar-fill{height:100%;border-radius:2px;transition:width .3s linear;}
 .pbar-fill.stam{background:var(--ok);}
@@ -269,9 +270,18 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 .gname-input.editing{display:inline-block;}
 .gedit-row-oneline{display:flex;align-items:center;gap:5px;flex-wrap:nowrap;}
 .gedit-row-oneline > input[type="number"]{width:42px;flex-shrink:0;}
-.gedit-max{margin-left:auto;display:flex;align-items:center;gap:4px;flex-shrink:0;opacity:.85;}
-.gedit-max label{font-size:9.5px;color:var(--ink-dim);white-space:nowrap;}
-.gedit-max input[type="number"]{width:42px;}
+.gedit-max{margin-left:auto;display:flex;align-items:center;gap:3px;flex-shrink:0;}
+.gmax-btn{
+  width:26px;height:26px;border:1px solid #5a6a8a;border-radius:6px;
+  background:#1a2235;color:#9eb6ff;font-size:14px;font-weight:800;line-height:1;
+  padding:0;cursor:pointer;font-family:inherit;
+  -webkit-tap-highlight-color:transparent;
+}
+.gmax-btn:active{background:#2a3550;}
+.gmax-val{
+  min-width:2.2em;text-align:center;font-size:12px;font-weight:800;
+  color:#9eb6ff;font-variant-numeric:tabular-nums;
+}
 .gval{
   font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;font-family:"M PLUS Rounded 1c","Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;
   color:var(--ok);line-height:1.1;
@@ -281,7 +291,7 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 .gsub .gsub-cur{font-weight:700;color:#ffb35e;font-family:"M PLUS Rounded 1c","Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;}
 .gsub .gsub-sep{font-weight:600;color:var(--ink-dim);margin:0 1px;}
 .gsub .gsub-max{font-weight:700;color:var(--stam-cur-c);font-family:"M PLUS Rounded 1c","Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;}
-.gsub .gsub-clock{color:var(--ink);margin-left:3px;}
+.gsub .gsub-clock{color:#c9b8ff;font-weight:600;margin-left:3px;}
 .gbar{height:3px;background:var(--line);border-radius:2px;overflow:hidden;margin-top:5px;}
 .gbar-fill{height:100%;border-radius:2px;background:var(--ok);transition:width .3s linear;}
 .gbar-fill.full{background:var(--stam-full-c)!important;}
@@ -610,7 +620,11 @@ function getStamInfo(s, now){
   const elapsed = Math.max(0, now - s.stamStart);
   const recovered = Math.floor(elapsed / STAM_INTERVAL);
   const current = Math.min(s.stamMax, s.stamCurrent + recovered);
-  if (current >= s.stamMax) return { current: s.stamMax, fullIn: 0, fullAt: null, isFull: true, pct: 100 };
+  if (current >= s.stamMax) {
+    const need = Math.max(0, s.stamMax - s.stamCurrent);
+    const fullAt = s.stamStart + need * STAM_INTERVAL;
+    return { current: s.stamMax, fullIn: 0, fullAt: fullAt, isFull: true, pct: 100 };
+  }
   const nextIn = STAM_INTERVAL - (elapsed % STAM_INTERVAL);
   const need = s.stamMax - current;
   const fullIn = (need - 1) * STAM_INTERVAL + nextIn;
@@ -625,7 +639,11 @@ function getGStamInfo(s, now){
   const elapsed = Math.max(0, now - s.stamStart);
   const recovered = Math.floor(elapsed / G_STAM_INTERVAL);
   const current = Math.min(s.stamMax, s.stamCurrent + recovered);
-  if (current >= s.stamMax) return { current: s.stamMax, fullIn: 0, fullAt: null, isFull: true, pct: 100 };
+  if (current >= s.stamMax) {
+    const need = Math.max(0, s.stamMax - s.stamCurrent);
+    const fullAt = s.stamStart + need * G_STAM_INTERVAL;
+    return { current: s.stamMax, fullIn: 0, fullAt: fullAt, isFull: true, pct: 100 };
+  }
   const nextIn = G_STAM_INTERVAL - (elapsed % G_STAM_INTERVAL);
   const need = s.stamMax - current;
   const fullIn = (need - 1) * G_STAM_INTERVAL + nextIn;
@@ -707,7 +725,7 @@ function build(){
           '<div class="tblock">' +
             '<div class="ttag idle">放置報酬</div>' +
             '<div class="tval idle" id="idle-val-' + i + '">—:—</div>' +
-            '<div class="tsub" id="idle-sub-' + i + '"></div>' +
+            '<div class="tsub" id="idle-sub-' + i + '" class="idle-meta"></div>' +
             '<div class="pbar"><div class="pbar-fill idle" id="idle-bar-' + i + '" style="width:0%"></div></div>' +
           '</div>' +
         '</div>' +
@@ -755,8 +773,9 @@ function buildG(){
             '<input type="number" id="g-cur-' + i + '" value="' + s.stamCurrent + '" min="0" max="999" inputmode="numeric">' +
             '<button type="button" class="ebtn stam" data-gaction="update" data-idx="' + i + '">更新</button>' +
             '<span class="gedit-max">' +
-              '<label>上限</label>' +
-              '<input type="number" id="g-max-' + i + '" value="' + s.stamMax + '" min="1" max="999" inputmode="numeric">' +
+              '<button type="button" class="gmax-btn" data-gaction="max-down" data-idx="' + i + '" aria-label="上限を減らす">−</button>' +
+              '<span class="gmax-val" id="g-max-val-' + i + '">' + s.stamMax + '</span>' +
+              '<button type="button" class="gmax-btn" data-gaction="max-up" data-idx="' + i + '" aria-label="上限を増やす">+</button>' +
             '</span>' +
           '</div>' +
         '</div>' +
@@ -951,9 +970,9 @@ function restoreGEditInputs(i){
   const now = Date.now();
   const live = s.stamRunning ? getGStamInfo(s, now).current : s.stamCurrent;
   const curEl = document.getElementById('g-cur-' + i);
-  const maxEl = document.getElementById('g-max-' + i);
+  const maxVal = document.getElementById('g-max-val-' + i);
   if (curEl) { curEl.value = String(live); curEl.dataset.prev = String(live); }
-  if (maxEl) { maxEl.value = String(s.stamMax); maxEl.dataset.prev = String(s.stamMax); }
+  if (maxVal) maxVal.textContent = String(s.stamMax);
 }
 
 function endGNameEditVisual(i){
@@ -1038,31 +1057,36 @@ function onGCardClick(i, ev){
 }
 function onGCurFocus(el){ el.dataset.prev = el.value; el.value = ''; }
 function onGCurBlur(i, el){ if (el.value === '') el.value = el.dataset.prev || state.g.slots[i].stamCurrent; }
-function onGMaxFocus(el){ el.dataset.prev = el.value; el.value = ''; }
-function onGMaxBlur(i, el){ if (el.value === '') el.value = el.dataset.prev || state.g.slots[i].stamMax; }
+function adjustGMax(i, delta){
+  const maxVal = document.getElementById('g-max-val-' + i);
+  if (!maxVal) return;
+  let max = parseInt(maxVal.textContent, 10);
+  if (isNaN(max)) max = state.g.slots[i].stamMax || 130;
+  max = Math.max(1, Math.min(999, max + delta));
+  maxVal.textContent = String(max);
+}
 function applyG(i){
   const curEl = document.getElementById('g-cur-' + i);
-  const maxEl = document.getElementById('g-max-' + i);
+  const maxVal = document.getElementById('g-max-val-' + i);
   let cur = parseInt(curEl.value, 10);
-  const max = parseInt(maxEl.value, 10);
+  let max = parseInt(maxVal ? maxVal.textContent : '', 10);
   if (isNaN(cur)) cur = state.g.slots[i].stamCurrent;
-  if (isNaN(max) || max <= 0) {
-    maxEl.style.borderColor = 'var(--danger)';
-    maxEl.focus();
-    setTimeout(() => { maxEl.style.borderColor = ''; }, 1500);
-    return;
-  }
+  if (isNaN(max) || max <= 0) max = state.g.slots[i].stamMax;
+  max = Math.max(1, Math.min(999, max));
   if (document.activeElement) document.activeElement.blur();
   state.g.slots[i].stamCurrent = Math.max(0, Math.min(cur, max));
   state.g.slots[i].stamMax = max;
   state.g.slots[i].stamStart = Date.now();
   state.g.slots[i].stamRunning = true;
   curEl.value = String(state.g.slots[i].stamCurrent);
+  if (maxVal) maxVal.textContent = String(max);
   saveState();
   gOpenIdx = -1;
   updateGOpenState();
   renderG();
 }
+
+
 function toggleGMark(i){
   const s = state.g.slots[i];
   const mark = gRefs[i] && gRefs[i].mark;
@@ -1247,14 +1271,16 @@ function render(){
       if (s.stamRunning) {
         if (stam.isFull) {
           stamMain = 'MAX'; stamCls = 'tval stam full';
-          stamCurTxt = String(stam.current); stamMaxTxt = String(s.stamMax); stamClockTxt = '';
+          stamCurTxt = String(stam.current); stamMaxTxt = String(s.stamMax);
+          stamClockTxt = stam.fullAt ? (formatClock(stam.fullAt) + ' 到達') : '';
           stamBarCls = 'pbar-fill stam full';
         } else {
           stamMain = formatTime(stam.fullIn);
           const stamUrgent = stam.fullIn != null && stam.fullIn < URGENT_MS;
           stamCls = 'tval stam' + (stamUrgent ? ' urgent' : '');
           stamCurTxt = String(stam.current); stamMaxTxt = String(s.stamMax);
-          stamClockTxt = formatClock(stam.fullAt); stamBarCls = 'pbar-fill stam';
+          stamClockTxt = stam.fullAt ? formatClock(stam.fullAt) : '';
+          stamBarCls = 'pbar-fill stam';
         }
       } else {
         stamMain = '—:—'; stamCls = 'tval stam';
@@ -1293,13 +1319,15 @@ function renderG(){
       if (s.stamRunning) {
         if (stam.isFull) {
           main = 'MAX'; cls = 'gval full';
-          curTxt = String(stam.current); maxTxt = String(s.stamMax); clockTxt = '';
+          curTxt = String(stam.current); maxTxt = String(s.stamMax);
+          clockTxt = stam.fullAt ? (formatClock(stam.fullAt) + ' 到達') : '';
           barCls = 'gbar-fill full';
         } else {
           main = formatTime(stam.fullIn);
           cls = 'gval';
           curTxt = String(stam.current); maxTxt = String(s.stamMax);
-          clockTxt = formatClock(stam.fullAt); barCls = 'gbar-fill';
+          clockTxt = stam.fullAt ? formatClock(stam.fullAt) : '';
+          barCls = 'gbar-fill';
         }
       } else {
         main = '—:—'; cls = 'gval';
@@ -1433,6 +1461,8 @@ function setupGDelegatedEvents(){
     const i = Number(el.dataset.idx);
     if (action === 'card') onGCardClick(i, ev);
     else if (action === 'update') applyG(i);
+    else if (action === 'max-up') adjustGMax(i, 1);
+    else if (action === 'max-down') adjustGMax(i, -1);
     else if (action === 'mark') { /* 長押しのみ */ }
   });
 
@@ -1440,14 +1470,12 @@ function setupGDelegatedEvents(){
     const t = ev.target;
     if (!t.id) return;
     if (t.id.indexOf('g-cur-') === 0) onGCurFocus(t);
-    else if (t.id.indexOf('g-max-') === 0) onGMaxFocus(t);
   });
 
   wrap.addEventListener('focusout', (ev) => {
     const t = ev.target;
     if (!t.id) return;
     if (t.id.indexOf('g-cur-') === 0) onGCurBlur(Number(t.id.split('-').pop()), t);
-    else if (t.id.indexOf('g-max-') === 0) onGMaxBlur(Number(t.id.split('-').pop()), t);
     else if (t.classList && t.classList.contains('gname-input')) onGNameBlur(Number(t.id.split('-').pop()));
   });
 
