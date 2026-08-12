@@ -1562,7 +1562,7 @@ if ('serviceWorker' in navigator && (location.protocol === 'http:' || location.p
     const regSW = () => {
       navigator.serviceWorker.register('./sw.js').then((reg) => {
         try { reg.update(); } catch (e) {}
-        setInterval(() => { try { reg.update(); } catch (e) {} }, 30 * 60 * 1000);
+        setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 60 * 1000);
       }).catch(() => {});
     };
     if ('requestIdleCallback' in window) requestIdleCallback(regSW, { timeout: 2500 });
