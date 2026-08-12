@@ -1,6 +1,6 @@
 {
-  "name": "深淵タイマー | ドットアビス",
-  "short_name": "深淵タイマー",
+  "name": "深淵",
+  "short_name": "深淵",
   "description": "ドットアビス / Gジェネ スタミナ・放置タイマー",
   "start_url": "./index.html",
   "scope": "./",

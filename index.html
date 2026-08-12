@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>深淵タイマー | ドットアビス</title>
+<title>深淵</title>
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="深淵タイマー">
+<meta name="apple-mobile-web-app-title" content="深淵">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -185,7 +185,8 @@ input,textarea{
 .tsub-cur{font-weight:700;color:#ffb35e;font-family:"M PLUS Rounded 1c","Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;}
 .tsub-sep{font-weight:600;color:var(--ink-dim);margin:0 1px;}
 .tsub-max{font-weight:700;color:var(--stam-cur-c);font-family:"M PLUS Rounded 1c","Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;}
-.tsub-clock{margin-left:4px;color:#c9b8ff;font-weight:600;}
+.tsub-clock{margin-left:4px;font-weight:600;}
+.idle-clock{color:#c9b8ff;font-weight:600;}
 .idle-meta{color:#c9b8ff;font-weight:600;}
 .pbar{height:3px;background:var(--line);border-radius:2px;overflow:hidden;margin-top:3px;}
 .pbar-fill{height:100%;border-radius:2px;transition:width .3s linear;}
@@ -414,7 +415,8 @@ function formatClock(ts){
 function escapeHtml(s){
   return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
-function setText(el, text){ if (el && el.textContent !== text) el.textContent = text; }
+function setText(el, text){ if (!el) return; if (el.dataset._h !== undefined) delete el.dataset._h; if (el.textContent !== text) el.textContent = text; }
+function setHTML(el, html){ if (el && el.dataset._h !== html) { el.innerHTML = html; el.dataset._h = html; } }
 function setClass(el, cls){ if (el && el.className !== cls) el.className = cls; }
 function setWidth(el, pct){
   if (!el) return;
@@ -660,6 +662,8 @@ function getIdleInfo(s, now){
   return {
     display: isFull ? 'MAX' : formatTime(remaining),
     meta: isFull ? formatClock(fullAt) + ' 到達' : formatClock(fullAt) + ' 満タン',
+    clockTxt: formatClock(fullAt),
+    suffix: isFull ? ' 到達' : ' 満タン',
     pct: Math.min(100, (elapsed / cap) * 100),
     isFull,
     remainingMs: remaining
@@ -1267,37 +1271,45 @@ function render(){
       if (!r || !r.stamVal) continue;
       const stam = getStamInfo(s, now);
       const idle = getIdleInfo(s, now);
-      let stamMain, stamCls, stamCurTxt, stamMaxTxt, stamClockTxt, stamBarCls;
+      let stamMain, stamCls, stamCurTxt, stamMaxTxt, stamClockTxt, stamClockSuffix, stamBarCls;
       if (s.stamRunning) {
         if (stam.isFull) {
           stamMain = 'MAX'; stamCls = 'tval stam full';
           stamCurTxt = String(stam.current); stamMaxTxt = String(s.stamMax);
-          stamClockTxt = stam.fullAt ? (formatClock(stam.fullAt) + ' 到達') : '';
+          stamClockTxt = stam.fullAt ? formatClock(stam.fullAt) : ''; stamClockSuffix = stam.fullAt ? ' 到達' : '';
           stamBarCls = 'pbar-fill stam full';
         } else {
           stamMain = formatTime(stam.fullIn);
           const stamUrgent = stam.fullIn != null && stam.fullIn < URGENT_MS;
           stamCls = 'tval stam' + (stamUrgent ? ' urgent' : '');
           stamCurTxt = String(stam.current); stamMaxTxt = String(s.stamMax);
-          stamClockTxt = stam.fullAt ? formatClock(stam.fullAt) : '';
+          stamClockTxt = stam.fullAt ? formatClock(stam.fullAt) : ''; stamClockSuffix = '';
           stamBarCls = 'pbar-fill stam';
         }
       } else {
         stamMain = '—:—'; stamCls = 'tval stam';
-        stamCurTxt = String(s.stamCurrent); stamMaxTxt = String(s.stamMax); stamClockTxt = '';
+        stamCurTxt = String(s.stamCurrent); stamMaxTxt = String(s.stamMax); stamClockTxt = ''; stamClockSuffix = '';
         stamBarCls = 'pbar-fill stam';
       }
       setText(r.stamVal, stamMain); setClass(r.stamVal, stamCls);
       setText(r.stamSubCur, stamCurTxt);
       setText(r.stamSubMax, stamMaxTxt);
-      setText(r.stamSubClock, stamClockTxt);
+      if (stamClockTxt) {
+        setHTML(r.stamSubClock, '<span class="idle-clock">' + stamClockTxt + '</span>' + stamClockSuffix);
+      } else {
+        setText(r.stamSubClock, '');
+      }
       setWidth(r.stamBar, stam.pct); setClass(r.stamBar, stamBarCls);
       setText(r.idleVal, idle.display);
       let idleCls = 'tval idle';
       if (idle.isFull) idleCls += ' full';
       else if (s.idleRunning && idle.remainingMs != null && idle.remainingMs < URGENT_MS) idleCls += ' urgent';
       setClass(r.idleVal, idleCls);
-      setText(r.idleSub, idle.meta);
+      if (idle.clockTxt) {
+        setHTML(r.idleSub, '<span class="idle-clock">' + idle.clockTxt + '</span>' + idle.suffix);
+      } else {
+        setText(r.idleSub, idle.meta);
+      }
       setWidth(r.idleBar, idle.pct);
       setClass(r.idleBar, 'pbar-fill idle' + (idle.isFull ? ' full' : (idleCls.indexOf('urgent') >= 0 ? ' urgent' : '')));
     }
