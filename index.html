@@ -15,11 +15,6 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="深淵">
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap" media="print" onload="this.media='all'">
-<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap"></noscript>
 <style>
 :root{
   --bg:#000000; --bg-panel:#141414; --bg-card:#000000; --bg-inset:#111111;
@@ -34,7 +29,7 @@ html,body{margin:0;padding:0;overscroll-behavior:none;background-color:#000;}
 body{
   background:var(--bg);
   color:var(--ink);
-  font-family:"M PLUS Rounded 1c","Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+  font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;
   min-height:100vh;
   padding:calc(12px + env(safe-area-inset-top)) calc(10px + env(safe-area-inset-right)) calc(32px + env(safe-area-inset-bottom)) calc(10px + env(safe-area-inset-left));
   -webkit-tap-highlight-color:transparent;
@@ -173,7 +168,7 @@ input,textarea{
 .ttag.stam{color:var(--ok);}
 .ttag.idle{color:var(--idle-c);}
 .tval{
-  font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;font-family:"M PLUS Rounded 1c","Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;
+  font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;
   line-height:1.05;white-space:nowrap;overflow:hidden;min-width:7.2ch;display:inline-block;letter-spacing:.01em;
 }
 .tval.stam{color:var(--ok);}
@@ -181,9 +176,9 @@ input,textarea{
 .tval.full{color:var(--stam-full-c)!important;}
 .tval.urgent{color:var(--stam-full-c)!important;}
 .tsub{font-size:10px;color:var(--ink);height:13px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-variant-numeric:tabular-nums;}
-.tsub-cur{font-weight:700;color:#ffb35e;font-family:"M PLUS Rounded 1c","Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;}
+.tsub-cur{font-weight:700;color:#ffb35e;font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;}
 .tsub-sep{font-weight:600;color:var(--ink-dim);margin:0 1px;}
-.tsub-max{font-weight:700;color:var(--stam-cur-c);font-family:"M PLUS Rounded 1c","Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;}
+.tsub-max{font-weight:700;color:var(--stam-cur-c);font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;}
 .tsub-clock{margin-left:4px;font-weight:600;}
 .idle-clock{color:#c9b8ff;font-weight:600;}
 .idle-meta{color:#c9b8ff;font-weight:600;}
@@ -283,14 +278,14 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   color:#9eb6ff;font-variant-numeric:tabular-nums;
 }
 .gval{
-  font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;font-family:"M PLUS Rounded 1c","Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;
+  font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;
   color:var(--ok);line-height:1.1;
 }
 .gval.full{color:var(--stam-full-c)!important;}
 .gsub{font-size:10px;color:var(--ink);margin-top:1px;}
-.gsub .gsub-cur{font-weight:700;color:#ffb35e;font-family:"M PLUS Rounded 1c","Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;}
+.gsub .gsub-cur{font-weight:700;color:#ffb35e;font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;}
 .gsub .gsub-sep{font-weight:600;color:var(--ink-dim);margin:0 1px;}
-.gsub .gsub-max{font-weight:700;color:var(--stam-cur-c);font-family:"M PLUS Rounded 1c","Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;}
+.gsub .gsub-max{font-weight:700;color:var(--stam-cur-c);font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;}
 .gsub .gsub-clock{color:#c9b8ff;font-weight:600;margin-left:3px;}
 .gbar{height:3px;background:var(--line);border-radius:2px;overflow:hidden;margin-top:5px;}
 .gbar-fill{height:100%;border-radius:2px;background:var(--ok);transition:width .3s linear;}
@@ -1573,12 +1568,15 @@ if ('serviceWorker' in navigator && (location.protocol === 'http:' || location.p
     location.reload();
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').then((reg) => {
-      // 起動時に更新チェック（放置中に GitHub を更新した場合向け）
-      try { reg.update(); } catch (e) {}
-      // 定期的にも確認（タブを開きっぱなしのとき）
-      setInterval(() => { try { reg.update(); } catch (e) {} }, 30 * 60 * 1000);
-    }).catch(() => {});
+    // 初回描画と競合しないよう、少し遅らせて SW 登録
+    const regSW = () => {
+      navigator.serviceWorker.register('./sw.js').then((reg) => {
+        try { reg.update(); } catch (e) {}
+        setInterval(() => { try { reg.update(); } catch (e) {} }, 30 * 60 * 1000);
+      }).catch(() => {});
+    };
+    if ('requestIdleCallback' in window) requestIdleCallback(regSW, { timeout: 2500 });
+    else setTimeout(regSW, 1200);
   });
 }
 </script>
