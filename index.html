@@ -2,18 +2,14 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>深淵</title>
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#000000">
 <link rel="icon" href="icon-192.png" sizes="192x192" type="image/png">
-<link rel="apple-touch-icon" href="icon-192.png">
-<meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="深淵">
 
 <style>
 :root{
@@ -31,7 +27,7 @@ body{
   color:var(--ink);
   font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;
   min-height:100vh;
-  padding:calc(12px + env(safe-area-inset-top)) calc(10px + env(safe-area-inset-right)) calc(32px + env(safe-area-inset-bottom)) calc(10px + env(safe-area-inset-left));
+  padding:12px 10px 32px;
   -webkit-tap-highlight-color:transparent;
   touch-action:manipulation;
   overscroll-behavior-y:none;
@@ -50,7 +46,7 @@ input,textarea{
   min-height:40px;
 }
 .bar-left{display:flex;align-items:center;gap:8px;justify-self:start;}
-.bar-note{font-size:10px;color:var(--ink-dim);}
+.bar-note{font-size:10px;color:var(--ink-dim);display:none;}
 .daily-val{
   color:#9fd1f5;font-weight:700;font-variant-numeric:tabular-nums;font-size:16px;
   justify-self:center;white-space:nowrap;line-height:1;
@@ -313,7 +309,7 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   font-size:11px;color:var(--ink-dim);font-weight:700;margin:0 0 6px 2px;
   display:flex;align-items:baseline;gap:6px;
 }
-.gsection-note{font-size:9.5px;font-weight:400;color:#5c6785;}
+.gsection-note{font-size:9.5px;font-weight:400;color:#5c6785;display:none;}
 .gwrap{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
 .gcard{
   background:var(--bg-card);border:1.5px solid #3a3a3a;border-radius:12px;padding:7px 9px;
@@ -897,7 +893,7 @@ function softBlur(){
 
 function onCardClick(i, ev){
   const t = ev.target;
-  if (t.closest && (t.closest('input') || t.closest('button') || t.closest('.name-disp') || t.closest('.rank-disp') || t.closest('.name-input') || t.closest('.rank-input'))) return;
+  if (t.closest && (t.closest('input') || t.closest('button') || t.closest('.name-input') || t.closest('.rank-input'))) return;
   if (textEditIdx >= 0) {
     softBlur();
     textEditIdx = -1;
@@ -1467,6 +1463,10 @@ function setupDelegatedEvents(){
   grid.addEventListener('click', (ev) => {
     const t = ev.target;
     if (t.classList && (t.classList.contains('name-disp') || t.classList.contains('rank-disp'))) {
+      if (lpFired) { lpFired = false; return; }
+      const cardEl = t.closest('.card');
+      const idx = cardEl ? Number(cardEl.dataset.idx) : NaN;
+      if (Number.isFinite(idx)) onCardClick(idx, ev);
       return;
     }
     if (t.closest && t.closest('input')) return;
@@ -1505,6 +1505,7 @@ function setupDelegatedEvents(){
   });
 
   let lpTimer = null;
+  let lpFired = false;
   let lpX = 0, lpY = 0;
   const LP_MS = 500;
   const LP_MOVE2 = 12 * 12;
@@ -1524,10 +1525,12 @@ function setupDelegatedEvents(){
     const i = Number((idEl.dataset && idEl.dataset.idx != null) ? idEl.dataset.idx : (idEl.id || '').split('-').pop());
     if (!Number.isFinite(i)) return;
     clearLp();
+    lpFired = false;
     const pt = (ev.touches && ev.touches[0]) ? ev.touches[0] : ev;
     lpX = pt.clientX; lpY = pt.clientY;
     lpTimer = setTimeout(() => {
       lpTimer = null;
+      lpFired = true;
       if (mode === 'weekly') toggleWeeklyMark(i);
       else if (mode === 'mark') toggleMissionMark(i);
       else if (mode === 'name') beginNameEdit(i);
