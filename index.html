@@ -448,6 +448,8 @@ let textEditIdx = -1;
 let suppressOpenAllUntil = 0;
 let refs = [];
 let tickId = null;
+let resetCheckTimer = null;
+let swRegistrationScheduled = false;
 let armedIdle = {};
 let labelSaveTimer = null;
 let lastProgressSig = '';
@@ -651,6 +653,9 @@ function loadState(){
   }
   build();
   render();
+  // 進行中のタイマーがある場合だけ、毎秒描画を開始する。
+  startTicking();
+  scheduleResetCheck();
   if (storageOk) setSaveStamp('読み込み完了');
 }
 
@@ -1175,6 +1180,7 @@ function applyG(i){
   gOpenIdx = -1;
   updateGOpenState();
   renderG();
+  startTicking();
 }
 
 function toggleGMark(i){
@@ -1264,6 +1270,7 @@ function applyStam(i){
   openMode = null;
   updateOpenState();
   render();
+  startTicking();
 }
 
 function beginRankEdit(i){
@@ -1340,6 +1347,7 @@ function onReceiveClick(i, btnEl){
     openMode = null;
     updateOpenState();
     render();
+    startTicking();
   } else {
     disarmAllIdle();
     btnEl.textContent = '確定';
@@ -1408,6 +1416,8 @@ function render(){
     }
   } catch (e) { console.warn(e); }
   renderG();
+  // すべて満タン・未開始なら、不要な毎秒描画を停止する。
+  if (tickId && !needsTicking()) stopTicking();
 }
 
 function renderG(){
@@ -1446,9 +1456,26 @@ function renderG(){
   } catch (e) { console.warn(e); }
 }
 
+function needsTicking(){
+  const now = Date.now();
+  for (let i = 0; i < N; i++) {
+    const s = state.slots[i];
+    if (s.stamRunning && !getStamInfo(s, now).isFull) return true;
+    if (s.idleRunning && !getIdleInfo(s, now).isFull) return true;
+  }
+  for (let i = 0; i < GN; i++) {
+    const s = state.g.slots[i];
+    if (s.stamRunning && !getGStamInfo(s, now).isFull) return true;
+  }
+  return false;
+}
+
 function startTicking(){
-  if (tickId) { clearInterval(tickId); tickId = null; }
-  tickId = setInterval(render, 1000);
+  if (!needsTicking()) {
+    stopTicking();
+    return;
+  }
+  if (!tickId) tickId = setInterval(render, 1000);
 }
 function stopTicking(){
   if (tickId) { clearInterval(tickId); tickId = null; }
@@ -1636,13 +1663,35 @@ function setupGDelegatedEvents(){
 loadState();
 setupDelegatedEvents();
 setupGDelegatedEvents();
-startTicking();
+// 初期描画を優先し、Service Workerの登録はアイドル時へ退避する。
+scheduleServiceWorkerRegistration();
 const startupGraceUntil = Date.now() + 3000;
 
 // ---- 画面復帰時のタイマー同期処理 ----
 function resumeTicking(){
-  startTicking();
   render();
+  startTicking();
+  scheduleResetCheck();
+}
+
+function scheduleResetCheck(){
+  if (resetCheckTimer) clearTimeout(resetCheckTimer);
+
+  const now = new Date();
+  const next = new Date(now);
+  next.setHours(1, 0, 1, 0);
+  if (next <= now) next.setDate(next.getDate() + 1);
+
+  const nextGameReset = new Date(now);
+  nextGameReset.setHours(5, 0, 1, 0);
+  if (nextGameReset <= now) nextGameReset.setDate(nextGameReset.getDate() + 1);
+  if (nextGameReset < next) next.setTime(nextGameReset.getTime());
+
+  resetCheckTimer = setTimeout(() => {
+    resetCheckTimer = null;
+    render();
+    scheduleResetCheck();
+  }, Math.max(1000, next.getTime() - now.getTime()));
 }
 
 document.addEventListener('visibilitychange', () => {
@@ -1657,23 +1706,19 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('pageshow', resumeTicking);
 window.addEventListener('focus', resumeTicking);
 
-if ('serviceWorker' in navigator && (location.protocol === 'http:' || location.protocol === 'https:')) {
-  let swRefreshing = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (swRefreshing) return;
-    swRefreshing = true;
-    location.reload();
-  });
-  window.addEventListener('load', () => {
-    const regSW = () => {
-      navigator.serviceWorker.register('./sw.js').then((reg) => {
-        try { reg.update(); } catch (e) {}
-        setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 60 * 1000);
-      }).catch(() => {});
-    };
-    if ('requestIdleCallback' in window) requestIdleCallback(regSW, { timeout: 2500 });
-    else setTimeout(regSW, 1200);
-  });
+function scheduleServiceWorkerRegistration(){
+  if (swRegistrationScheduled) return;
+  if (!('serviceWorker' in navigator)) return;
+  if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
+
+  swRegistrationScheduled = true;
+  const register = () => {
+    navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).catch(() => {});
+  };
+
+  // Service Workerの取得・インストールを初期描画と競合させない。
+  if ('requestIdleCallback' in window) requestIdleCallback(register, { timeout: 8000 });
+  else setTimeout(register, 2500);
 }
 </script>
 </body>
