@@ -628,7 +628,6 @@ function parseStoredState(){
           if (o.stamCurrent >= o.stamMax) { o.stamCurrent = o.stamMax; o.stamStart = ss; }
         }
         o.missionDone = !!s.missionDone;
-        o.weeklyDone = !!s.weeklyDone;
         return o;
       });
       result.g.dailyDate = typeof parsed.g.dailyDate === 'string' ? parsed.g.dailyDate : dayStrAt(G_RESET_HOUR);
