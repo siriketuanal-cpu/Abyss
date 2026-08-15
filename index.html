@@ -2099,12 +2099,22 @@ function resumeTicking(force){
     clearTimeout(resumeDebounceTimer);
     resumeDebounceTimer = null;
   }
-  resumeDebounceTimer = setTimeout(() => {
-    resumeDebounceTimer = null;
+
+  const restart = () => {
     if (document.hidden) return;
     render();
     startTicking();
     scheduleResetCheck();
+  };
+
+  // タスク復帰は即時同期する。通常の重複イベントだけ短くまとめる。
+  if (force) {
+    restart();
+    return;
+  }
+  resumeDebounceTimer = setTimeout(() => {
+    resumeDebounceTimer = null;
+    restart();
   }, 48);
 }
 
@@ -2133,6 +2143,8 @@ function scheduleResetCheck(){
 
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
+    // 次の復帰を直前イベントの抑止対象にしない。
+    lastResumeAt = 0;
     if (Date.now() < startupGraceUntil) return;
     stopTicking();
     if (resumeDebounceTimer) {
@@ -2140,9 +2152,13 @@ document.addEventListener('visibilitychange', () => {
       resumeDebounceTimer = null;
     }
   } else {
-    resumeTicking(false);
+    // Androidのタスク復帰では最初の可視化を必ず同期する。
+    resumeTicking(true);
   }
 });
+
+// 一部のWebView・PWAシェルが送る復帰通知も同じ経路で扱う。
+document.addEventListener('resume', () => resumeTicking(true));
 
 window.addEventListener('pageshow', (ev) => {
   if (ev.persisted) resumeTicking(true);
