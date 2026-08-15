@@ -36,7 +36,7 @@ body{
 }
 input,textarea{
   -webkit-user-select:text;user-select:text;
-  -webkit-touch-callout:default;
+  -webkit-touch-callout:none!important;
 }
 .wrap{max-width:820px;margin:0 auto;}
 .bar{
@@ -104,11 +104,12 @@ input,textarea{
   font-variant-numeric:tabular-nums;
   -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
 }
-.rank-disp{
+  .rank-disp{
   display:inline-block;border-bottom:1px dashed transparent;cursor:pointer;
   -webkit-user-select:none!important;user-select:none!important;
-  -webkit-touch-callout:none!important;touch-action:manipulation;
+  -webkit-touch-callout:none!important;-webkit-user-drag:none;touch-action:manipulation;
 }
+.rank-disp::selection{background:transparent;color:inherit;}
 .rank-input{
   display:none;background:transparent;border:none;border-bottom:1px dashed #f0a07a;
   outline:none;caret-color:#f0a07a;text-align:right;
@@ -311,9 +312,9 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 }
 .gsection-note{font-size:9.5px;font-weight:400;color:#5c6785;display:none;}
 .gwrap{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
-.gcard{
+  .gcard{
   background:var(--bg-card);border:1.5px solid #3a3a3a;border-radius:12px;padding:7px 9px;
-  cursor:pointer;position:relative;-webkit-tap-highlight-color:transparent;
+  cursor:pointer;position:relative;overflow:visible;-webkit-tap-highlight-color:transparent;
 }
 .gcard.open{border-color:var(--stam-cur-c);z-index:30;}
 .grow-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;}
@@ -370,16 +371,84 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   appearance:none;-webkit-appearance:none;font-family:inherit;padding:0;
 }
 .gmark.show{opacity:1;color:#fff;border-color:var(--stam-cur-c);background:transparent;}
-.gedit{display:none;margin-top:7px;padding-top:7px;border-top:1px dashed var(--line);}
-.gcard.open .gedit{display:block;}
-.gedit-row{display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
+  .gedit{
+    display:none;position:absolute;z-index:31;top:calc(100% + 6px);left:0;right:0;
+    margin:0;padding:8px 9px;background:#000;border:1px solid var(--stam-cur-c);border-radius:12px;
+    box-shadow:0 8px 18px rgba(0,0,0,.45);
+  }
+  .gcard.open .gedit{display:block;}
+  .gedit-row{display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
 .gedit-row label{font-size:9.5px;color:var(--ink-dim);}
 .gedit-row input[type="number"]{
   width:42px;background:var(--bg-inset);border:1px solid var(--line);border-radius:6px;
   color:var(--ink);padding:4px 5px;font-size:11.5px;font-family:inherit;text-align:center;
 }
-.gedit-row .ebtn{padding:5px 8px;font-size:10.5px;}
-</style>
+  .gedit-row .ebtn{padding:5px 8px;font-size:10.5px;}
+
+  /* 幻想水滸伝 STAR LEAP */
+  .slsection{margin-top:14px;}
+  .slwrap{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .slcard{
+    background:var(--bg-card);border:1.5px solid #3a3a3a;border-radius:12px;padding:7px 9px;
+    cursor:pointer;position:relative;min-width:0;overflow:visible;-webkit-tap-highlight-color:transparent;
+  }
+  .slcard.open{border-color:#6fe8ff;z-index:30;}
+  .slhead{display:flex;align-items:center;justify-content:space-between;gap:5px;margin-bottom:2px;}
+  .slname{font-size:10.5px;font-weight:800;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .slbadge{font-size:8.5px;font-weight:700;color:#c8eef8;background:#1a2a33;border:1px solid #3d6a7a;border-radius:4px;padding:1px 5px;white-space:nowrap;}
+  .sltag{font-size:9px;font-weight:700;color:#8fd6a8;letter-spacing:.04em;}
+  .sltag.orb{color:#b9a7ff;}
+  .slmain{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--ok);line-height:1.1;white-space:nowrap;overflow:hidden;}
+  .slmain.full{color:var(--stam-full-c);}
+  .slorbs{letter-spacing:2px;color:#c9b8ff;font-size:16px;}
+  .slsub{height:13px;margin-top:1px;font-size:9.5px;color:#c9b8ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums;}
+  .slbar{height:3px;background:var(--line);border-radius:2px;overflow:hidden;margin-top:5px;}
+  .slbar-fill{height:100%;border-radius:2px;background:var(--ok);transition:width .3s linear;}
+  .slbar-fill.orb{background:#b9a7ff;}
+  .slbar-fill.full{background:var(--stam-full-c);}
+  .sledit{
+    display:none;position:absolute;z-index:31;top:calc(100% + 6px);left:0;right:0;
+    margin:0;padding:7px 9px;background:#000;border:1px solid #6fe8ff;border-radius:12px;
+    box-shadow:0 8px 18px rgba(0,0,0,.45);cursor:default;
+  }
+  .slcard.open .sledit{display:flex;align-items:center;gap:3px;}
+  .sledit input{box-sizing:border-box;height:28px;background:var(--bg-inset);border:1px solid #4a5a78;border-radius:6px;color:var(--ink);padding:4px 4px;font-size:11.5px;font-family:inherit;text-align:center;min-width:0;}
+  .sledit-current{flex:0 0 36px;width:36px;}
+  .sledit-next-input{flex:0 0 43px;width:43px;text-align:right;padding-right:4px;}
+  .slbtn{box-sizing:border-box;height:30px;border:none;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:800;cursor:pointer;font-family:inherit;color:#08131b;background:#8ec5ff;white-space:nowrap;}
+  .slbtn.sync{background:linear-gradient(135deg,#8ec5ff,#5b9dff);color:#0b1220;min-width:3.4em;}
+  .slbtn.consume{
+    flex:0 0 auto;min-width:2.4em;padding:5px 12px;font-size:16px;line-height:1;
+    background:linear-gradient(135deg,#ffc48a,#ff9a4a);color:#2a1400;
+  }
+  /* 通常スタミナ編集は、ドットアビスの .edit-side-stam と同じ入力寸法・更新位置に統一。 */
+  .slcard.stam-card .sledit{height:56px;padding:10px 12px;}
+  .slcard.stam-card .sledit-current{
+    flex:0 0 42px;width:42px;height:auto;
+    padding:4px 5px;font-size:11.5px;
+  }
+  .slcard.stam-card .slbtn.sync{
+    position:absolute;left:58%;transform:translateX(-50%);
+    height:auto;min-width:0;padding:6px 12px;font-size:11.5px;font-weight:700;letter-spacing:.03em;border-radius:8px;
+  }
+  .slcard.stam-card .slbtn.sync:active{transform:translateX(-50%) translateY(1px);}
+  .slcard.orb-card .sledit{min-height:28px;justify-content:space-between;align-items:center;flex-wrap:nowrap;}
+  .slcard.orb-card .slbtn.orb-adjust{
+    flex:0 0 26px;width:26px;height:26px;min-width:0;padding:0;margin:0;
+    font-size:16px;line-height:1;display:inline-flex;align-items:center;justify-content:center;
+  }
+  .slcard.orb-card .slbtn.restore{
+    background:linear-gradient(135deg,#b8e8c9,#72c894);color:#062015;
+  }
+  .slcard.orb-card .slbtn.consume{
+    position:absolute;left:50%;transform:translateX(-50%);
+    background:linear-gradient(135deg,#ffc48a,#ff9a4a);color:#2a1400;
+  }
+  .slcard.orb-card .slbtn.consume:active{transform:translateX(-50%) translateY(1px);}
+  .slcard.orb-card .sledit-next-input{flex:0 0 48px;width:48px;height:26px;margin-left:auto;font-size:11px;}
+  .slbtn.orb.sync{background:linear-gradient(135deg,#8ec5ff,#5b9dff);color:#0b1220;}
+  .slbtn:active{transform:translateY(1px);}
+  </style>
 </head>
 <body>
 <div class="wrap">
@@ -390,8 +459,10 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   </div>
   <div class="grid" id="grid"></div>
   <div class="gsection">
-    <div class="gsection-title">Gジェネ<span class="gsection-note">深夜1時更新</span></div>
     <div class="gwrap" id="gwrap"></div>
+  </div>
+  <div class="slsection">
+    <div class="slwrap" id="slwrap"></div>
   </div>
   <div class="backdrop" id="backdrop" onclick="closeAllPanels()"></div>
 </div>
@@ -439,7 +510,17 @@ const defaultGSlot = () => ({
 let gOpenIdx = -1;
 let gRefs = [];
 
-let state = { slots: Array.from({ length: N }, defaultSlot), dailyDate: '', weeklyWeekId: '', g: { slots: Array.from({ length: GN }, defaultGSlot), dailyDate: '' } };
+// ---- 幻想水滸伝 STAR LEAP ----
+const SL_STAM_MAX = 80;
+const SL_STAM_INTERVAL = 12 * 60 * 1000;
+const SL_ORB_MAX = 4;
+const SL_ORB_INTERVAL = 6 * 60 * 60 * 1000;
+const defaultSLTimer = () => ({ current: 0, start: null, running: false });
+const defaultSLState = () => ({ stamina: defaultSLTimer(), orb: defaultSLTimer() });
+let slOpenType = null;
+let slRefs = {};
+
+let state = { slots: Array.from({ length: N }, defaultSlot), dailyDate: '', weeklyWeekId: '', g: { slots: Array.from({ length: GN }, defaultGSlot), dailyDate: '' }, sl: defaultSLState() };
 
 let openIdx = -1;
 let openMode = null;
@@ -480,6 +561,14 @@ function formatTime(ms){
 function formatClock(ts){
   const d = new Date(ts);
   return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+function formatFixedDuration(ms){
+  ms = Math.max(0, safeNum(ms, 0));
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
 }
 function escapeHtml(s){
   return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -567,7 +656,7 @@ function renderDailyProgress(){
 function parseStoredState(){
   if (typeof localStorage === 'undefined') throw new Error('no localStorage');
   const raw = localStorage.getItem(STORAGE_KEY);
-  const result = { slots: null, dailyDate: gameDayStr(), weeklyWeekId: '', g: { slots: null, dailyDate: dayStrAt(G_RESET_HOUR) } };
+  const result = { slots: null, dailyDate: gameDayStr(), weeklyWeekId: '', g: { slots: null, dailyDate: dayStrAt(G_RESET_HOUR) }, sl: defaultSLState() };
   if (raw) {
     const parsed = JSON.parse(raw);
     if (parsed.slots && Array.isArray(parsed.slots) && parsed.slots.length === N) {
@@ -634,6 +723,22 @@ function parseStoredState(){
       });
       result.g.dailyDate = typeof parsed.g.dailyDate === 'string' ? parsed.g.dailyDate : dayStrAt(G_RESET_HOUR);
     }
+
+    if (parsed.sl && typeof parsed.sl === 'object') {
+      const readSLTimer = (source, max) => {
+        const out = defaultSLTimer();
+        if (!source || typeof source !== 'object') return out;
+        out.current = Math.max(0, Math.min(max, safeNum(source.current, 0)));
+        const start = safeNum(source.start, null);
+        if (source.running && start && start > 0 && start < Date.now() + 60000) {
+          out.start = start;
+          out.running = true;
+        }
+        return out;
+      };
+      result.sl.stamina = readSLTimer(parsed.sl.stamina, SL_STAM_MAX);
+      result.sl.orb = readSLTimer(parsed.sl.orb, SL_ORB_MAX);
+    }
   }
   return result;
 }
@@ -646,6 +751,7 @@ function loadState(){
     state.weeklyWeekId = parsed.weeklyWeekId || '';
     if (parsed.g && parsed.g.slots) state.g.slots = parsed.g.slots;
     if (parsed.g) state.g.dailyDate = parsed.g.dailyDate;
+    if (parsed.sl) state.sl = parsed.sl;
   } catch (e) {
     storageOk = false;
     setSaveStamp('このブラウザでは保存機能が使えません');
@@ -707,6 +813,25 @@ function getGStamInfo(s, now){
   const need = s.stamMax - current;
   const fullIn = (need - 1) * G_STAM_INTERVAL + nextIn;
   return { current, fullIn, fullAt: now + fullIn, isFull: false, pct: s.stamMax ? Math.min(100, (current / s.stamMax) * 100) : 0 };
+}
+
+function getSLTimerInfo(timer, max, interval, now){
+  if (!timer.running || !timer.start) {
+    const current = timer.current;
+    return { current, nextIn: null, fullIn: null, fullAt: null, isFull: current >= max, pct: max ? (current / max) * 100 : 0 };
+  }
+  const elapsed = Math.max(0, now - timer.start);
+  const recovered = Math.floor(elapsed / interval);
+  const current = Math.min(max, timer.current + recovered);
+  if (current >= max) {
+    const need = Math.max(0, max - timer.current);
+    const fullAt = timer.start + need * interval;
+    return { current: max, nextIn: 0, fullIn: 0, fullAt, isFull: true, pct: 100 };
+  }
+  const nextIn = interval - (elapsed % interval);
+  const need = max - current;
+  const fullIn = (need - 1) * interval + nextIn;
+  return { current, nextIn, fullIn, fullAt: now + fullIn, isFull: false, pct: Math.min(100, (current / max) * 100) };
 }
 
 function getIdleInfo(s, now){
@@ -814,6 +939,7 @@ function build(){
   cacheRefs();
   _lastOpenIdx = -1;
   buildG();
+  buildSL();
 }
 
 function buildG(){
@@ -866,6 +992,287 @@ function cacheRefsG(){
       curEl: document.getElementById('g-cur-' + i)
     });
   }
+}
+
+function buildSL(){
+  const wrap = document.getElementById('slwrap');
+  if (!wrap) return;
+  const stamina = state.sl.stamina;
+  const orb = state.sl.orb;
+  wrap.innerHTML =
+    '<div class="slcard stam-card" id="sl-card-stamina" data-slaction="card" data-sltype="stamina">' +
+      '<div class="slhead"><span class="slname">スタミナ</span><span class="slbadge">12分 / 1</span></div>' +
+      '<div class="sltag">討伐依頼</div>' +
+      '<div class="slmain" id="sl-stamina-main">—:—</div>' +
+      '<div class="slsub" id="sl-stamina-sub"></div>' +
+      '<div class="slbar"><div class="slbar-fill" id="sl-stamina-bar" style="width:0%"></div></div>' +
+      '<div class="sledit"><input type="text" class="sledit-current" id="sl-stamina-current" value="" inputmode="numeric" pattern="[0-9]*" aria-label="現在のスタミナ">' +
+      '<button type="button" class="slbtn sync" data-slaction="sync" data-sltype="stamina">更新</button></div>' +
+    '</div>' +
+    '<div class="slcard orb-card" id="sl-card-orb" data-slaction="card" data-sltype="orb">' +
+      '<div class="slhead"><span class="slname">御大樹の恵み</span><span class="slbadge">6時間 / 1</span></div>' +
+      '<div class="sltag orb">素材収集</div>' +
+      '<div class="slmain slorbs" id="sl-orb-main">○○○○</div>' +
+      '<div class="slsub" id="sl-orb-sub"></div>' +
+      '<div class="slbar"><div class="slbar-fill orb" id="sl-orb-bar" style="width:0%"></div></div>' +
+      '<div class="sledit">' +
+      '<button type="button" class="slbtn orb-adjust restore" data-slaction="restore" data-sltype="orb" aria-label="御大樹の恵みを1回復">＋</button>' +
+      '<button type="button" class="slbtn orb-adjust consume" data-slaction="consume" data-sltype="orb" aria-label="御大樹の恵みを1消費">−</button>' +
+      '<input type="text" class="sledit-next-input" id="sl-orb-next" placeholder="342" inputmode="numeric" pattern="[0-9:]*" aria-label="次のオーブ回復までの残り時間。3:42または342で入力" title="次の回復までを3:42または342で入力">' +
+      '</div>' +
+    '</div>';
+  slRefs = {
+    stamina: { card: document.getElementById('sl-card-stamina'), main: document.getElementById('sl-stamina-main'), sub: document.getElementById('sl-stamina-sub'), bar: document.getElementById('sl-stamina-bar'), input: document.getElementById('sl-stamina-current') },
+    orb: { card: document.getElementById('sl-card-orb'), main: document.getElementById('sl-orb-main'), sub: document.getElementById('sl-orb-sub'), bar: document.getElementById('sl-orb-bar'), nextInput: document.getElementById('sl-orb-next') }
+  };
+}
+
+function getSLConfig(type){
+  return type === 'orb'
+    ? { timer: state.sl.orb, max: SL_ORB_MAX, interval: SL_ORB_INTERVAL }
+    : { timer: state.sl.stamina, max: SL_STAM_MAX, interval: SL_STAM_INTERVAL };
+}
+
+function normalizeSLTimer(type, now){
+  const cfg = getSLConfig(type);
+  const timer = cfg.timer;
+  if (!timer.running || !timer.start) return getSLTimerInfo(timer, cfg.max, cfg.interval, now);
+  const elapsed = Math.max(0, now - timer.start);
+  const recovered = Math.floor(elapsed / cfg.interval);
+  if (recovered > 0) {
+    timer.current = Math.min(cfg.max, timer.current + recovered);
+    timer.start += recovered * cfg.interval;
+  }
+  if (timer.current >= cfg.max) {
+    timer.current = cfg.max;
+    timer.running = false;
+    timer.start = null;
+  }
+  return getSLTimerInfo(timer, cfg.max, cfg.interval, now);
+}
+
+function formatSLRemainingInput(ms){
+  const totalMinutes = Math.max(0, Math.floor(ms / 60000));
+  return Math.floor(totalMinutes / 60) + ':' + String(totalMinutes % 60).padStart(2, '0');
+}
+
+function parseSLRemainingInput(value){
+  const raw = String(value || '').trim().replace(/：/g, ':');
+  let hours, minutes;
+
+  if (raw.includes(':')) {
+    const parts = raw.split(':');
+    if (parts.length !== 2) return null;
+    hours = Number(parts[0]);
+    minutes = Number(parts[1]);
+  } else if (/^\d{1,4}$/.test(raw)) {
+    // 数字のみは末尾2桁を分として扱う。例: 342 → 3時間42分、240 → 2時間40分。
+    if (raw.length <= 2) {
+      hours = 0;
+      minutes = Number(raw);
+    } else {
+      hours = Number(raw.slice(0, -2));
+      minutes = Number(raw.slice(-2));
+    }
+  } else {
+    return null;
+  }
+
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes) || hours < 0 || minutes < 0 || minutes > 59) return null;
+  const ms = (hours * 60 + minutes) * 60 * 1000;
+  if (ms <= 0 || ms > SL_ORB_INTERVAL) return null;
+  return ms;
+}
+
+function placeCaretAtEnd(el){
+  requestAnimationFrame(() => {
+    try {
+      const end = el.value.length;
+      el.setSelectionRange(end, end);
+    } catch (e) {}
+  });
+}
+
+function closeSLCard(){
+  slOpenType = null;
+  Object.keys(slRefs).forEach(key => {
+    if (slRefs[key] && slRefs[key].card) slRefs[key].card.classList.remove('open');
+  });
+  const bd = document.getElementById('backdrop');
+  if (bd) bd.classList.toggle('show', openIdx >= 0 || gOpenIdx >= 0);
+}
+
+function toggleSLCard(type){
+  if (slOpenType === type) {
+    closeSLCard();
+    return;
+  }
+  slOpenType = type;
+  const cfg = getSLConfig(type);
+  const live = normalizeSLTimer(type, Date.now());
+  if (slRefs[type] && slRefs[type].input) {
+    const input = slRefs[type].input;
+    input.dataset.prev = String(live.current);
+    input.value = String(live.current); // Gジェネと同じく、開いた直後は現在値を表示する。
+  }
+  if (type === 'orb' && slRefs.orb && slRefs.orb.nextInput) {
+    slRefs.orb.nextInput.value = cfg.timer.running && !live.isFull ? formatSLRemainingInput(live.nextIn) : '';
+  }
+  Object.keys(slRefs).forEach(key => {
+    if (slRefs[key] && slRefs[key].card) slRefs[key].card.classList.toggle('open', slOpenType === key);
+  });
+  const bd = document.getElementById('backdrop');
+  if (bd) bd.classList.add('show');
+}
+
+function syncSL(type){
+  const cfg = getSLConfig(type);
+  const input = slRefs[type] && slRefs[type].input;
+  const raw = (input && input.value != null) ? String(input.value).trim() : '';
+  let parsed;
+  if (raw === '') {
+    const prev = parseInt(input && input.dataset.prev, 10);
+    parsed = Number.isFinite(prev) ? prev : cfg.timer.current;
+  } else {
+    parsed = parseInt(raw, 10);
+  }
+  if (!Number.isFinite(parsed)) parsed = cfg.timer.current;
+  const value = Math.max(0, Math.min(cfg.max, parsed));
+  cfg.timer.current = value;
+  cfg.timer.running = value < cfg.max;
+  cfg.timer.start = cfg.timer.running ? Date.now() : null;
+  saveState();
+  renderSL();
+  if (input) input.value = String(value);
+  if (type === 'orb' && slRefs.orb && slRefs.orb.nextInput) slRefs.orb.nextInput.value = formatSLRemainingInput(SL_ORB_INTERVAL);
+  closeSLCard();
+  startTicking();
+}
+
+function adjustSLOrbNext(){
+  const cfg = getSLConfig('orb');
+  const input = slRefs.orb && slRefs.orb.nextInput;
+  const remaining = parseSLRemainingInput(input && input.value);
+  if (remaining === null || cfg.timer.current >= SL_ORB_MAX) return;
+
+  const now = Date.now();
+  normalizeSLTimer('orb', now);
+  if (cfg.timer.current >= SL_ORB_MAX) return;
+
+  cfg.timer.running = true;
+  cfg.timer.start = now - (SL_ORB_INTERVAL - remaining);
+  saveState();
+  renderSL();
+  if (input) input.value = formatSLRemainingInput(remaining);
+  startTicking();
+}
+
+function addSLOrb(){
+  const now = Date.now();
+  const cfg = getSLConfig('orb');
+  normalizeSLTimer('orb', now);
+  if (cfg.timer.current >= cfg.max) return;
+  cfg.timer.current += 1;
+  if (cfg.timer.current >= cfg.max) {
+    cfg.timer.running = false;
+    cfg.timer.start = null;
+  } else if (!cfg.timer.running) {
+    cfg.timer.running = true;
+    cfg.timer.start = now;
+  }
+  saveState();
+  renderSL();
+  startTicking();
+}
+
+function consumeSLOrb(){
+  const now = Date.now();
+  const cfg = getSLConfig('orb');
+  normalizeSLTimer('orb', now);
+  if (cfg.timer.current <= 0) return;
+  cfg.timer.current -= 1;
+  if (!cfg.timer.running) {
+    cfg.timer.running = true;
+    cfg.timer.start = now;
+  }
+  saveState();
+  renderSL();
+  startTicking();
+}
+
+function renderSL(){
+  if (!slRefs.stamina || !slRefs.orb) return;
+  const now = Date.now();
+  const stamCfg = getSLConfig('stamina');
+  const orbCfg = getSLConfig('orb');
+  const stamina = getSLTimerInfo(stamCfg.timer, stamCfg.max, stamCfg.interval, now);
+  const orb = getSLTimerInfo(orbCfg.timer, orbCfg.max, orbCfg.interval, now);
+
+  setText(slRefs.stamina.main, stamina.isFull ? 'MAX' : (stamCfg.timer.running ? formatTime(stamina.fullIn) : '—:—'));
+  setClass(slRefs.stamina.main, 'slmain' + (stamina.isFull ? ' full' : ''));
+  setText(slRefs.stamina.sub, stamina.current + '/' + SL_STAM_MAX + (stamina.fullAt ? '　' + formatClock(stamina.fullAt) + (stamina.isFull ? ' 到達' : '') : ''));
+  setWidth(slRefs.stamina.bar, stamina.pct);
+  setClass(slRefs.stamina.bar, 'slbar-fill' + (stamina.isFull ? ' full' : ''));
+
+  const filled = '●'.repeat(orb.current) + '○'.repeat(SL_ORB_MAX - orb.current);
+  setText(slRefs.orb.main, filled);
+  setClass(slRefs.orb.main, 'slmain slorbs' + (orb.isFull ? ' full' : ''));
+  const orbText = orb.isFull ? '4/4　満タン' : (orbCfg.timer.running ? '次 ' + formatFixedDuration(orb.nextIn) + '　全 ' + formatFixedDuration(orb.fullIn) : orb.current + '/4　未開始');
+  setText(slRefs.orb.sub, orbText);
+  setWidth(slRefs.orb.bar, orb.pct);
+  setClass(slRefs.orb.bar, 'slbar-fill orb' + (orb.isFull ? ' full' : ''));
+}
+
+function setupSLDelegatedEvents(){
+  const wrap = document.getElementById('slwrap');
+  if (!wrap || wrap.dataset.delegated) return;
+  wrap.dataset.delegated = '1';
+  wrap.addEventListener('click', (ev) => {
+    const el = ev.target.closest('[data-slaction]');
+    if (!el) return;
+    const action = el.dataset.slaction;
+    const type = el.dataset.sltype;
+    if (action === 'card') {
+      // 編集パネル内部の余白・入力欄は、カードを閉じる対象にしない。
+      if (ev.target.closest('.sledit')) return;
+      toggleSLCard(type);
+    } else if (action === 'sync') {
+      syncSL(type);
+    } else if (action === 'restore') {
+      addSLOrb();
+    } else if (action === 'consume') {
+      consumeSLOrb();
+    } else if (action === 'adjust-next') {
+      adjustSLOrbNext();
+    }
+  });
+  wrap.addEventListener('change', (ev) => {
+    if (ev.target && ev.target.id === 'sl-orb-next') adjustSLOrbNext();
+  });
+  wrap.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter' && ev.target && ev.target.id === 'sl-orb-next') {
+      ev.preventDefault();
+      ev.target.blur();
+    }
+  });
+  wrap.addEventListener('focusin', (ev) => {
+    const input = ev.target;
+    if (!input || input.tagName !== 'INPUT') return;
+    // 現在値欄・オーブの時間欄はフォーカスでブランク（入力しやすく）。
+    if (input.classList && (input.classList.contains('sledit-current') || input.id === 'sl-orb-next')) {
+      if (input.value !== '') input.dataset.prev = input.value;
+      input.value = '';
+      return;
+    }
+    placeCaretAtEnd(input);
+  });
+  wrap.addEventListener('focusout', (ev) => {
+    const input = ev.target;
+    if (!input || !input.classList || !input.classList.contains('sledit-current')) return;
+    if (String(input.value).trim() === '' && input.dataset.prev != null) {
+      input.value = input.dataset.prev;
+    }
+  });
 }
 
 function cacheRefs(){
@@ -1048,6 +1455,7 @@ function closeAllPanels(){
   if (gOpenIdx >= 0) restoreGEditInputs(gOpenIdx);
   gOpenIdx = -1;
   updateGOpenState();
+  closeSLCard();
   softBlur();
 }
 
@@ -1416,6 +1824,7 @@ function render(){
     }
   } catch (e) { console.warn(e); }
   renderG();
+  renderSL();
   // すべて満タン・未開始なら、不要な毎秒描画を停止する。
   if (tickId && !needsTicking()) stopTicking();
 }
@@ -1467,6 +1876,8 @@ function needsTicking(){
     const s = state.g.slots[i];
     if (s.stamRunning && !getGStamInfo(s, now).isFull) return true;
   }
+  if (state.sl.stamina.running && !getSLTimerInfo(state.sl.stamina, SL_STAM_MAX, SL_STAM_INTERVAL, now).isFull) return true;
+  if (state.sl.orb.running && !getSLTimerInfo(state.sl.orb, SL_ORB_MAX, SL_ORB_INTERVAL, now).isFull) return true;
   return false;
 }
 
@@ -1580,10 +1991,14 @@ function setupDelegatedEvents(){
 }
 
 document.addEventListener('contextmenu', (ev) => {
-  const el = ev.target;
-  if (el && el.tagName === 'INPUT' && el.classList && el.classList.contains('editing')) return;
-  if (el && el.tagName === 'INPUT' && el.type === 'number') return;
+  // 入力欄を含む全画面で、スマホの長押しメニューを表示しない。
   ev.preventDefault();
+}, { capture: true });
+
+document.addEventListener('selectstart', (ev) => {
+  // ランク表示を長押しして編集へ入る際に、表示文字をハイライトさせない。
+  const el = ev.target;
+  if (el && el.closest && el.closest('.rank-disp')) ev.preventDefault();
 }, { capture: true });
 
 function setupGDelegatedEvents(){
@@ -1663,15 +2078,34 @@ function setupGDelegatedEvents(){
 loadState();
 setupDelegatedEvents();
 setupGDelegatedEvents();
+setupSLDelegatedEvents();
 // 初期描画を優先し、Service Workerの登録はアイドル時へ退避する。
 scheduleServiceWorkerRegistration();
 const startupGraceUntil = Date.now() + 3000;
 
 // ---- 画面復帰時のタイマー同期処理 ----
-function resumeTicking(){
-  render();
-  startTicking();
-  scheduleResetCheck();
+// focus/pageshow は visibilitychange と二重発火しやすいので使わない。
+// 連続復帰イベントは短い debounce で1回にまとめる。
+let resumeDebounceTimer = null;
+let lastResumeAt = 0;
+
+function resumeTicking(force){
+  if (document.hidden) return;
+  const now = Date.now();
+  if (!force && now - lastResumeAt < 320) return;
+  lastResumeAt = now;
+
+  if (resumeDebounceTimer) {
+    clearTimeout(resumeDebounceTimer);
+    resumeDebounceTimer = null;
+  }
+  resumeDebounceTimer = setTimeout(() => {
+    resumeDebounceTimer = null;
+    if (document.hidden) return;
+    render();
+    startTicking();
+    scheduleResetCheck();
+  }, 48);
 }
 
 function scheduleResetCheck(){
@@ -1689,7 +2123,10 @@ function scheduleResetCheck(){
 
   resetCheckTimer = setTimeout(() => {
     resetCheckTimer = null;
-    render();
+    if (!document.hidden) {
+      render();
+      startTicking();
+    }
     scheduleResetCheck();
   }, Math.max(1000, next.getTime() - now.getTime()));
 }
@@ -1698,13 +2135,18 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     if (Date.now() < startupGraceUntil) return;
     stopTicking();
+    if (resumeDebounceTimer) {
+      clearTimeout(resumeDebounceTimer);
+      resumeDebounceTimer = null;
+    }
   } else {
-    resumeTicking();
+    resumeTicking(false);
   }
 });
 
-window.addEventListener('pageshow', resumeTicking);
-window.addEventListener('focus', resumeTicking);
+window.addEventListener('pageshow', (ev) => {
+  if (ev.persisted) resumeTicking(true);
+});
 
 function scheduleServiceWorkerRegistration(){
   if (swRegistrationScheduled) return;
