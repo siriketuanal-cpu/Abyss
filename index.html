@@ -305,7 +305,19 @@ input,textarea{
 .ebtn-gap{flex:1;}
 footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;display:none;}
 
-.gsection{margin-top:14px;}
+	/* テスト用ゲームタブ */
+	.game-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px;}
+	.game-tab{
+	  min-height:34px;border:1px solid #3d4a62;border-radius:9px;background:#0c111c;color:var(--ink-dim);
+	  font:700 11.5px/1 inherit;letter-spacing:.03em;cursor:pointer;
+	  -webkit-tap-highlight-color:transparent;
+	}
+	.game-tab.active{border-color:#6fe8ff;background:#132b35;color:#dff9ff;box-shadow:0 0 0 1px rgba(111,232,255,.2);}
+	.game-tab-panel{display:none;}
+	.game-tab-panel.active{display:block;}
+	.game-tab-panel .gsection,.game-tab-panel .slsection{margin-top:0;}
+	
+	.gsection{margin-top:14px;}
 .gsection-title{
   font-size:11px;color:var(--ink-dim);font-weight:700;margin:0 0 6px 2px;
   display:flex;align-items:baseline;gap:6px;
@@ -458,11 +470,19 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
     <span class="daily-progress" id="dailyProgress"></span>
   </div>
   <div class="grid" id="grid"></div>
-  <div class="gsection">
-    <div class="gwrap" id="gwrap"></div>
+  <div class="game-tabs" id="gameTabs" role="tablist" aria-label="ゲームタイマー">
+    <button type="button" class="game-tab active" id="game-tab-g" data-game-tab="g" role="tab" aria-selected="true" aria-controls="game-panel-g">Gジェネ</button>
+    <button type="button" class="game-tab" id="game-tab-sl" data-game-tab="sl" role="tab" aria-selected="false" aria-controls="game-panel-sl">スターリープ</button>
   </div>
-  <div class="slsection">
-    <div class="slwrap" id="slwrap"></div>
+  <div class="game-tab-panel active" id="game-panel-g" role="tabpanel" aria-labelledby="game-tab-g">
+    <div class="gsection">
+      <div class="gwrap" id="gwrap"></div>
+    </div>
+  </div>
+  <div class="game-tab-panel" id="game-panel-sl" role="tabpanel" aria-labelledby="game-tab-sl" hidden>
+    <div class="slsection">
+      <div class="slwrap" id="slwrap"></div>
+    </div>
   </div>
   <div class="backdrop" id="backdrop" onclick="closeAllPanels()"></div>
 </div>
@@ -1459,6 +1479,44 @@ function closeAllPanels(){
   softBlur();
 }
 
+// ---- テスト用ゲームタブ ----
+let activeGameTab = 'g';
+
+function switchGameTab(tab){
+  if (tab !== 'g' && tab !== 'sl') return;
+  if (tab === activeGameTab) return;
+
+  // 非表示になる編集欄を閉じ、重ね表示や入力フォーカスを残さない。
+  if (gOpenIdx >= 0) {
+    restoreGEditInputs(gOpenIdx);
+    gOpenIdx = -1;
+    updateGOpenState();
+  }
+  closeSLCard();
+  softBlur();
+
+  activeGameTab = tab;
+  const gPanel = document.getElementById('game-panel-g');
+  const slPanel = document.getElementById('game-panel-sl');
+  const gTab = document.getElementById('game-tab-g');
+  const slTab = document.getElementById('game-tab-sl');
+  const isG = tab === 'g';
+  if (gPanel) { gPanel.classList.toggle('active', isG); gPanel.hidden = !isG; }
+  if (slPanel) { slPanel.classList.toggle('active', !isG); slPanel.hidden = isG; }
+  if (gTab) { gTab.classList.toggle('active', isG); gTab.setAttribute('aria-selected', String(isG)); }
+  if (slTab) { slTab.classList.toggle('active', !isG); slTab.setAttribute('aria-selected', String(!isG)); }
+}
+
+function setupGameTabs(){
+  const tabs = document.getElementById('gameTabs');
+  if (!tabs || tabs.dataset.ready) return;
+  tabs.dataset.ready = '1';
+  tabs.addEventListener('click', (ev) => {
+    const tab = ev.target.closest('[data-game-tab]');
+    if (tab) switchGameTab(tab.dataset.gameTab);
+  });
+}
+
 // ---- Gジェネ操作 ----
 function updateGOpenState(){
   for (let i = 0; i < GN; i++) {
@@ -2079,6 +2137,7 @@ loadState();
 setupDelegatedEvents();
 setupGDelegatedEvents();
 setupSLDelegatedEvents();
+setupGameTabs();
 // 初期描画を優先し、Service Workerの登録はアイドル時へ退避する。
 scheduleServiceWorkerRegistration();
 const startupGraceUntil = Date.now() + 3000;
