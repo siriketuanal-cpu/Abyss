@@ -223,6 +223,12 @@ input,textarea{
 .pbar-fill.stam.full{background:var(--stam-full-c)!important;}
 .pbar-fill.idle.full{background:var(--stam-full-c)!important;}
 .pbar-fill.idle.urgent{background:var(--stam-full-c)!important;}
+/* 放置報酬の受取待機は、残り時間を保ったまま右端の小さな文言だけで示す。 */
+.tblock-idle{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
+.idle-main-line{display:flex;align-items:baseline;justify-content:space-between;gap:4px;min-width:0;}
+.idle-main-line .tval.idle{min-width:0;flex:0 1 auto;}
+.idle-receive{visibility:hidden;flex:0 0 auto;color:#bfe8ff;font-size:10.5px;font-weight:800;letter-spacing:.03em;white-space:nowrap;}
+.tblock-idle.receive-armed .idle-receive{visibility:visible;}
 .edit-panel{
   display:none;position:absolute;top:calc(100% + 6px);background:#000;
   border:1px solid var(--violet);border-radius:12px;padding:10px 12px;
@@ -929,22 +935,18 @@ function build(){
             '<div class="tsub"><span class="tsub-cur" id="stam-subcur-' + i + '"></span><span class="tsub-sep" id="stam-subsep-' + i + '">/</span><span class="tsub-max" id="stam-submax-' + i + '"></span><span class="tsub-clock" id="stam-subclock-' + i + '"></span></div>' +
             '<div class="pbar"><div class="pbar-fill stam" id="stam-bar-' + i + '" style="width:0%"></div></div>' +
           '</div>' +
-          '<div class="tblock tblock-idle">' +
+          '<div class="tblock tblock-idle" id="idle-block-' + i + '" data-idle-receive="true" role="button" aria-label="放置報酬を受け取る。2回タップで確定">' +
             '<div class="ttag idle">放置報酬</div>' +
-            '<div class="tval idle" id="idle-val-' + i + '">—:—</div>' +
+            '<div class="idle-main-line"><div class="tval idle" id="idle-val-' + i + '">—:—</div><span class="idle-receive" id="idle-receive-' + i + '">受取</span></div>' +
             '<div class="tsub idle-meta" id="idle-sub-' + i + '"></div>' +
             '<div class="pbar"><div class="pbar-fill idle" id="idle-bar-' + i + '" style="width:0%"></div></div>' +
           '</div>' +
         '</div>' +
-        '<div class="edit-panel" id="edit-' + i + '">' +
+          '<div class="edit-panel" id="edit-' + i + '">' +
           '<div class="edit-panel-split">' +
             '<div class="edit-side edit-side-stam">' +
               '<input type="number" id="stam-cur-' + i + '" value="' + s.stamCurrent + '" min="0" max="999" inputmode="numeric" aria-label="現在のスタミナ">' +
               '<button type="button" class="ebtn stam" data-action="update" data-idx="' + i + '">更新</button>' +
-            '</div>' +
-            '<div class="edit-side-divider" aria-hidden="true"></div>' +
-            '<div class="edit-side edit-side-idle">' +
-              '<button type="button" class="ebtn idle" id="recv-btn-' + i + '" data-action="receive" data-idx="' + i + '">受取</button>' +
             '</div>' +
           '</div>' +
         '</div>' +
@@ -1310,20 +1312,8 @@ function onCardClick(i, ev){
   if (Date.now() < suppressOpenAllUntil) return;
   disarmAllIdle();
 
-  let side = null;
-  if (t.closest && (t.closest('.tblock-stam') || t.closest('.row-hit-stam'))) side = 'stam';
-  else if (t.closest && (t.closest('.tblock-idle') || t.closest('.row-hit-idle'))) side = 'idle';
-  else {
-    const cardEl = (refs[i] && refs[i].card) || (t.closest && t.closest('.card'));
-    const x = (ev.clientX != null) ? ev.clientX
-      : (ev.changedTouches && ev.changedTouches[0] ? ev.changedTouches[0].clientX : null);
-    if (cardEl && x != null) {
-      const r = cardEl.getBoundingClientRect();
-      side = (x - r.left) >= r.width * 0.5 ? 'idle' : 'stam';
-    } else {
-      side = 'stam';
-    }
-  }
+  // 放置報酬領域は受取専用。カードの通常タップは常にスタミナ編集だけを開く。
+  const side = 'stam';
 
   if (openIdx === i) {
     if (t.closest && t.closest('.edit-panel')) return;
@@ -1807,41 +1797,45 @@ function onRankBlur(i){
   suppressOpenAllUntil = Date.now() + 150;
 }
 
+function updateIdleReceiveVisual(i, armed){
+  const block = document.getElementById('idle-block-' + i);
+  const action = document.getElementById('idle-receive-' + i);
+  if (!block || !action) return;
+  // 残り時間・満タン時刻は変えず、右端の別色文言だけで受取待機を示す。
+  block.classList.toggle('receive-armed', armed);
+  action.setAttribute('aria-hidden', armed ? 'false' : 'true');
+}
 function disarmIdle(i){
   if (Object.prototype.hasOwnProperty.call(armedIdle, i)) {
     clearTimeout(armedIdle[i]);
     delete armedIdle[i];
-    const btn = document.getElementById('recv-btn-' + i);
-    if (btn) { btn.textContent = '受取'; btn.classList.remove('armed'); }
+    updateIdleReceiveVisual(i, false);
+    render();
   }
 }
 function disarmAllIdle(){ Object.keys(armedIdle).forEach(k => disarmIdle(Number(k))); }
 
-function onReceiveClick(i, btnEl){
+function onIdleTimerTap(i){
   if (Object.prototype.hasOwnProperty.call(armedIdle, i)) {
     clearTimeout(armedIdle[i]);
     delete armedIdle[i];
+    updateIdleReceiveVisual(i, false);
     if (document.activeElement) document.activeElement.blur();
+    // 初回も受取後も、従来どおり12時間計測を開始する。
     state.slots[i].idleStart = Date.now() - IDLE_LEAD_MS;
     state.slots[i].idleRunning = true;
     saveState();
-    btnEl.textContent = '受取';
-    btnEl.classList.remove('armed');
-    openIdx = -1;
-    openMode = null;
-    updateOpenState();
     render();
     startTicking();
-  } else {
-    disarmAllIdle();
-    btnEl.textContent = '確定';
-    btnEl.classList.add('armed');
-    armedIdle[i] = setTimeout(() => {
-      delete armedIdle[i];
-      btnEl.textContent = '受取';
-      btnEl.classList.remove('armed');
-    }, 4000);
+    return;
   }
+  disarmAllIdle();
+  updateIdleReceiveVisual(i, true);
+  armedIdle[i] = setTimeout(() => {
+    delete armedIdle[i];
+    updateIdleReceiveVisual(i, false);
+    render();
+  }, 4000);
 }
 
 function render(){
@@ -1893,16 +1887,17 @@ function render(){
         setText(r.stamSubClock, '');
       }
       setWidth(r.stamBar, stam.pct); setClass(r.stamBar, stamBarCls);
-      setText(r.idleVal, idle.display);
       let idleCls = 'tval idle';
       if (idle.isFull) idleCls += ' full';
       else if (s.idleRunning && idle.remainingMs != null && idle.remainingMs < URGENT_MS) idleCls += ' urgent';
-      setClass(r.idleVal, idleCls);
+      // 受取待機中も、残り時間と満タン時刻は通常どおり毎秒更新する。
+      setText(r.idleVal, idle.display);
       if (idle.clockTxt) {
         setHTML(r.idleSub, '<span class="idle-clock">' + idle.clockTxt + '</span>' + idle.suffix);
       } else {
         setText(r.idleSub, idle.meta);
       }
+      setClass(r.idleVal, idleCls);
       setWidth(r.idleBar, idle.pct);
       setClass(r.idleBar, 'pbar-fill idle' + (idle.isFull ? ' full' : (idleCls.indexOf('urgent') >= 0 ? ' urgent' : '')));
     }
@@ -1984,6 +1979,13 @@ function setupDelegatedEvents(){
 
   grid.addEventListener('click', (ev) => {
     const t = ev.target;
+    const idleBlock = t.closest && t.closest('[data-idle-receive]');
+    if (idleBlock) {
+      const cardEl = idleBlock.closest('.card');
+      const idx = cardEl ? Number(cardEl.dataset.idx) : NaN;
+      if (Number.isFinite(idx)) onIdleTimerTap(idx);
+      return;
+    }
     if (t.classList && (t.classList.contains('name-disp') || t.classList.contains('rank-disp'))) {
       if (lpFired) { lpFired = false; return; }
       const cardEl = t.closest('.card');
@@ -1998,7 +2000,6 @@ function setupDelegatedEvents(){
     const i = Number(el.dataset.idx);
     if (action === 'card') onCardClick(i, ev);
     else if (action === 'update') applyStam(i);
-    else if (action === 'receive') onReceiveClick(i, el);
     else if (action === 'mark' || action === 'weekly') { /* 長押し判定で制御 */ }
   });
 
