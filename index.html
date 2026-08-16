@@ -95,6 +95,10 @@ input,textarea{
 .grid[data-group="g1"] .card-row[data-group="g1"],
 .grid[data-group="g2"] .card-row[data-group="g2"]{display:flex;}
 .card-row{display:flex;align-items:center;gap:11px;}
+/* ドットアビスはスタミナと放置報酬を独立カードとして横並びにする。 */
+.abyss-timers{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;flex:1 1 auto;min-width:0;}
+.abyss-timers > .card{min-width:0;}
+.abyss-idle-card{cursor:pointer;}
 .card-row:nth-child(3),.card-row:nth-child(5){
   margin-top:2px;padding-top:8px;border-top:1px solid #5a6a88;
 }
@@ -115,6 +119,8 @@ input,textarea{
 .card.g1.open{border-color:var(--g1);box-shadow:0 0 0 1.5px var(--g1);}
 .card.g2.open{border-color:var(--g2);box-shadow:0 0 0 1.5px var(--g2);}
 .row-top{display:flex;align-items:center;gap:7px;margin-bottom:3px;}
+/* 放置報酬側にもスタミナ側の名前・ランク行と同じ高さを確保し、タイマー表示を揃える。 */
+.abyss-idle-spacer{height:16.6px;margin-bottom:3px;}
 .rank-disp,.rank-input{
   margin-left:auto;flex-shrink:0;width:4.2em;max-width:38%;
   color:#f0a07a;font-size:12px;font-weight:800;
@@ -233,7 +239,7 @@ input,textarea{
   z-index:31;
   contain:layout style;
   box-sizing:border-box;
-  width:calc(50% - 4px);
+  width:100%;
   left:0;right:auto;
 }
 .card.g0 .edit-panel{border-color:var(--g0);}
@@ -279,15 +285,10 @@ input,textarea{
   white-space:nowrap;
 }
 .card.open.mode-stam .edit-panel{
-  left:0;right:auto;width:calc(50% - 4px);
+  left:0;right:auto;width:100%;
   border-color:var(--ok);
 }
-.card.open.mode-idle .edit-panel{
-  left:auto;right:0;width:calc(50% - 4px);
-  border-color:var(--idle-c);
-}
 .card.open.mode-stam .edit-side-idle{display:none !important;}
-.card.open.mode-idle .edit-side-stam{display:none !important;}
 .row-top{position:relative;}
 .row-hit{position:absolute;top:0;bottom:0;z-index:1;}
 .row-hit-stam{left:0;width:50%;}
@@ -913,43 +914,34 @@ function build(){
     const s = state.slots[i];
     html +=
       '<div class="card-row" data-group="' + groupClass(i) + '">' +
-      '<div class="card ' + groupClass(i) + '" id="card-' + i + '" data-action="card" data-idx="' + i + '"' +
-      ' aria-expanded="false">' +
-        '<div class="row-top">' +
-          '<span class="row-hit row-hit-stam" aria-hidden="true"></span>' +
-          '<span class="row-hit row-hit-idle" aria-hidden="true"></span>' +
-          '<span class="name-disp' + (s.label ? '' : ' empty') + '" id="name-disp-' + i + '">' +
-          (s.label ? escapeHtml(s.label) : ('スロット ' + (i + 1))) + '</span>' +
-          '<input class="name-input" id="name-' + i + '" value="' + escapeHtml(s.label) + '" placeholder="スロット ' + (i + 1) + '"' +
-          ' inputmode="text" enterkeyhint="done" aria-label="スロット' + (i + 1) + 'の名前">' +
-
-          '<span class="rank-disp" id="rank-disp-' + i + '">Lv.' + (s.rank || 1) + '</span>' +
-          '<input class="rank-input" id="rank-' + i + '" value="' + (s.rank || 1) + '"' +
-          ' inputmode="numeric" enterkeyhint="done" aria-label="プレイヤレベル">' +
-        '</div>' +
-        '<div class="timers-row">' +
-          '<div class="tblock tblock-stam">' +
-            '<div class="ttag stam">スタミナ</div>' +
-            '<div class="tval stam" id="stam-val-' + i + '">—:—</div>' +
-            '<div class="tsub"><span class="tsub-cur" id="stam-subcur-' + i + '"></span><span class="tsub-sep" id="stam-subsep-' + i + '">/</span><span class="tsub-max" id="stam-submax-' + i + '"></span><span class="tsub-clock" id="stam-subclock-' + i + '"></span></div>' +
-            '<div class="pbar"><div class="pbar-fill stam" id="stam-bar-' + i + '" style="width:0%"></div></div>' +
+        '<div class="abyss-timers">' +
+          '<div class="card abyss-stam-card ' + groupClass(i) + '" id="card-' + i + '" data-action="card" data-idx="' + i + '" aria-expanded="false">' +
+            '<div class="row-top">' +
+              '<span class="name-disp' + (s.label ? '' : ' empty') + '" id="name-disp-' + i + '">' +
+              (s.label ? escapeHtml(s.label) : ('スロット ' + (i + 1))) + '</span>' +
+              '<input class="name-input" id="name-' + i + '" value="' + escapeHtml(s.label) + '" placeholder="スロット ' + (i + 1) + '" inputmode="text" enterkeyhint="done" aria-label="スロット' + (i + 1) + 'の名前">' +
+              '<span class="rank-disp" id="rank-disp-' + i + '">Lv.' + (s.rank || 1) + '</span>' +
+              '<input class="rank-input" id="rank-' + i + '" value="' + (s.rank || 1) + '" inputmode="numeric" enterkeyhint="done" aria-label="プレイヤレベル">' +
+            '</div>' +
+            '<div class="tblock tblock-stam">' +
+              '<div class="ttag stam">スタミナ</div>' +
+              '<div class="tval stam" id="stam-val-' + i + '">—:—</div>' +
+              '<div class="tsub"><span class="tsub-cur" id="stam-subcur-' + i + '"></span><span class="tsub-sep" id="stam-subsep-' + i + '">/</span><span class="tsub-max" id="stam-submax-' + i + '"></span><span class="tsub-clock" id="stam-subclock-' + i + '"></span></div>' +
+              '<div class="pbar"><div class="pbar-fill stam" id="stam-bar-' + i + '" style="width:0%"></div></div>' +
+            '</div>' +
+            '<div class="edit-panel" id="edit-' + i + '"><div class="edit-panel-split"><div class="edit-side edit-side-stam">' +
+              '<input type="number" id="stam-cur-' + i + '" value="' + s.stamCurrent + '" min="0" max="999" inputmode="numeric" aria-label="現在のスタミナ">' +
+              '<button type="button" class="ebtn stam" data-action="update" data-idx="' + i + '">更新</button>' +
+            '</div></div></div>' +
           '</div>' +
-          '<div class="tblock tblock-idle" id="idle-block-' + i + '" data-idle-receive="true" role="button" aria-label="放置報酬を受け取る。2回タップで確定">' +
+          '<div class="card abyss-idle-card ' + groupClass(i) + ' tblock-idle" id="idle-block-' + i + '" data-idle-receive="true" data-idx="' + i + '" role="button" aria-label="放置報酬を受け取る。2回タップで確定">' +
+            '<div class="row-top abyss-idle-spacer" aria-hidden="true"></div>' +
             '<div class="ttag idle">放置報酬</div>' +
             '<div class="tval idle" id="idle-val-' + i + '">—:—</div>' +
             '<div class="tsub idle-meta" id="idle-sub-' + i + '"></div>' +
             '<div class="pbar"><div class="pbar-fill idle" id="idle-bar-' + i + '" style="width:0%"></div></div>' +
           '</div>' +
         '</div>' +
-          '<div class="edit-panel" id="edit-' + i + '">' +
-          '<div class="edit-panel-split">' +
-            '<div class="edit-side edit-side-stam">' +
-              '<input type="number" id="stam-cur-' + i + '" value="' + s.stamCurrent + '" min="0" max="999" inputmode="numeric" aria-label="現在のスタミナ">' +
-              '<button type="button" class="ebtn stam" data-action="update" data-idx="' + i + '">更新</button>' +
-            '</div>' +
-          '</div>' +
-        '</div>' +
-      '</div>' +
       '<div class="mark-col">' +
       '<button type="button" class="daily-mark ' + groupClass(i) + (s.missionDone ? ' show' : '') + '" id="daily-mark-' + i + '"' +
       ' data-action="mark" data-idx="' + i + '" tabindex="-1" aria-label="スロット' + (i + 1) + 'のデイリー完了" aria-pressed="' + (s.missionDone ? 'true' : 'false') + '">✓</button>' +
@@ -1309,6 +1301,12 @@ function onCardClick(i, ev){
     return;
   }
   if (Date.now() < suppressOpenAllUntil) return;
+  // 受取確認中は、スタミナ側を触れても最初のタップでは確認を解除するだけにする。
+  // 放置報酬カード同士と同じ安全クッションを適用し、誤操作を防ぐ。
+  if (Object.keys(armedIdle).length > 0) {
+    disarmAllIdle();
+    return;
+  }
   disarmAllIdle();
 
   // 放置報酬領域は受取専用。カードの通常タップは常にスタミナ編集だけを開く。
@@ -1841,6 +1839,13 @@ function onIdleTimerTap(i){
     startTicking();
     return;
   }
+  // 別スロットが受取確認中なら、最初のタップは確認を解除するだけにする。
+  // 意図せず別の放置報酬をそのまま受取待機へ切り替えないための安全クッション。
+  const hasOtherArmedIdle = Object.keys(armedIdle).some((key) => Number(key) !== i);
+  if (hasOtherArmedIdle) {
+    disarmAllIdle();
+    return;
+  }
   disarmAllIdle();
   updateIdleReceiveVisual(i, true);
   armedIdle[i] = setTimeout(() => {
@@ -2009,41 +2014,13 @@ function setupDelegatedEvents(){
       return;
     }
     if (t.classList && (t.classList.contains('name-disp') || t.classList.contains('rank-disp'))) {
-      // 長押しの名前・ランク編集は従来どおり維持する。
       if (lpFired) { lpFired = false; return; }
       const cardEl = t.closest('.card');
       const idx = cardEl ? Number(cardEl.dataset.idx) : NaN;
-      // 右半分では、上段のランク表示を含めて放置報酬の操作を優先する。
-      if (cardEl && typeof ev.clientX === 'number') {
-        const rect = cardEl.getBoundingClientRect();
-        if (ev.clientX >= rect.left + (rect.width / 2)) {
-          if (Number.isFinite(idx)) {
-            closeAbyssEditForIdle();
-            onIdleTimerTap(idx);
-          }
-          return;
-        }
-      }
       if (Number.isFinite(idx)) onCardClick(idx, ev);
       return;
     }
-    if (t.closest && t.closest('input')) return;
-    if (t.closest && t.closest('.edit-panel')) return;
-
-    // 名前・ランク以外では、カード右半分を放置報酬の広い操作領域として扱う。
-    const cardEl = t.closest && t.closest('.card');
-    if (cardEl && typeof ev.clientX === 'number') {
-      const rect = cardEl.getBoundingClientRect();
-      if (ev.clientX >= rect.left + (rect.width / 2)) {
-        const idx = Number(cardEl.dataset.idx);
-        if (Number.isFinite(idx)) {
-          closeAbyssEditForIdle();
-          onIdleTimerTap(idx);
-        }
-        return;
-      }
-    }
-
+    if (t.closest && (t.closest('input') || t.closest('.edit-panel'))) return;
     const el = t.closest('[data-action]');
     if (!el) return;
     const action = el.dataset.action;
