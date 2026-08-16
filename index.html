@@ -225,8 +225,8 @@ input,textarea{
 .pbar-fill.idle.urgent{background:var(--stam-full-c)!important;}
 /* 放置報酬の受取待機は色と文字だけで示し、点滅・アニメーションは使わない。 */
 .tblock-idle{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
-.tblock-idle.receive-armed .tval.idle{color:#ffe0a3!important;}
-.tblock-idle.receive-armed .idle-meta{color:#ffe0a3!important;}
+.tblock-idle.receive-armed .tval.idle{color:#bfe8ff!important;}
+.tblock-idle.receive-armed .idle-meta{color:#bfe8ff!important;}
 .edit-panel{
   display:none;position:absolute;top:calc(100% + 6px);background:#000;
   border:1px solid var(--violet);border-radius:12px;padding:10px 12px;
@@ -1818,6 +1818,15 @@ function disarmIdle(i){
 }
 function disarmAllIdle(){ Object.keys(armedIdle).forEach(k => disarmIdle(Number(k))); }
 
+function closeAbyssEditForIdle(){
+  if (openIdx < 0) return;
+  restoreEditInputs(openIdx);
+  openIdx = -1;
+  openMode = null;
+  updateOpenState();
+  softBlur();
+}
+
 function onIdleTimerTap(i){
   if (Object.prototype.hasOwnProperty.call(armedIdle, i)) {
     clearTimeout(armedIdle[i]);
@@ -1992,17 +2001,49 @@ function setupDelegatedEvents(){
     if (idleBlock) {
       const cardEl = idleBlock.closest('.card');
       const idx = cardEl ? Number(cardEl.dataset.idx) : NaN;
-      if (Number.isFinite(idx)) onIdleTimerTap(idx);
+      if (Number.isFinite(idx)) {
+        // 放置報酬を押したら、開いているスタミナ編集を静かに閉じて受取操作へ移る。
+        closeAbyssEditForIdle();
+        onIdleTimerTap(idx);
+      }
       return;
     }
     if (t.classList && (t.classList.contains('name-disp') || t.classList.contains('rank-disp'))) {
+      // 長押しの名前・ランク編集は従来どおり維持する。
       if (lpFired) { lpFired = false; return; }
       const cardEl = t.closest('.card');
       const idx = cardEl ? Number(cardEl.dataset.idx) : NaN;
+      // 右半分では、上段のランク表示を含めて放置報酬の操作を優先する。
+      if (cardEl && typeof ev.clientX === 'number') {
+        const rect = cardEl.getBoundingClientRect();
+        if (ev.clientX >= rect.left + (rect.width / 2)) {
+          if (Number.isFinite(idx)) {
+            closeAbyssEditForIdle();
+            onIdleTimerTap(idx);
+          }
+          return;
+        }
+      }
       if (Number.isFinite(idx)) onCardClick(idx, ev);
       return;
     }
     if (t.closest && t.closest('input')) return;
+    if (t.closest && t.closest('.edit-panel')) return;
+
+    // 名前・ランク以外では、カード右半分を放置報酬の広い操作領域として扱う。
+    const cardEl = t.closest && t.closest('.card');
+    if (cardEl && typeof ev.clientX === 'number') {
+      const rect = cardEl.getBoundingClientRect();
+      if (ev.clientX >= rect.left + (rect.width / 2)) {
+        const idx = Number(cardEl.dataset.idx);
+        if (Number.isFinite(idx)) {
+          closeAbyssEditForIdle();
+          onIdleTimerTap(idx);
+        }
+        return;
+      }
+    }
+
     const el = t.closest('[data-action]');
     if (!el) return;
     const action = el.dataset.action;
