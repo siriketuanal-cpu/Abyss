@@ -369,17 +369,6 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 .gedit-row-oneline{display:flex;align-items:center;gap:5px;flex-wrap:nowrap;}
 .gedit-row-oneline > input[type="number"]{width:42px;flex-shrink:0;text-align:center;}
 .gedit-max{margin-left:auto;display:flex;align-items:center;gap:3px;flex-shrink:0;}
-.gmax-btn{
-  width:26px;height:26px;border:1px solid #5a6a8a;border-radius:6px;
-  background:#1a2235;color:#9eb6ff;font-size:14px;font-weight:800;line-height:1;
-  padding:0;cursor:pointer;font-family:inherit;
-  -webkit-tap-highlight-color:transparent;
-}
-.gmax-btn:active{background:#2a3550;}
-.gmax-val{
-  min-width:2.2em;text-align:center;font-size:12px;font-weight:800;
-  color:#9eb6ff;font-variant-numeric:tabular-nums;
-}
 .gval{
   font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;
   color:var(--ok);line-height:1.1;
@@ -401,26 +390,20 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   appearance:none;-webkit-appearance:none;font-family:inherit;padding:0;
 }
 .gmark.show{opacity:1;color:#fff;border-color:var(--stam-cur-c);background:transparent;}
-  /* Gジェネの編集欄も、端末幅によるズレが起起きないよう高さと絶対位置を完全に固定する。 */
+  /* Gジェネはv35までの自然な編集欄サイズに戻し、上限だけを右寄せの小さな入力欄で変更する。 */
   .gedit{
     display:none;position:absolute;z-index:31;top:calc(100% + 6px);left:0;right:0;
-    height:56px;margin:0;padding:10px 12px;background:#000;border:1px solid var(--stam-cur-c);border-radius:12px;
-    box-shadow:0 8px 18px rgba(0,0,0,.45);box-sizing:border-box;
+    margin:0;padding:8px 9px;background:#000;border:1px solid var(--stam-cur-c);border-radius:12px;
+    box-shadow:0 8px 18px rgba(0,0,0,.45);
   }
-  .gcard.open .gedit{display:flex;align-items:center;}
-  .gedit-row-oneline{
-    width:100%;position:relative;display:flex;align-items:center;justify-content:space-between;gap:0;
+  .gcard.open .gedit{display:block;}
+  .gedit-row-oneline{display:flex;align-items:center;gap:5px;flex-wrap:nowrap;}
+  .gedit-row-oneline > input[type="number"],.g-max-input{
+    width:42px;box-sizing:border-box;background:var(--bg-inset);border:1px solid var(--line);border-radius:6px;
+    color:var(--ink);padding:4px 5px;font-size:11.5px;font-family:inherit;text-align:center;flex-shrink:0;
   }
-  .gedit-row-oneline > input[type="number"]{
-    flex:0 0 42px;width:42px;height:auto;background:var(--bg-inset);border:1px solid var(--line);border-radius:6px;
-    color:var(--ink);padding:4px 5px;font-size:11.5px;font-family:inherit;text-align:center;
-  }
-  .gedit-row-oneline .ebtn.stam{
-    position:absolute;left:44%;transform:translateX(-50%);
-    height:auto;min-width:0;padding:6px 12px;font-size:11.5px;font-weight:700;letter-spacing:.03em;border-radius:8px;
-  }
-  .gedit-row-oneline .ebtn.stam:active{transform:translateX(-50%) translateY(1px);}
-  .gedit-max{margin-left:auto;display:flex;align-items:center;gap:3px;flex-shrink:0;}
+  .gedit-row-oneline .ebtn{padding:5px 8px;font-size:10.5px;flex-shrink:0;}
+  .g-max-input{margin-left:auto;}
 
   /* 幻想水滸伝 STAR LEAP */
   .slsection{margin-top:14px;}
@@ -470,18 +453,10 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   }
   .slcard.stam-card .slbtn.sync:active{transform:translateX(-50%) translateY(1px);}
   /* オーブは「全回復まで」の時間だけで現在数と次回復時刻を逆算する。 */
-  /* スターリープ・オーブはスタミナと同じ「入力欄＋中央更新ボタン」に統一し、余計なラベルは消す。 */
-  .slcard.orb-card .sledit{height:56px;padding:10px 12px;}
-  .slcard.orb-card .sl-orb-full-input{
-    flex:0 0 52px;width:52px;height:auto;
-    padding:4px 5px;font-size:11.5px;text-align:center;
-  }
-  .slcard.orb-card .slbtn.orb-full-sync{
-    position:absolute;left:58%;transform:translateX(-50%);
-    height:auto;min-width:0;padding:6px 12px;font-size:11.5px;font-weight:700;letter-spacing:.03em;border-radius:8px;
-    background:linear-gradient(135deg,#8ec5ff,#5b9dff);color:#0b1220;
-  }
-  .slcard.orb-card .slbtn.orb-full-sync:active{transform:translateX(-50%) translateY(1px);}
+  /* スターリープ・オーブはv35までのカード幅を保ち、ラベルなしの入力欄と更新ボタンだけを中央に置く。 */
+  .slcard.orb-card .sledit{min-height:42px;justify-content:center;align-items:center;gap:6px;flex-wrap:nowrap;}
+  .slcard.orb-card .sl-orb-full-input{flex:0 0 56px;width:56px;height:28px;padding:4px 4px;font-size:11.5px;text-align:center;}
+  .slcard.orb-card .slbtn.orb-full-sync{flex:0 0 auto;height:28px;min-width:0;padding:5px 9px;font-size:11px;background:linear-gradient(135deg,#8ec5ff,#5b9dff);color:#0b1220;}
   .slbtn:active{transform:translateY(1px);}
   </style>
 </head>
@@ -1013,11 +988,7 @@ function buildG(){
         '<div class="gedit-row-oneline">' +
           '<input type="number" id="g-cur-' + i + '" value="' + s.stamCurrent + '" min="0" max="999" inputmode="numeric" aria-label="G' + (i + 1) + 'の現在スタミナ">' +
           '<button type="button" class="ebtn stam" data-gaction="update" data-idx="' + i + '">更新</button>' +
-          '<span class="gedit-max">' +
-            '<button type="button" class="gmax-btn" data-gaction="max-down" data-idx="' + i + '" aria-label="上限を減らす">−</button>' +
-            '<span class="gmax-val" id="g-max-val-' + i + '">' + s.stamMax + '</span>' +
-            '<button type="button" class="gmax-btn" data-gaction="max-up" data-idx="' + i + '" aria-label="上限を増やす">+</button>' +
-          '</span>' +
+          '<input type="number" class="g-max-input" id="g-max-input-' + i + '" value="' + s.stamMax + '" min="1" max="999" inputmode="numeric" aria-label="G' + (i + 1) + 'のスタミナ上限">' +
         '</div>' +
       '</div>' +
       '</div>';
@@ -1580,9 +1551,9 @@ function restoreGEditInputs(i){
   const now = Date.now();
   const live = s.stamRunning ? getGStamInfo(s, now).current : s.stamCurrent;
   const curEl = document.getElementById('g-cur-' + i);
-  const maxVal = document.getElementById('g-max-val-' + i);
+  const maxInput = document.getElementById('g-max-input-' + i);
   if (curEl) { curEl.value = String(live); curEl.dataset.prev = String(live); }
-  if (maxVal) maxVal.textContent = String(s.stamMax);
+  if (maxInput) { maxInput.value = String(s.stamMax); maxInput.dataset.prev = String(s.stamMax); }
 }
 
 function endGNameEditVisual(i){
@@ -1666,23 +1637,19 @@ function onGCardClick(i, ev){
   const now = Date.now();
   const live = s.stamRunning ? getGStamInfo(s, now).current : s.stamCurrent;
   const curEl = document.getElementById('g-cur-' + i);
+  const maxInput = document.getElementById('g-max-input-' + i);
   if (curEl) { curEl.value = String(live); curEl.dataset.prev = String(live); }
+  if (maxInput) { maxInput.value = String(s.stamMax); maxInput.dataset.prev = String(s.stamMax); }
 }
 function onGCurFocus(el){ el.dataset.prev = el.value; el.value = ''; }
 function onGCurBlur(i, el){ if (el.value === '') el.value = el.dataset.prev || state.g.slots[i].stamCurrent; }
-function adjustGMax(i, delta){
-  const maxVal = document.getElementById('g-max-val-' + i);
-  if (!maxVal) return;
-  let max = parseInt(maxVal.textContent, 10);
-  if (isNaN(max)) max = state.g.slots[i].stamMax || 130;
-  max = Math.max(1, Math.min(999, max + delta));
-  maxVal.textContent = String(max);
-}
+function onGMaxFocus(el){ el.dataset.prev = el.value; el.value = ''; }
+function onGMaxBlur(i, el){ if (el.value === '') el.value = el.dataset.prev || state.g.slots[i].stamMax; }
 function applyG(i){
   const curEl = document.getElementById('g-cur-' + i);
-  const maxVal = document.getElementById('g-max-val-' + i);
+  const maxInput = document.getElementById('g-max-input-' + i);
   let cur = parseInt(curEl.value, 10);
-  let max = parseInt(maxVal ? maxVal.textContent : '', 10);
+  let max = parseInt(maxInput ? maxInput.value : '', 10);
   if (isNaN(cur)) cur = state.g.slots[i].stamCurrent;
   if (isNaN(max) || max <= 0) max = state.g.slots[i].stamMax;
   max = Math.max(1, Math.min(999, max));
@@ -1692,7 +1659,7 @@ function applyG(i){
   state.g.slots[i].stamStart = Date.now();
   state.g.slots[i].stamRunning = true;
   curEl.value = String(state.g.slots[i].stamCurrent);
-  if (maxVal) maxVal.textContent = String(max);
+  if (maxInput) { maxInput.value = String(max); maxInput.dataset.prev = String(max); }
   saveState();
   gOpenIdx = -1;
   updateGOpenState();
@@ -2133,8 +2100,6 @@ function setupGDelegatedEvents(){
     const i = Number(el.dataset.idx);
     if (action === 'card') onGCardClick(i, ev);
     else if (action === 'update') applyG(i);
-    else if (action === 'max-up') adjustGMax(i, 1);
-    else if (action === 'max-down') adjustGMax(i, -1);
     else if (action === 'mark') { /* 長押し判定 */ }
   });
 
@@ -2142,12 +2107,14 @@ function setupGDelegatedEvents(){
     const t = ev.target;
     if (!t.id) return;
     if (t.id.indexOf('g-cur-') === 0) onGCurFocus(t);
+    else if (t.id.indexOf('g-max-input-') === 0) onGMaxFocus(t);
   });
 
   wrap.addEventListener('focusout', (ev) => {
     const t = ev.target;
     if (!t.id) return;
     if (t.id.indexOf('g-cur-') === 0) onGCurBlur(Number(t.id.split('-').pop()), t);
+    else if (t.id.indexOf('g-max-input-') === 0) onGMaxBlur(Number(t.id.split('-').pop()), t);
     else if (t.classList && t.classList.contains('gname-input')) onGNameBlur(Number(t.id.split('-').pop()));
   });
 
@@ -2192,20 +2159,33 @@ function setupGDelegatedEvents(){
   wrap.addEventListener('mouseup', clearGLp);
 }
 
+// 初期表示は同期的に完了させ、起動安定化は描画後に1回だけ実行する。
+// これにより、初期画面を遅らせずに復帰直後の表示・タイマー・PWA登録を整える。
+let startupStabilized = false;
+function scheduleStartupStabilization(){
+  const stabilize = () => {
+    if (startupStabilized || document.hidden) return;
+    startupStabilized = true;
+    requestAnimationFrame(() => {
+      if (document.hidden) return;
+      // setText/setWidthの差分更新だけなので、不要な点滅を起こさず時刻表示を再同期する。
+      render();
+      startTicking();
+      scheduleResetCheck();
+      scheduleServiceWorkerRegistration();
+    });
+  };
+  if ('requestIdleCallback' in window) requestIdleCallback(stabilize, { timeout: 600 });
+  else setTimeout(stabilize, 50);
+}
+
 loadState();
 setupDelegatedEvents();
 setupGDelegatedEvents();
 setupSLDelegatedEvents();
 setupGameTabs();
 setupAbyssTabs();
-// 起動時の初期描画をさらにスムーズにするため、requestIdleCallbackまたは即時微小遅延でレンダリングを安定化する。
-if (typeof requestIdleCallback === 'function') {
-  requestIdleCallback(() => { render(); startTicking(); }, { timeout: 500 });
-} else {
-  setTimeout(() => { render(); startTicking(); }, 50);
-}
-// Service Workerの登録は完全に後回しにし、起動体感を高速化する。
-scheduleServiceWorkerRegistration();
+scheduleStartupStabilization();
 const startupGraceUntil = Date.now() + 3000;
 
 // ---- 画面復帰時のタイマー同期処理 ----
