@@ -74,8 +74,26 @@ input,textarea{
   background:#ffc94a;
   border:1px solid #e0a82e;
 }
+/* テスト用: ドットアビスをグループカラーごとに切り替える。 */
+.abyss-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:6px;}
+.abyss-tab{
+  min-height:32px;border:1px solid #3d4a62;border-radius:8px;background:#0c111c;color:var(--ink-dim);
+  display:flex;align-items:center;justify-content:center;gap:5px;
+  font:700 10.5px/1 inherit;letter-spacing:.02em;cursor:pointer;-webkit-tap-highlight-color:transparent;
+}
+.abyss-tab-name{font-size:12px;font-weight:800;white-space:nowrap;}
+/* 時間はグループ色と分け、どのタブでも同じ淡いアンバーで読ませる。 */
+.abyss-tab-idle{color:#ffd98f;font-size:10.5px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:0;white-space:nowrap;opacity:1;text-shadow:0 0 4px rgba(255,217,143,.16);}
+.abyss-tab.g0{color:#b9aaff;}.abyss-tab.g1{color:#a6ccff;}.abyss-tab.g2{color:#c2ccdf;}
+.abyss-tab.active.g0{border-color:var(--g0);background:#1a1530;box-shadow:0 0 0 1px rgba(124,95,214,.25);}
+.abyss-tab.active.g1{border-color:var(--g1);background:#10233c;box-shadow:0 0 0 1px rgba(91,157,255,.25);}
+.abyss-tab.active.g2{border-color:var(--g2);background:#1c2330;box-shadow:0 0 0 1px rgba(143,163,196,.25);}
 .grid{display:grid;grid-template-columns:1fr;gap:6px;margin-top:6px;}
 @media (min-width:620px){.grid{grid-template-columns:1fr 1fr;}}
+.grid[data-group] .card-row{display:none;margin-top:0!important;padding-top:0!important;border-top:none!important;}
+.grid[data-group="g0"] .card-row[data-group="g0"],
+.grid[data-group="g1"] .card-row[data-group="g1"],
+.grid[data-group="g2"] .card-row[data-group="g2"]{display:flex;}
 .card-row{display:flex;align-items:center;gap:11px;}
 .card-row:nth-child(3),.card-row:nth-child(5){
   margin-top:2px;padding-top:8px;border-top:1px solid #5a6a88;
@@ -469,7 +487,12 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
     <span class="daily-val" id="dailyDateDisplay">—</span>
     <span class="daily-progress" id="dailyProgress"></span>
   </div>
-  <div class="grid" id="grid"></div>
+  <div class="abyss-tabs" id="abyssTabs" role="tablist" aria-label="ドットアビスのグループ">
+    <button type="button" class="abyss-tab g0 active" data-abyss-group="g0" role="tab" aria-selected="true" aria-label="グループA"><span class="abyss-tab-name">A</span><span class="abyss-tab-idle" id="abyss-idle-g0">未開始</span></button>
+    <button type="button" class="abyss-tab g1" data-abyss-group="g1" role="tab" aria-selected="false" aria-label="グループB"><span class="abyss-tab-name">B</span><span class="abyss-tab-idle" id="abyss-idle-g1">未開始</span></button>
+    <button type="button" class="abyss-tab g2" data-abyss-group="g2" role="tab" aria-selected="false" aria-label="グループC"><span class="abyss-tab-name">C</span><span class="abyss-tab-idle" id="abyss-idle-g2">未開始</span></button>
+  </div>
+  <div class="grid" id="grid" data-group="g0"></div>
   <div class="game-tabs" id="gameTabs" role="tablist" aria-label="ゲームタイマー">
     <button type="button" class="game-tab active" id="game-tab-g" data-game-tab="g" role="tab" aria-selected="true" aria-controls="game-panel-g">Gジェネ</button>
     <button type="button" class="game-tab" id="game-tab-sl" data-game-tab="sl" role="tab" aria-selected="false" aria-controls="game-panel-sl">スターリープ</button>
@@ -904,7 +927,7 @@ function build(){
   for (let i = 0; i < N; i++) {
     const s = state.slots[i];
     html +=
-      '<div class="card-row">' +
+      '<div class="card-row" data-group="' + groupClass(i) + '">' +
       '<div class="card ' + groupClass(i) + '" id="card-' + i + '" data-action="card" data-idx="' + i + '"' +
       ' aria-expanded="false">' +
         '<div class="row-top">' +
@@ -1479,6 +1502,49 @@ function closeAllPanels(){
   softBlur();
 }
 
+// ---- テスト用: ドットアビスのグループタブ ----
+let activeAbyssGroup = 'g0';
+
+function switchAbyssGroup(group){
+  if (!['g0', 'g1', 'g2'].includes(group) || group === activeAbyssGroup) return;
+
+  // 非表示になるカードの編集欄・フォーカスを残さない。
+  if (openIdx >= 0) {
+    restoreEditInputs(openIdx);
+    openIdx = -1;
+    openMode = null;
+    updateOpenState();
+  }
+  softBlur();
+
+  activeAbyssGroup = group;
+  const grid = document.getElementById('grid');
+  if (grid) grid.dataset.group = group;
+  document.querySelectorAll('[data-abyss-group]').forEach((tab) => {
+    const selected = tab.dataset.abyssGroup === group;
+    tab.classList.toggle('active', selected);
+    tab.setAttribute('aria-selected', String(selected));
+  });
+}
+
+function setupAbyssTabs(){
+  const tabs = document.getElementById('abyssTabs');
+  if (!tabs || tabs.dataset.ready) return;
+  tabs.dataset.ready = '1';
+  tabs.addEventListener('click', (ev) => {
+    const tab = ev.target.closest('[data-abyss-group]');
+    if (tab) switchAbyssGroup(tab.dataset.abyssGroup);
+  });
+}
+
+function renderAbyssTabIdle(shortestByGroup){
+  ['g0', 'g1', 'g2'].forEach((group) => {
+    const shortest = shortestByGroup[group];
+    const text = shortest === undefined ? '未開始' : (shortest <= 0 ? 'MAX' : formatTime(shortest));
+    setText(document.getElementById('abyss-idle-' + group), text);
+  });
+}
+
 // ---- テスト用ゲームタブ ----
 let activeGameTab = 'g';
 
@@ -1832,12 +1898,20 @@ function render(){
     ensureWeeklyDate();
     const now = Date.now();
     if (!refs.length) return;
+    // カード描画で求めた放置報酬情報を再利用し、タブ用の二重計算を避ける。
+    const abyssTabShortest = Object.create(null);
     for (let i = 0; i < N; i++) {
       const s = state.slots[i];
       const r = refs[i];
       if (!r || !r.stamVal) continue;
       const stam = getStamInfo(s, now);
       const idle = getIdleInfo(s, now);
+      if (idle.remainingMs != null) {
+        const group = groupClass(i);
+        if (abyssTabShortest[group] === undefined || idle.remainingMs < abyssTabShortest[group]) {
+          abyssTabShortest[group] = idle.remainingMs;
+        }
+      }
       let stamMain, stamCls, stamCurTxt, stamMaxTxt, stamClockTxt, stamClockSuffix, stamBarCls;
       if (s.stamRunning) {
         if (stam.isFull) {
@@ -1880,6 +1954,7 @@ function render(){
       setWidth(r.idleBar, idle.pct);
       setClass(r.idleBar, 'pbar-fill idle' + (idle.isFull ? ' full' : (idleCls.indexOf('urgent') >= 0 ? ' urgent' : '')));
     }
+    renderAbyssTabIdle(abyssTabShortest);
   } catch (e) { console.warn(e); }
   renderG();
   renderSL();
@@ -2138,6 +2213,7 @@ setupDelegatedEvents();
 setupGDelegatedEvents();
 setupSLDelegatedEvents();
 setupGameTabs();
+setupAbyssTabs();
 // 初期描画を優先し、Service Workerの登録はアイドル時へ退避する。
 scheduleServiceWorkerRegistration();
 const startupGraceUntil = Date.now() + 3000;
@@ -2147,11 +2223,15 @@ const startupGraceUntil = Date.now() + 3000;
 // 連続復帰イベントは短い debounce で1回にまとめる。
 let resumeDebounceTimer = null;
 let lastResumeAt = 0;
+const RESUME_FORCE_COALESCE_MS = 180;
+const RESUME_NORMAL_DEBOUNCE_MS = 320;
 
 function resumeTicking(force){
   if (document.hidden) return;
   const now = Date.now();
-  if (!force && now - lastResumeAt < 320) return;
+  // visibilitychange・resume・pageshowが連続しても、最初の即時描画だけを採用する。
+  const minGap = force ? RESUME_FORCE_COALESCE_MS : RESUME_NORMAL_DEBOUNCE_MS;
+  if (now - lastResumeAt < minGap) return;
   lastResumeAt = now;
 
   if (resumeDebounceTimer) {
