@@ -202,7 +202,6 @@ input,textarea{
   25%{transform:translateX(-3px);}
   75%{transform:translateX(3px);}
 }
-.timers-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:center;}
 .tblock{min-width:0;}
 .ttag{font-size:9px;font-weight:700;letter-spacing:.04em;}
 .ttag.stam{color:var(--ok);}
@@ -245,15 +244,10 @@ input,textarea{
 .card.g0 .edit-panel{border-color:var(--g0);}
 .card.g1 .edit-panel{border-color:var(--g1);}
 .card.g2 .edit-panel{border-color:var(--g2);}
-.card.open .edit-panel{display:block;}
-.edit-panel-split{display:flex;align-items:center;gap:6px;width:100%;}
-.edit-side{display:flex;align-items:center;width:100%;min-width:0;}
-.edit-side-divider{display:none;}
+.card.open .edit-panel{display:block;border-color:var(--ok);}
 .edit-side-stam{
-  justify-content:flex-start;
-  position:relative;
-  gap:0;
-  min-height:34px;
+  display:flex;align-items:center;width:100%;min-width:0;
+  justify-content:flex-start;position:relative;gap:0;min-height:34px;
 }
 .edit-side-stam input[type="number"]{
   width:42px;
@@ -277,24 +271,6 @@ input,textarea{
   border-radius:8px;
   white-space:nowrap;
 }
-.edit-side-idle{justify-content:center;}
-.edit-side-idle .ebtn.idle{
-  padding:6px 12px;
-  font-size:11.5px;
-  border-radius:8px;
-  white-space:nowrap;
-}
-.card.open.mode-stam .edit-panel{
-  left:0;right:auto;width:100%;
-  border-color:var(--ok);
-}
-.card.open.mode-stam .edit-side-idle{display:none !important;}
-.row-top{position:relative;}
-.row-hit{position:absolute;top:0;bottom:0;z-index:1;}
-.row-hit-stam{left:0;width:50%;}
-.row-hit-idle{right:0;width:50%;}
-.row-top .name-disp,.row-top .name-input,
-.row-top .rank-disp,.row-top .rank-input{position:relative;z-index:2;}
 
 .backdrop{
   display:none;
@@ -312,6 +288,9 @@ input,textarea{
   transform:translateZ(0);
 }
 .backdrop.show{display:block;}
+/* 放置報酬の受取確認は、編集モーダルより薄い暗転で対象だけを明確にする。 */
+.backdrop.idle-confirm{display:block;z-index:27;opacity:.22;}
+.abyss-idle-card.receive-armed{z-index:28;}
 .ebtn.idle.armed{background:linear-gradient(135deg,#ffb4b4,#ff6b6b);color:#2a0a0a;animation:armPulse .8s ease-in-out infinite;}
 @keyframes armPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.06);}}
 .edit-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px;}
@@ -552,7 +531,6 @@ let slRefs = {};
 let state = { slots: Array.from({ length: N }, defaultSlot), dailyDate: '', weeklyWeekId: '', g: { slots: Array.from({ length: GN }, defaultGSlot), dailyDate: '' }, sl: defaultSLState() };
 
 let openIdx = -1;
-let openMode = null;
 let storageOk = true;
 let textEditIdx = -1;
 let suppressOpenAllUntil = 0;
@@ -929,10 +907,10 @@ function build(){
               '<div class="tsub"><span class="tsub-cur" id="stam-subcur-' + i + '"></span><span class="tsub-sep" id="stam-subsep-' + i + '">/</span><span class="tsub-max" id="stam-submax-' + i + '"></span><span class="tsub-clock" id="stam-subclock-' + i + '"></span></div>' +
               '<div class="pbar"><div class="pbar-fill stam" id="stam-bar-' + i + '" style="width:0%"></div></div>' +
             '</div>' +
-            '<div class="edit-panel" id="edit-' + i + '"><div class="edit-panel-split"><div class="edit-side edit-side-stam">' +
+            '<div class="edit-panel" id="edit-' + i + '"><div class="edit-side-stam">' +
               '<input type="number" id="stam-cur-' + i + '" value="' + s.stamCurrent + '" min="0" max="999" inputmode="numeric" aria-label="現在のスタミナ">' +
               '<button type="button" class="ebtn stam" data-action="update" data-idx="' + i + '">更新</button>' +
-            '</div></div></div>' +
+            '</div></div>' +
           '</div>' +
           '<div class="card abyss-idle-card ' + groupClass(i) + ' tblock-idle" id="idle-block-' + i + '" data-idle-receive="true" data-idx="' + i + '" role="button" aria-label="放置報酬を受け取る。2回タップで確定">' +
             '<div class="row-top abyss-idle-spacer" aria-hidden="true"></div>' +
@@ -1309,31 +1287,20 @@ function onCardClick(i, ev){
   }
   disarmAllIdle();
 
-  // 放置報酬領域は受取専用。カードの通常タップは常にスタミナ編集だけを開く。
-  const side = 'stam';
-
+  // スタミナカードは、タップで編集を開閉する単一の役割だけを持つ。
   if (openIdx === i) {
     if (t.closest && t.closest('.edit-panel')) return;
-    if (side && side !== openMode) {
-      openMode = side;
-      updateOpenState();
-      if (side === 'stam') prefillsStamCur(i);
-      softBlur();
-      return;
-    }
     restoreEditInputs(i);
     openIdx = -1;
-    openMode = null;
     updateOpenState();
     softBlur();
     return;
   }
   const prevOpen = openIdx;
   openIdx = i;
-  openMode = side || 'stam';
   updateOpenState();
   if (prevOpen >= 0) restoreEditInputs(prevOpen);
-  if (openMode === 'stam') prefillsStamCur(i);
+  prefillsStamCur(i);
   softBlur();
 }
 
@@ -1344,14 +1311,8 @@ function updateOpenState(){
     refs[prev].card.classList.remove('open');
     refs[prev].card.setAttribute('aria-expanded', 'false');
   }
-  if (prev >= 0 && refs[prev] && refs[prev].card) {
-    refs[prev].card.classList.remove('mode-stam', 'mode-idle');
-  }
   if (openIdx >= 0 && refs[openIdx] && refs[openIdx].card) {
     refs[openIdx].card.classList.add('open');
-    refs[openIdx].card.classList.remove('mode-stam', 'mode-idle');
-    if (openMode === 'stam') refs[openIdx].card.classList.add('mode-stam');
-    else if (openMode === 'idle') refs[openIdx].card.classList.add('mode-idle');
     refs[openIdx].card.setAttribute('aria-expanded', 'true');
   }
   if ((prev >= 0) !== editing) {
@@ -1367,6 +1328,7 @@ function updateOpenState(){
   const anyOpen = editing || gOpenIdx >= 0;
   const bd = document.getElementById('backdrop');
   if (bd) bd.classList.toggle('show', anyOpen);
+  syncIdleConfirmBackdrop();
   _lastOpenIdx = openIdx;
 }
 
@@ -1388,7 +1350,7 @@ function endNameEditVisual(i){
   }
 }
 function beginNameEdit(i){
-  if (openIdx >= 0) { restoreEditInputs(openIdx); openIdx = -1; openMode = null; updateOpenState(); }
+  if (openIdx >= 0) { restoreEditInputs(openIdx); openIdx = -1; updateOpenState(); }
   for (let j = 0; j < N; j++) endRankEditVisual(j);
   const el = document.getElementById('name-' + i);
   const disp = document.getElementById('name-disp-' + i);
@@ -1433,7 +1395,7 @@ function closeAllPanels(){
   disarmAllIdle();
   if (openIdx >= 0) restoreEditInputs(openIdx);
   openIdx = -1;
-  openMode = null;
+ 
   updateOpenState();
   if (gOpenIdx >= 0) restoreGEditInputs(gOpenIdx);
   gOpenIdx = -1;
@@ -1452,7 +1414,7 @@ function switchAbyssGroup(group){
   if (openIdx >= 0) {
     restoreEditInputs(openIdx);
     openIdx = -1;
-    openMode = null;
+   
     updateOpenState();
   }
   softBlur();
@@ -1531,6 +1493,7 @@ function updateGOpenState(){
   const anyOpen = openIdx >= 0 || gOpenIdx >= 0;
   const bd = document.getElementById('backdrop');
   if (bd) bd.classList.toggle('show', anyOpen);
+  syncIdleConfirmBackdrop();
 }
 function restoreGEditInputs(i){
   if (i < 0 || i >= GN) return;
@@ -1555,7 +1518,7 @@ function endGNameEditVisual(i){
   }
 }
 function beginGNameEdit(i){
-  if (openIdx >= 0) { restoreEditInputs(openIdx); openIdx = -1; openMode = null; updateOpenState(); }
+  if (openIdx >= 0) { restoreEditInputs(openIdx); openIdx = -1; updateOpenState(); }
   if (gOpenIdx >= 0) { restoreGEditInputs(gOpenIdx); gOpenIdx = -1; updateGOpenState(); }
   for (let j = 0; j < GN; j++) endGNameEditVisual(j);
   for (let j = 0; j < N; j++) { endNameEditVisual(j); endRankEditVisual(j); }
@@ -1616,7 +1579,7 @@ function onGCardClick(i, ev){
   }
   if (document.activeElement) document.activeElement.blur();
   const prevOpen = gOpenIdx;
-  if (openIdx >= 0) { restoreEditInputs(openIdx); openIdx = -1; openMode = null; updateOpenState(); }
+  if (openIdx >= 0) { restoreEditInputs(openIdx); openIdx = -1; updateOpenState(); }
   gOpenIdx = i;
   updateGOpenState();
   if (prevOpen >= 0) restoreGEditInputs(prevOpen);
@@ -1738,14 +1701,14 @@ function applyStam(i){
   curEl.value = state.slots[i].stamCurrent;
   saveState();
   openIdx = -1;
-  openMode = null;
+ 
   updateOpenState();
   render();
   startTicking();
 }
 
 function beginRankEdit(i){
-  if (openIdx >= 0) { restoreEditInputs(openIdx); openIdx = -1; openMode = null; updateOpenState(); }
+  if (openIdx >= 0) { restoreEditInputs(openIdx); openIdx = -1; updateOpenState(); }
   for (let j = 0; j < N; j++) endNameEditVisual(j);
   const el = document.getElementById('rank-' + i);
   const disp = document.getElementById('rank-disp-' + i);
@@ -1794,6 +1757,14 @@ function onRankBlur(i){
   suppressOpenAllUntil = Date.now() + 150;
 }
 
+function syncIdleConfirmBackdrop(){
+  const bd = document.getElementById('backdrop');
+  if (!bd) return;
+  // 編集中は既存の強い暗転を優先し、受取確認中だけ薄い暗転を使う。
+  const hasModal = openIdx >= 0 || gOpenIdx >= 0;
+  bd.classList.toggle('idle-confirm', Object.keys(armedIdle).length > 0 && !hasModal);
+}
+
 function updateIdleReceiveVisual(i, armed){
   const block = document.getElementById('idle-block-' + i);
   const val = document.getElementById('idle-val-' + i);
@@ -1805,6 +1776,7 @@ function updateIdleReceiveVisual(i, armed){
     setText(val, '受取');
     setText(sub, 'もう一度タップ');
   }
+  syncIdleConfirmBackdrop();
 }
 function disarmIdle(i){
   if (Object.prototype.hasOwnProperty.call(armedIdle, i)) {
@@ -1820,7 +1792,7 @@ function closeAbyssEditForIdle(){
   if (openIdx < 0) return;
   restoreEditInputs(openIdx);
   openIdx = -1;
-  openMode = null;
+ 
   updateOpenState();
   softBlur();
 }
@@ -1853,6 +1825,7 @@ function onIdleTimerTap(i){
     updateIdleReceiveVisual(i, false);
     render();
   }, 4000);
+  syncIdleConfirmBackdrop();
 }
 
 function render(){
