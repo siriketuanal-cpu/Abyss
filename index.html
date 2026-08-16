@@ -223,17 +223,10 @@ input,textarea{
 .pbar-fill.stam.full{background:var(--stam-full-c)!important;}
 .pbar-fill.idle.full{background:var(--stam-full-c)!important;}
 .pbar-fill.idle.urgent{background:var(--stam-full-c)!important;}
-/* 放置報酬の受取待機は、左側に残り時間を維持しつつ右側にしっかりした受取文言を示す。 */
+/* 放置報酬の受取待機は色と文字だけで示し、点滅・アニメーションは使わない。 */
 .tblock-idle{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
-.idle-main-line{display:flex;align-items:baseline;justify-content:space-between;gap:4px;min-width:0;}
-.idle-main-line .tval.idle{min-width:0;flex:0 1 auto;}
-.idle-receive-wrap{display:none;flex:0 0 auto;text-align:right;}
-.tblock-idle.receive-armed .idle-receive-wrap{display:block;}
-.idle-receive-main{color:#bfe8ff;font-size:14px;font-weight:800;line-height:1.1;letter-spacing:.02em;}
-.idle-receive-sub{color:#bfe8ff;font-size:9.5px;font-weight:700;line-height:1.1;opacity:.9;margin-top:1px;}
-.idle-sub-line{display:flex;align-items:baseline;justify-content:space-between;gap:4px;min-width:0;}
-.idle-sub-line .tsub.idle-meta{min-width:0;flex:0 1 auto;}
-.tblock-idle.receive-armed .idle-sub-line .tsub.idle-meta{display:none;}
+.tblock-idle.receive-armed .tval.idle{color:#ffe0a3!important;}
+.tblock-idle.receive-armed .idle-meta{color:#ffe0a3!important;}
 .edit-panel{
   display:none;position:absolute;top:calc(100% + 6px);background:#000;
   border:1px solid var(--violet);border-radius:12px;padding:10px 12px;
@@ -943,13 +936,8 @@ function build(){
           '</div>' +
           '<div class="tblock tblock-idle" id="idle-block-' + i + '" data-idle-receive="true" role="button" aria-label="放置報酬を受け取る。2回タップで確定">' +
             '<div class="ttag idle">放置報酬</div>' +
-            '<div class="idle-main-line">' +
-              '<div class="tval idle" id="idle-val-' + i + '">—:—</div>' +
-              '<div class="idle-receive-wrap" id="idle-receive-wrap-' + i + '"><div class="idle-receive-main">受取</div><div class="idle-receive-sub">もう一度タップ</div></div>' +
-            '</div>' +
-            '<div class="idle-sub-line">' +
-              '<div class="tsub idle-meta" id="idle-sub-' + i + '"></div>' +
-            '</div>' +
+            '<div class="tval idle" id="idle-val-' + i + '">—:—</div>' +
+            '<div class="tsub idle-meta" id="idle-sub-' + i + '"></div>' +
             '<div class="pbar"><div class="pbar-fill idle" id="idle-bar-' + i + '" style="width:0%"></div></div>' +
           '</div>' +
         '</div>' +
@@ -1810,9 +1798,15 @@ function onRankBlur(i){
 
 function updateIdleReceiveVisual(i, armed){
   const block = document.getElementById('idle-block-' + i);
-  if (!block) return;
-  // 残り時間・満タン時刻は維持しつつ、右側にしっかりした受取確認文言を表示する。
+  const val = document.getElementById('idle-val-' + i);
+  const sub = document.getElementById('idle-sub-' + i);
+  if (!block || !val || !sub) return;
   block.classList.toggle('receive-armed', armed);
+  if (armed) {
+    // 派手な動きは使わず、受取待機だけを静かな文字変更で示す。
+    setText(val, '受取');
+    setText(sub, 'もう一度タップ');
+  }
 }
 function disarmIdle(i){
   if (Object.prototype.hasOwnProperty.call(armedIdle, i)) {
@@ -1899,12 +1893,18 @@ function render(){
       let idleCls = 'tval idle';
       if (idle.isFull) idleCls += ' full';
       else if (s.idleRunning && idle.remainingMs != null && idle.remainingMs < URGENT_MS) idleCls += ' urgent';
-      // 受取待機中も、残り時間と満タン時刻は通常どおり毎秒更新する。
-      setText(r.idleVal, idle.display);
-      if (idle.clockTxt) {
-        setHTML(r.idleSub, '<span class="idle-clock">' + idle.clockTxt + '</span>' + idle.suffix);
+      const idleArmed = Object.prototype.hasOwnProperty.call(armedIdle, i);
+      if (idleArmed) {
+        // 受取待機中は毎秒描画でも静かな確認表示を維持する。
+        setText(r.idleVal, '受取');
+        setText(r.idleSub, 'もう一度タップ');
       } else {
-        setText(r.idleSub, idle.meta);
+        setText(r.idleVal, idle.display);
+        if (idle.clockTxt) {
+          setHTML(r.idleSub, '<span class="idle-clock">' + idle.clockTxt + '</span>' + idle.suffix);
+        } else {
+          setText(r.idleSub, idle.meta);
+        }
       }
       setClass(r.idleVal, idleCls);
       setWidth(r.idleBar, idle.pct);
