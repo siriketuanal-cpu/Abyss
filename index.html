@@ -401,19 +401,26 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   appearance:none;-webkit-appearance:none;font-family:inherit;padding:0;
 }
 .gmark.show{opacity:1;color:#fff;border-color:var(--stam-cur-c);background:transparent;}
+  /* Gジェネの編集欄も、端末幅によるズレが起起きないよう高さと絶対位置を完全に固定する。 */
   .gedit{
     display:none;position:absolute;z-index:31;top:calc(100% + 6px);left:0;right:0;
-    margin:0;padding:8px 9px;background:#000;border:1px solid var(--stam-cur-c);border-radius:12px;
-    box-shadow:0 8px 18px rgba(0,0,0,.45);
+    height:56px;margin:0;padding:10px 12px;background:#000;border:1px solid var(--stam-cur-c);border-radius:12px;
+    box-shadow:0 8px 18px rgba(0,0,0,.45);box-sizing:border-box;
   }
-  .gcard.open .gedit{display:block;}
-  .gedit-row{display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
-.gedit-row label{font-size:9.5px;color:var(--ink-dim);}
-.gedit-row input[type="number"]{
-  width:42px;background:var(--bg-inset);border:1px solid var(--line);border-radius:6px;
-  color:var(--ink);padding:4px 5px;font-size:11.5px;font-family:inherit;text-align:center;
-}
-  .gedit-row .ebtn{padding:5px 8px;font-size:10.5px;}
+  .gcard.open .gedit{display:flex;align-items:center;}
+  .gedit-row-oneline{
+    width:100%;position:relative;display:flex;align-items:center;justify-content:space-between;gap:0;
+  }
+  .gedit-row-oneline > input[type="number"]{
+    flex:0 0 42px;width:42px;height:auto;background:var(--bg-inset);border:1px solid var(--line);border-radius:6px;
+    color:var(--ink);padding:4px 5px;font-size:11.5px;font-family:inherit;text-align:center;
+  }
+  .gedit-row-oneline .ebtn.stam{
+    position:absolute;left:44%;transform:translateX(-50%);
+    height:auto;min-width:0;padding:6px 12px;font-size:11.5px;font-weight:700;letter-spacing:.03em;border-radius:8px;
+  }
+  .gedit-row-oneline .ebtn.stam:active{transform:translateX(-50%) translateY(1px);}
+  .gedit-max{margin-left:auto;display:flex;align-items:center;gap:3px;flex-shrink:0;}
 
   /* 幻想水滸伝 STAR LEAP */
   .slsection{margin-top:14px;}
@@ -462,21 +469,19 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
     height:auto;min-width:0;padding:6px 12px;font-size:11.5px;font-weight:700;letter-spacing:.03em;border-radius:8px;
   }
   .slcard.stam-card .slbtn.sync:active{transform:translateX(-50%) translateY(1px);}
-  .slcard.orb-card .sledit{min-height:28px;justify-content:space-between;align-items:center;flex-wrap:nowrap;}
-  .slcard.orb-card .slbtn.orb-adjust{
-    flex:0 0 26px;width:26px;height:26px;min-width:0;padding:0;margin:0;
-    font-size:16px;line-height:1;display:inline-flex;align-items:center;justify-content:center;
+  /* オーブは「全回復まで」の時間だけで現在数と次回復時刻を逆算する。 */
+  /* スターリープ・オーブはスタミナと同じ「入力欄＋中央更新ボタン」に統一し、余計なラベルは消す。 */
+  .slcard.orb-card .sledit{height:56px;padding:10px 12px;}
+  .slcard.orb-card .sl-orb-full-input{
+    flex:0 0 52px;width:52px;height:auto;
+    padding:4px 5px;font-size:11.5px;text-align:center;
   }
-  .slcard.orb-card .slbtn.restore{
-    background:linear-gradient(135deg,#b8e8c9,#72c894);color:#062015;
+  .slcard.orb-card .slbtn.orb-full-sync{
+    position:absolute;left:58%;transform:translateX(-50%);
+    height:auto;min-width:0;padding:6px 12px;font-size:11.5px;font-weight:700;letter-spacing:.03em;border-radius:8px;
+    background:linear-gradient(135deg,#8ec5ff,#5b9dff);color:#0b1220;
   }
-  .slcard.orb-card .slbtn.consume{
-    position:absolute;left:50%;transform:translateX(-50%);
-    background:linear-gradient(135deg,#ffc48a,#ff9a4a);color:#2a1400;
-  }
-  .slcard.orb-card .slbtn.consume:active{transform:translateX(-50%) translateY(1px);}
-  .slcard.orb-card .sledit-next-input{flex:0 0 48px;width:48px;height:26px;margin-left:auto;font-size:11px;}
-  .slbtn.orb.sync{background:linear-gradient(135deg,#8ec5ff,#5b9dff);color:#0b1220;}
+  .slcard.orb-card .slbtn.orb-full-sync:active{transform:translateX(-50%) translateY(1px);}
   .slbtn:active{transform:translateY(1px);}
   </style>
 </head>
@@ -1004,17 +1009,17 @@ function buildG(){
         '<div class="gval" id="g-val-' + i + '">—:—</div>' +
         '<div class="gsub"><span class="gsub-cur" id="g-subcur-' + i + '"></span><span class="gsub-sep" id="g-subsep-' + i + '">/</span><span class="gsub-max" id="g-submax-' + i + '"></span><span class="gsub-clock" id="g-subclock-' + i + '"></span></div>' +
         '<div class="gbar"><div class="gbar-fill" id="g-bar-' + i + '" style="width:0%"></div></div>' +
-        '<div class="gedit" id="g-edit-' + i + '">' +
-          '<div class="gedit-row gedit-row-oneline">' +
-            '<input type="number" id="g-cur-' + i + '" value="' + s.stamCurrent + '" min="0" max="999" inputmode="numeric">' +
-            '<button type="button" class="ebtn stam" data-gaction="update" data-idx="' + i + '">更新</button>' +
-            '<span class="gedit-max">' +
-              '<button type="button" class="gmax-btn" data-gaction="max-down" data-idx="' + i + '" aria-label="上限を減らす">−</button>' +
-              '<span class="gmax-val" id="g-max-val-' + i + '">' + s.stamMax + '</span>' +
-              '<button type="button" class="gmax-btn" data-gaction="max-up" data-idx="' + i + '" aria-label="上限を増やす">+</button>' +
-            '</span>' +
-          '</div>' +
+      '<div class="gedit" id="g-edit-' + i + '">' +
+        '<div class="gedit-row-oneline">' +
+          '<input type="number" id="g-cur-' + i + '" value="' + s.stamCurrent + '" min="0" max="999" inputmode="numeric" aria-label="G' + (i + 1) + 'の現在スタミナ">' +
+          '<button type="button" class="ebtn stam" data-gaction="update" data-idx="' + i + '">更新</button>' +
+          '<span class="gedit-max">' +
+            '<button type="button" class="gmax-btn" data-gaction="max-down" data-idx="' + i + '" aria-label="上限を減らす">−</button>' +
+            '<span class="gmax-val" id="g-max-val-' + i + '">' + s.stamMax + '</span>' +
+            '<button type="button" class="gmax-btn" data-gaction="max-up" data-idx="' + i + '" aria-label="上限を増やす">+</button>' +
+          '</span>' +
         '</div>' +
+      '</div>' +
       '</div>';
   }
   wrap.innerHTML = html;
@@ -1059,14 +1064,13 @@ function buildSL(){
       '<div class="slsub" id="sl-orb-sub"></div>' +
       '<div class="slbar"><div class="slbar-fill orb" id="sl-orb-bar" style="width:0%"></div></div>' +
       '<div class="sledit">' +
-      '<button type="button" class="slbtn orb-adjust restore" data-slaction="restore" data-sltype="orb" aria-label="御大樹の恵みを1回復">＋</button>' +
-      '<button type="button" class="slbtn orb-adjust consume" data-slaction="consume" data-sltype="orb" aria-label="御大樹の恵みを1消費">−</button>' +
-      '<input type="text" class="sledit-next-input" id="sl-orb-next" placeholder="342" inputmode="numeric" pattern="[0-9:]*" aria-label="次のオーブ回復までの残り時間。3:42または342で入力" title="次の回復までを3:42または342で入力">' +
+      '<input type="text" class="sl-orb-full-input" id="sl-orb-full" placeholder="1800" inputmode="numeric" pattern="[0-9:]*" aria-label="オーブ全回復までの残り時間。18:00または1800で入力" title="全回復までを18:00または1800で入力">' +
+      '<button type="button" class="slbtn orb-full-sync" data-slaction="orb-full-sync" aria-label="全回復時間からオーブ状態を更新">更新</button>' +
       '</div>' +
     '</div>';
   slRefs = {
     stamina: { card: document.getElementById('sl-card-stamina'), main: document.getElementById('sl-stamina-main'), sub: document.getElementById('sl-stamina-sub'), bar: document.getElementById('sl-stamina-bar'), input: document.getElementById('sl-stamina-current') },
-    orb: { card: document.getElementById('sl-card-orb'), main: document.getElementById('sl-orb-main'), sub: document.getElementById('sl-orb-sub'), bar: document.getElementById('sl-orb-bar'), nextInput: document.getElementById('sl-orb-next') }
+    orb: { card: document.getElementById('sl-card-orb'), main: document.getElementById('sl-orb-main'), sub: document.getElementById('sl-orb-sub'), bar: document.getElementById('sl-orb-bar'), fullInput: document.getElementById('sl-orb-full') }
   };
 }
 
@@ -1094,12 +1098,12 @@ function normalizeSLTimer(type, now){
   return getSLTimerInfo(timer, cfg.max, cfg.interval, now);
 }
 
-function formatSLRemainingInput(ms){
+function formatSLFullRecoveryInput(ms){
   const totalMinutes = Math.max(0, Math.floor(ms / 60000));
   return Math.floor(totalMinutes / 60) + ':' + String(totalMinutes % 60).padStart(2, '0');
 }
 
-function parseSLRemainingInput(value){
+function parseSLFullRecoveryInput(value){
   const raw = String(value || '').trim().replace(/：/g, ':');
   let hours, minutes;
 
@@ -1109,7 +1113,7 @@ function parseSLRemainingInput(value){
     hours = Number(parts[0]);
     minutes = Number(parts[1]);
   } else if (/^\d{1,4}$/.test(raw)) {
-    // 数字のみは末尾2桁を分として扱う。例: 342 → 3時間42分、240 → 2時間40分。
+    // 数字のみは末尾2桁を分として扱う。例: 342 → 3時間42分、1800 → 18時間00分。
     if (raw.length <= 2) {
       hours = 0;
       minutes = Number(raw);
@@ -1123,7 +1127,7 @@ function parseSLRemainingInput(value){
 
   if (!Number.isInteger(hours) || !Number.isInteger(minutes) || hours < 0 || minutes < 0 || minutes > 59) return null;
   const ms = (hours * 60 + minutes) * 60 * 1000;
-  if (ms <= 0 || ms > SL_ORB_INTERVAL) return null;
+  if (ms < 0 || ms > SL_ORB_MAX * SL_ORB_INTERVAL) return null;
   return ms;
 }
 
@@ -1158,8 +1162,10 @@ function toggleSLCard(type){
     input.dataset.prev = String(live.current);
     input.value = String(live.current); // Gジェネと同じく、開いた直後は現在値を表示する。
   }
-  if (type === 'orb' && slRefs.orb && slRefs.orb.nextInput) {
-    slRefs.orb.nextInput.value = cfg.timer.running && !live.isFull ? formatSLRemainingInput(live.nextIn) : '';
+  if (type === 'orb' && slRefs.orb && slRefs.orb.fullInput) {
+    const fullIn = live.isFull ? 0 : (cfg.timer.running ? live.fullIn : null);
+    slRefs.orb.fullInput.value = fullIn == null ? '' : formatSLFullRecoveryInput(fullIn);
+    slRefs.orb.fullInput.dataset.prev = slRefs.orb.fullInput.value;
   }
   Object.keys(slRefs).forEach(key => {
     if (slRefs[key] && slRefs[key].card) slRefs[key].card.classList.toggle('open', slOpenType === key);
@@ -1187,59 +1193,42 @@ function syncSL(type){
   saveState();
   renderSL();
   if (input) input.value = String(value);
-  if (type === 'orb' && slRefs.orb && slRefs.orb.nextInput) slRefs.orb.nextInput.value = formatSLRemainingInput(SL_ORB_INTERVAL);
   closeSLCard();
   startTicking();
 }
 
-function adjustSLOrbNext(){
+function syncSLOrbFullRecovery(){
   const cfg = getSLConfig('orb');
-  const input = slRefs.orb && slRefs.orb.nextInput;
-  const remaining = parseSLRemainingInput(input && input.value);
-  if (remaining === null || cfg.timer.current >= SL_ORB_MAX) return;
+  const input = slRefs.orb && slRefs.orb.fullInput;
+  const raw = (input && input.value != null) ? String(input.value).trim() : '';
+  let fullIn = parseSLFullRecoveryInput(raw);
+  if (fullIn === null && raw === '' && input && input.dataset.prev != null) {
+    fullIn = parseSLFullRecoveryInput(input.dataset.prev);
+  }
+  if (fullIn === null) return;
 
   const now = Date.now();
-  normalizeSLTimer('orb', now);
-  if (cfg.timer.current >= SL_ORB_MAX) return;
+  const missing = fullIn === 0 ? 0 : Math.ceil(fullIn / cfg.interval);
+  const current = cfg.max - missing;
+  const nextIn = fullIn === 0 ? 0 : fullIn - (missing - 1) * cfg.interval;
 
-  cfg.timer.running = true;
-  cfg.timer.start = now - (SL_ORB_INTERVAL - remaining);
-  saveState();
-  renderSL();
-  if (input) input.value = formatSLRemainingInput(remaining);
-  startTicking();
-}
-
-function addSLOrb(){
-  const now = Date.now();
-  const cfg = getSLConfig('orb');
-  normalizeSLTimer('orb', now);
-  if (cfg.timer.current >= cfg.max) return;
-  cfg.timer.current += 1;
-  if (cfg.timer.current >= cfg.max) {
+  cfg.timer.current = current;
+  if (current >= cfg.max) {
     cfg.timer.running = false;
     cfg.timer.start = null;
-  } else if (!cfg.timer.running) {
+  } else {
     cfg.timer.running = true;
-    cfg.timer.start = now;
+    // 次の1個までの残り時間から、直列回復の開始時刻を復元する。
+    cfg.timer.start = now - (cfg.interval - nextIn);
   }
-  saveState();
-  renderSL();
-  startTicking();
-}
 
-function consumeSLOrb(){
-  const now = Date.now();
-  const cfg = getSLConfig('orb');
-  normalizeSLTimer('orb', now);
-  if (cfg.timer.current <= 0) return;
-  cfg.timer.current -= 1;
-  if (!cfg.timer.running) {
-    cfg.timer.running = true;
-    cfg.timer.start = now;
-  }
   saveState();
   renderSL();
+  if (input) {
+    input.value = formatSLFullRecoveryInput(fullIn);
+    input.dataset.prev = input.value;
+  }
+  closeSLCard();
   startTicking();
 }
 
@@ -1281,28 +1270,21 @@ function setupSLDelegatedEvents(){
       toggleSLCard(type);
     } else if (action === 'sync') {
       syncSL(type);
-    } else if (action === 'restore') {
-      addSLOrb();
-    } else if (action === 'consume') {
-      consumeSLOrb();
-    } else if (action === 'adjust-next') {
-      adjustSLOrbNext();
+    } else if (action === 'orb-full-sync') {
+      syncSLOrbFullRecovery();
     }
   });
-  wrap.addEventListener('change', (ev) => {
-    if (ev.target && ev.target.id === 'sl-orb-next') adjustSLOrbNext();
-  });
   wrap.addEventListener('keydown', (ev) => {
-    if (ev.key === 'Enter' && ev.target && ev.target.id === 'sl-orb-next') {
+    if (ev.key === 'Enter' && ev.target && ev.target.id === 'sl-orb-full') {
       ev.preventDefault();
-      ev.target.blur();
+      syncSLOrbFullRecovery();
     }
   });
   wrap.addEventListener('focusin', (ev) => {
     const input = ev.target;
     if (!input || input.tagName !== 'INPUT') return;
-    // 現在値欄・オーブの時間欄はフォーカスでブランク（入力しやすく）。
-    if (input.classList && (input.classList.contains('sledit-current') || input.id === 'sl-orb-next')) {
+    // 現在値欄・オーブ全回復時間欄はフォーカスでブランク（入力しやすく）。
+    if (input.classList && (input.classList.contains('sledit-current') || input.id === 'sl-orb-full')) {
       if (input.value !== '') input.dataset.prev = input.value;
       input.value = '';
       return;
@@ -1311,7 +1293,7 @@ function setupSLDelegatedEvents(){
   });
   wrap.addEventListener('focusout', (ev) => {
     const input = ev.target;
-    if (!input || !input.classList || !input.classList.contains('sledit-current')) return;
+    if (!input || !input.classList || (!input.classList.contains('sledit-current') && input.id !== 'sl-orb-full')) return;
     if (String(input.value).trim() === '' && input.dataset.prev != null) {
       input.value = input.dataset.prev;
     }
@@ -1626,6 +1608,8 @@ function beginGNameEdit(i){
   el.classList.add('editing');
   el.value = state.g.slots[i].label || '';
   textEditIdx = 1000 + i;
+  // 長押し直後に発生し得る末尾のclickで、名前編集が即座に閉じないようにする。
+  suppressOpenAllUntil = Date.now() + 450;
   el.focus({ preventScroll: true });
   const collapseSel = () => {
     try { const n = el.value.length; el.setSelectionRange(n, n); } catch (e) {}
@@ -1654,7 +1638,9 @@ function onGNameBlur(i){
 
 function onGCardClick(i, ev){
   const t = ev.target;
-  if (t.closest && (t.closest('input') || t.closest('button') || t.closest('.gname-disp') || t.closest('.gname-input'))) return;
+  // 通常タップは名前・数値・バーを含めてカード編集を開く。入力欄とボタンだけは個別操作を優先する。
+  if (t.closest && (t.closest('input') || t.closest('button'))) return;
+  if (Date.now() < suppressOpenAllUntil) return;
   if (textEditIdx >= 0) {
     const ae = document.activeElement;
     if (ae && ae.classList && (ae.classList.contains('gname-input') || ae.classList.contains('name-input') || ae.classList.contains('rank-input'))) ae.blur();
@@ -1662,7 +1648,6 @@ function onGCardClick(i, ev){
     suppressOpenAllUntil = Date.now() + 150;
     return;
   }
-  if (Date.now() < suppressOpenAllUntil) return;
   if (gOpenIdx === i) {
     if (t.closest && t.closest('.gedit')) return;
     if (document.activeElement) document.activeElement.blur();
@@ -2141,7 +2126,6 @@ function setupGDelegatedEvents(){
 
   wrap.addEventListener('click', (ev) => {
     const t = ev.target;
-    if (t.classList && (t.classList.contains('gname-disp') || t.classList.contains('gname-input'))) return;
     if (t.closest && t.closest('input')) return;
     const el = t.closest('[data-gaction]');
     if (!el) return;
@@ -2214,7 +2198,13 @@ setupGDelegatedEvents();
 setupSLDelegatedEvents();
 setupGameTabs();
 setupAbyssTabs();
-// 初期描画を優先し、Service Workerの登録はアイドル時へ退避する。
+// 起動時の初期描画をさらにスムーズにするため、requestIdleCallbackまたは即時微小遅延でレンダリングを安定化する。
+if (typeof requestIdleCallback === 'function') {
+  requestIdleCallback(() => { render(); startTicking(); }, { timeout: 500 });
+} else {
+  setTimeout(() => { render(); startTicking(); }, 50);
+}
+// Service Workerの登録は完全に後回しにし、起動体感を高速化する。
 scheduleServiceWorkerRegistration();
 const startupGraceUntil = Date.now() + 3000;
 
