@@ -137,11 +137,21 @@ input,textarea{
   color:transparent;font-size:24px;text-shadow:none;
 }
 .idle-mark.daily-mark.show{
+  color:#b9aaff;background:transparent;border:none;box-shadow:none;
+  text-shadow:0 0 7px rgba(185,170,255,.55);
+}
+.idle-mark.g0.daily-mark.show{
+  color:#b9aaff;background:transparent;border:none;box-shadow:none;
+  text-shadow:0 0 7px rgba(185,170,255,.55);
+}
+.idle-mark.g1.daily-mark.show{
   color:#6fe8ff;background:transparent;border:none;box-shadow:none;
   text-shadow:0 0 7px rgba(111,232,255,.55);
 }
-.idle-mark.g1.daily-mark.show{color:#6fe8ff;}
-.idle-mark.g2.daily-mark.show{color:#6fe8ff;}
+.idle-mark.g2.daily-mark.show{
+  color:#d0d8e8;background:transparent;border:none;box-shadow:none;
+  text-shadow:0 0 7px rgba(208,216,232,.55);
+}
 /* ウィークリーは枠なしの星をさらに大きく表示する。 */
 .idle-mark.weekly-mark{font-size:24px;color:#4e472f;border:none;border-radius:0;background:transparent;box-shadow:none;}
 .idle-mark.weekly-mark.show{font-size:25px;color:#ffcc33;background:transparent;border:none;box-shadow:none;text-shadow:0 0 7px rgba(255,204,51,.58);}
@@ -1981,8 +1991,8 @@ function setupDelegatedEvents(){
     const t = ev.target;
     const idleBlock = t.closest && t.closest('[data-idle-receive]');
     if (idleBlock) {
-      // 長押し直後のクリックや、内蔵チェック長押し後は受取確認へ進ませない。
-      if (Date.now() - lastLpTime < 600) return;
+      // 長押し直後のクリックや、内蔵チェック長押し後は受取確認へ進ませない（300msに短縮）。
+      if (Date.now() - lastLpTime < 300) return;
       if (t.closest && t.closest('.idle-mark') && lpFired) { lpFired = false; return; }
       const cardEl = idleBlock.closest('.card');
       const idx = cardEl ? Number(cardEl.dataset.idx) : NaN;
