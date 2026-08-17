@@ -119,8 +119,23 @@ input,textarea{
 .card.g1.open{border-color:var(--g1);box-shadow:0 0 0 1.5px var(--g1);}
 .card.g2.open{border-color:var(--g2);box-shadow:0 0 0 1.5px var(--g2);}
 .row-top{display:flex;align-items:center;gap:7px;margin-bottom:3px;}
-/* 放置報酬側にもスタミナ側の名前・ランク行と同じ高さを確保し、タイマー表示を揃える。 */
-.abyss-idle-spacer{height:16.6px;margin-bottom:3px;}
+/* 放置報酬の内蔵チェック行は、スタミナ側の名前・ランク行と同じ高さでタイマー位置を揃える。 */
+.abyss-idle-head{height:16.6px;margin-bottom:3px;display:flex;align-items:center;justify-content:flex-end;}
+.idle-marks{display:flex;align-items:center;gap:14px;height:16.6px;}
+.idle-mark{
+  width:20px;height:20px;display:flex;align-items:center;justify-content:center;
+  padding:0;border:1px solid #51607b;border-radius:5px;background:#0d131e;color:#aab6cd;opacity:1;
+  font:900 16px/1 inherit;cursor:pointer;outline:none;appearance:none;-webkit-appearance:none;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.035);
+  -webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;user-select:none;
+}
+/* 未完了でも輪郭と記号を明瞭にし、完了時だけ色・背景・外周で状態を分ける。 */
+.idle-mark.daily-mark.show{color:#f3efff;background:#211a3d;border-color:var(--g0);box-shadow:0 0 0 1px rgba(124,95,214,.32);}
+.idle-mark.g1.daily-mark.show{background:#10233c;border-color:var(--g1);box-shadow:0 0 0 1px rgba(91,157,255,.32);}
+.idle-mark.g2.daily-mark.show{background:#1c2330;border-color:var(--g2);box-shadow:0 0 0 1px rgba(143,163,196,.32);}
+.idle-mark.weekly-mark{font-size:17px;color:#d3bd74;border-color:#6d5e38;background:#15130d;}
+.idle-mark.weekly-mark.show{color:#fff2a8;background:#3a2d08;border-color:#ffcc33;box-shadow:0 0 0 1px rgba(255,204,51,.28);}
+.idle-mark.disabled-by-edit{pointer-events:none;opacity:.25;}
 .rank-disp,.rank-input{
   margin-left:auto;flex-shrink:0;width:4.2em;max-width:38%;
   color:#f0a07a;font-size:12px;font-weight:800;
@@ -162,40 +177,6 @@ input,textarea{
 .name-input.editing{display:inline-block;}
 .name-input:focus{outline:none;}
 
-.daily-mark{
-  width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-  font-size:18px;font-weight:900;color:transparent;cursor:pointer;
-  border:1.5px solid var(--line);background:transparent;opacity:.4;outline:none;user-select:none;
-  flex-shrink:0;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;
-  position:relative;z-index:26;transition:opacity .15s ease;
-  appearance:none;-webkit-appearance:none;font-family:inherit;padding:0;
-  margin-top:-2px;
-}
-.daily-mark.show{opacity:.85;font-weight:900;background:transparent;-webkit-font-smoothing:antialiased;}
-.daily-mark.g0.show{border-color:var(--g0);color:var(--g0);}
-.daily-mark.g1.show{border-color:var(--g1);color:var(--g1);}
-.daily-mark.g2.show{border-color:var(--g2);color:var(--g2);}
-.daily-mark.armed{animation:markShake .3s ease;}
-.daily-mark.disabled-by-edit{pointer-events:none;opacity:.25;}
-
-.mark-col{
-  display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
-  gap:12px;flex-shrink:0;padding-top:0;
-}
-
-.weekly-mark{
-  width:30px;height:30px;display:flex;align-items:center;justify-content:center;
-  font-size:20px;font-weight:900;color:#3d485e;cursor:pointer;
-  border:none;background:transparent;opacity:.5;outline:none;user-select:none;
-  flex-shrink:0;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;
-  appearance:none;-webkit-appearance:none;font-family:inherit;padding:0;
-  position:relative;z-index:26;transition:opacity .15s ease, color .15s ease, transform .15s ease;
-}
-.weekly-mark.show{
-  opacity:1;color:#ffcc33;transform:scale(1.15);
-  text-shadow:0 0 6px rgba(255,204,51,0.5);
-}
-.weekly-mark.disabled-by-edit{pointer-events:none;opacity:.25;}
 
 @keyframes markShake{
   0%,100%{transform:translateX(0);}
@@ -913,19 +894,20 @@ function build(){
             '</div></div>' +
           '</div>' +
           '<div class="card abyss-idle-card ' + groupClass(i) + ' tblock-idle" id="idle-block-' + i + '" data-idle-receive="true" data-idx="' + i + '" role="button" aria-label="放置報酬を受け取る。2回タップで確定">' +
-            '<div class="row-top abyss-idle-spacer" aria-hidden="true"></div>' +
+            '<div class="row-top abyss-idle-head">' +
+              '<div class="idle-marks" aria-label="デイリー・ウィークリー。長押しで切替">' +
+                '<button type="button" class="idle-mark weekly-mark' + (s.weeklyDone ? ' show' : '') + '" id="weekly-mark-' + i + '"' +
+                ' data-action="weekly" data-idx="' + i + '" tabindex="-1" aria-label="スロット' + (i + 1) + 'のウィークリー。長押しで切替" aria-pressed="' + (s.weeklyDone ? 'true' : 'false') + '">☆</button>' +
+                '<button type="button" class="idle-mark daily-mark ' + groupClass(i) + (s.missionDone ? ' show' : '') + '" id="daily-mark-' + i + '"' +
+                ' data-action="mark" data-idx="' + i + '" tabindex="-1" aria-label="スロット' + (i + 1) + 'のデイリー完了。長押しで切替" aria-pressed="' + (s.missionDone ? 'true' : 'false') + '">✓</button>' +
+              '</div>' +
+            '</div>' +
             '<div class="ttag idle">放置報酬</div>' +
             '<div class="tval idle" id="idle-val-' + i + '">—:—</div>' +
             '<div class="tsub idle-meta" id="idle-sub-' + i + '"></div>' +
             '<div class="pbar"><div class="pbar-fill idle" id="idle-bar-' + i + '" style="width:0%"></div></div>' +
           '</div>' +
         '</div>' +
-      '<div class="mark-col">' +
-      '<button type="button" class="daily-mark ' + groupClass(i) + (s.missionDone ? ' show' : '') + '" id="daily-mark-' + i + '"' +
-      ' data-action="mark" data-idx="' + i + '" tabindex="-1" aria-label="スロット' + (i + 1) + 'のデイリー完了" aria-pressed="' + (s.missionDone ? 'true' : 'false') + '">✓</button>' +
-      '<button type="button" class="weekly-mark' + (s.weeklyDone ? ' show' : '') + '" id="weekly-mark-' + i + '"' +
-      ' data-action="weekly" data-idx="' + i + '" tabindex="-1" aria-label="スロット' + (i + 1) + 'のウィークリー" aria-pressed="' + (s.weeklyDone ? 'true' : 'false') + '">☆</button>' +
-      '</div>' +
       '</div>';
   }
   grid.innerHTML = html;
@@ -1977,6 +1959,8 @@ function setupDelegatedEvents(){
     const t = ev.target;
     const idleBlock = t.closest && t.closest('[data-idle-receive]');
     if (idleBlock) {
+      // 内蔵チェックの長押し後は、続いて発生するクリックで受取確認へ進ませない。
+      if (t.closest && t.closest('.idle-mark') && lpFired) { lpFired = false; return; }
       const cardEl = idleBlock.closest('.card');
       const idx = cardEl ? Number(cardEl.dataset.idx) : NaN;
       if (Number.isFinite(idx)) {
