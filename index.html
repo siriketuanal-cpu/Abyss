@@ -169,6 +169,13 @@ input,textarea{
   -webkit-touch-callout:none!important;-webkit-user-drag:none;touch-action:manipulation;
 }
 .rank-disp::selection{background:transparent;color:inherit;}
+/* 長押しの対象は表示枠全体ではなく、実際の文字の近くに限定する。 */
+.name-lp-hit,.rank-lp-hit{
+  display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  padding:0 1px;cursor:pointer;touch-action:manipulation;
+  -webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important;
+}
+.rank-lp-hit{min-width:2.4em;text-align:right;}
 .rank-input{
   display:none;background:transparent;border:none;border-bottom:1px dashed #f0a07a;
   outline:none;caret-color:#f0a07a;text-align:right;
@@ -216,7 +223,20 @@ input,textarea{
 .tval.full{color:var(--stam-full-c)!important;}
 .tval.urgent{color:var(--stam-full-c)!important;}
 .tsub{font-size:10px;color:var(--ink);height:13px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-variant-numeric:tabular-nums;}
-.tsub-cur{font-weight:700;color:#ffb35e;font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;}
+.tsub{position:relative;}
+.tsub-cur{display:inline-block;width:3ch;font-weight:700;color:#ffb35e;font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;}
+/* 現在値だけを元の3文字幅の領域で置き換える。後続の/上限値と時刻は動かさない。 */
+.tsub-cur-input{
+  display:none;position:absolute;left:0;top:0;width:3ch;height:13px;box-sizing:border-box;margin:0;padding:0;
+  border:0;border-radius:0;background:transparent;color:#ffb35e;
+  font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;
+  font-size:10px;line-height:13px;font-weight:700;text-align:left;outline:none;appearance:textfield;-moz-appearance:textfield;
+}
+.tsub-cur-input::-webkit-outer-spin-button,.tsub-cur-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+.tsub.stam-manual-editing .tsub-cur{visibility:hidden;}
+.tsub.stam-manual-editing .tsub-cur-input{display:block;}
+/* 1回目のタップで表示する40消費後の参考値。対象カードは暗転より前面に保つ。 */
+.card.stam-preview{z-index:28;}
 .tsub-sep{font-weight:600;color:var(--ink-dim);margin:0 1px;}
 .tsub-max{font-weight:700;color:var(--stam-cur-c);font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;}
 .tsub-clock{margin-left:4px;font-weight:600;}
@@ -332,7 +352,7 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   background:var(--bg-card);border:1.5px solid #3a3a3a;border-radius:12px;padding:7px 9px;
   cursor:pointer;position:relative;overflow:visible;-webkit-tap-highlight-color:transparent;
 }
-.gcard.open{border-color:var(--stam-cur-c);z-index:30;}
+.gcard.g-inline-active{z-index:30;}
 .grow-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;}
 .gname-disp,.gname-input{
   font-size:10.5px;font-weight:700;color:var(--ink);
@@ -352,19 +372,23 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   -webkit-user-select:text;user-select:text;-webkit-touch-callout:default;
 }
 .gname-input.editing{display:inline-block;}
-.gedit-row-oneline{display:flex;align-items:center;gap:5px;flex-wrap:nowrap;}
-.gedit-row-oneline > input[type="number"]{width:42px;flex-shrink:0;text-align:center;}
-.gedit-max{margin-left:auto;display:flex;align-items:center;gap:3px;flex-shrink:0;}
 .gval{
   font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;
   color:var(--ok);line-height:1.1;
 }
 .gval.full{color:var(--stam-full-c)!important;}
-.gsub{font-size:10px;color:var(--ink);margin-top:1px;}
-.gsub .gsub-cur{font-weight:700;color:#ffb35e;font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;}
+.gsub{position:relative;font-size:10px;color:var(--ink);margin-top:1px;}
+.gsub .gsub-cur{display:inline-block;width:3ch;font-weight:700;color:#ffb35e;font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;}
 .gsub .gsub-sep{font-weight:600;color:var(--ink-dim);margin:0 1px;}
-.gsub .gsub-max{font-weight:700;color:var(--stam-cur-c);font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;}
+.gsub .gsub-max{display:inline-block;width:3ch;font-weight:700;color:var(--stam-cur-c);font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;}
 .gsub .gsub-clock{color:#c9b8ff;font-weight:600;margin-left:3px;}
+.gname-lp-hit{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 1px;cursor:pointer;touch-action:manipulation;-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important;}
+.g-inline-field{display:none;position:absolute;top:0;width:3ch;height:13px;box-sizing:border-box;background:transparent;border:0;border-radius:0;font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;font-size:10px;line-height:13px;font-weight:700;text-align:left;outline:none;padding:0;margin:0;appearance:textfield;-moz-appearance:textfield;}
+.g-inline-field::-webkit-outer-spin-button,.g-inline-field::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+.g-inline-current .gsub-cur{visibility:hidden;}
+.g-inline-current .g-inline-current-field{display:block;left:0;color:#ffb35e;}
+.g-inline-max .gsub-max{visibility:hidden;}
+.g-inline-max .g-inline-max-field{display:block;left:4.4ch;color:var(--stam-cur-c);}
 .gbar{height:3px;background:var(--line);border-radius:2px;overflow:hidden;margin-top:5px;}
 .gbar-fill{height:100%;border-radius:2px;background:var(--ok);transition:width .3s linear;}
 .gbar-fill.full{background:var(--stam-full-c)!important;}
@@ -376,20 +400,6 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   appearance:none;-webkit-appearance:none;font-family:inherit;padding:0;
 }
 .gmark.show{opacity:1;color:#fff;border-color:var(--stam-cur-c);background:transparent;}
-  /* Gジェネはv35までの自然な編集欄サイズに戻し、上限だけを右寄せの小さな入力欄で変更する。 */
-  .gedit{
-    display:none;position:absolute;z-index:31;top:calc(100% + 6px);left:0;right:0;
-    margin:0;padding:8px 9px;background:#000;border:1px solid var(--stam-cur-c);border-radius:12px;
-    box-shadow:0 8px 18px rgba(0,0,0,.45);
-  }
-  .gcard.open .gedit{display:block;}
-  .gedit-row-oneline{display:flex;align-items:center;gap:5px;flex-wrap:nowrap;}
-  .gedit-row-oneline > input[type="number"],.g-max-input{
-    width:42px;box-sizing:border-box;background:var(--bg-inset);border:1px solid var(--line);border-radius:6px;
-    color:var(--ink);padding:4px 5px;font-size:11.5px;font-family:inherit;text-align:center;flex-shrink:0;
-  }
-  .gedit-row-oneline .ebtn{padding:5px 8px;font-size:10.5px;flex-shrink:0;}
-  .g-max-input{margin-left:auto;}
 
   /* 幻想水滸伝 STAR LEAP */
   .slsection{margin-top:14px;}
@@ -521,7 +531,6 @@ const defaultGSlot = () => ({
   label: '',
   stamCurrent: 0, stamMax: 130, stamStart: null, stamRunning: false, missionDone: false
 });
-let gOpenIdx = -1;
 let gRefs = [];
 
 // ---- 幻想水滸伝 STAR LEAP ----
@@ -545,6 +554,7 @@ let tickId = null;
 let resetCheckTimer = null;
 let swRegistrationScheduled = false;
 let armedIdle = {};
+let stamPreview = {};
 let labelSaveTimer = null;
 let lastProgressSig = '';
 let lastDailyLabel = '';
@@ -870,25 +880,112 @@ function stamRemainderAfter40s(current){
   return c % 40;
 }
 
-function prefillsStamCur(i){
+function getLiveStamCurrent(i){
   const s = state.slots[i];
-  const now = Date.now();
-  const live = s.stamRunning ? getStamInfo(s, now).current : s.stamCurrent;
-  const stepped = stamRemainderAfter40s(live);
-  const curEl = document.getElementById('stam-cur-' + i);
-  if (curEl) {
-    curEl.value = String(stepped);
-    curEl.dataset.prev = String(stepped);
-  }
+  return s.stamRunning ? getStamInfo(s, Date.now()).current : s.stamCurrent;
 }
 
+function clearStamPreview(i){
+  const r = refs[i];
+  if (r && r.card) r.card.classList.remove('stam-preview');
+  if (r && r.stamSub) r.stamSub.classList.remove('stam-manual-editing');
+  if (r && r.directCurEl) r.directCurEl.value = '';
+  delete stamPreview[i];
+}
+
+function clearAllStamPreviews(){
+  Object.keys(stamPreview).forEach((key) => clearStamPreview(Number(key)));
+  syncIdleConfirmBackdrop();
+}
+
+// 1回目: 40消費後の参考値だけを表示する。画面外タップでは保存せずに戻す。
+function beginStamReference(i){
+  const r = refs[i];
+  if (!r) return;
+  clearAllStamPreviews();
+  const live = getLiveStamCurrent(i);
+  stamPreview[i] = { value: stamRemainderAfter40s(live), phase: 'reference' };
+  if (r.card) r.card.classList.add('stam-preview');
+  syncIdleConfirmBackdrop();
+  render();
+}
+
+// スタミナタイマー領域の長押しで、任意値を空欄から直接入力する。
+function beginStamManualInput(i){
+  const r = refs[i];
+  if (!r || !r.directCurEl || !r.stamSub) return;
+  if (Object.keys(armedIdle).length > 0) {
+    disarmAllIdle();
+    return;
+  }
+  let preview = stamPreview[i];
+  if (!preview) {
+    clearAllStamPreviews();
+    const live = getLiveStamCurrent(i);
+    preview = { value: stamRemainderAfter40s(live), phase: 'manual', manualOnly: true };
+    stamPreview[i] = preview;
+    if (r.card) r.card.classList.add('stam-preview');
+  } else {
+    preview.phase = 'manual';
+    preview.manualOnly = true;
+  }
+  const input = r.directCurEl;
+  input.value = '';
+  r.stamSub.classList.add('stam-manual-editing');
+  syncIdleConfirmBackdrop();
+  input.focus({ preventScroll: true });
+}
+
+function commitStamPreview(i, rawValue){
+  const preview = stamPreview[i];
+  if (!preview) return;
+  const s = state.slots[i];
+  const raw = rawValue == null ? '' : String(rawValue).trim();
+  // 長押しから開いた手入力を空欄のまま閉じた場合は、値を変えずに取り消す。
+  if (raw === '' && preview.manualOnly) {
+    clearStamPreview(i);
+    syncIdleConfirmBackdrop();
+    render();
+    return;
+  }
+  let next = preview.value;
+  if (raw !== '') {
+    const parsed = parseInt(raw, 10);
+    if (!isNaN(parsed)) next = parsed;
+  }
+  s.stamCurrent = Math.max(0, Math.min(next, s.stamMax));
+  s.stamStart = Date.now();
+  s.stamRunning = true;
+  clearStamPreview(i);
+  saveState();
+  suppressOpenAllUntil = Date.now() + 180;
+  syncIdleConfirmBackdrop();
+  render();
+  startTicking();
+}
+
+// 画面外タップ時は、1回目の参考表示なら取消、2回目以降なら確定する。
+function resolveAllStamPreviewsFromOutside(){
+  const entries = Object.keys(stamPreview).map(Number);
+  let cancelledReference = false;
+  entries.forEach((i) => {
+    const preview = stamPreview[i];
+    if (!preview) return;
+    if (preview.phase === 'reference') {
+      clearStamPreview(i);
+      cancelledReference = true;
+    } else {
+      commitStamPreview(i);
+    }
+  });
+  // 参考表示を取り消した場合も、仮表示の数字を残さず即時に実値へ戻す。
+  if (cancelledReference) render();
+  syncIdleConfirmBackdrop();
+}
+
+/* 旧編集パネルを使わないため、既存の呼び出し元には安全な空関数を残す。 */
 function restoreEditInputs(i){
   if (i < 0 || i >= N) return;
-  const s = state.slots[i];
-  const now = Date.now();
-  const live = s.stamRunning ? getStamInfo(s, now).current : s.stamCurrent;
-  const curEl = document.getElementById('stam-cur-' + i);
-  if (curEl) { curEl.value = String(live); curEl.dataset.prev = String(live); }
 }
 
 function build(){
@@ -901,22 +998,18 @@ function build(){
         '<div class="abyss-timers">' +
           '<div class="card abyss-stam-card ' + groupClass(i) + '" id="card-' + i + '" data-action="card" data-idx="' + i + '" aria-expanded="false">' +
             '<div class="row-top">' +
-              '<span class="name-disp' + (s.label ? '' : ' empty') + '" id="name-disp-' + i + '">' +
-              (s.label ? escapeHtml(s.label) : ('スロット ' + (i + 1))) + '</span>' +
+              '<span class="name-disp' + (s.label ? '' : ' empty') + '" id="name-disp-' + i + '"><span class="name-lp-hit">' +
+              (s.label ? escapeHtml(s.label) : ('スロット ' + (i + 1))) + '</span></span>' +
               '<input class="name-input" id="name-' + i + '" value="' + escapeHtml(s.label) + '" placeholder="スロット ' + (i + 1) + '" inputmode="text" enterkeyhint="done" aria-label="スロット' + (i + 1) + 'の名前">' +
-              '<span class="rank-disp" id="rank-disp-' + i + '">Lv.' + (s.rank || 1) + '</span>' +
+              '<span class="rank-disp" id="rank-disp-' + i + '"><span class="rank-lp-hit">Lv.' + (s.rank || 1) + '</span></span>' +
               '<input class="rank-input" id="rank-' + i + '" value="' + (s.rank || 1) + '" inputmode="numeric" enterkeyhint="done" aria-label="プレイヤレベル">' +
             '</div>' +
             '<div class="tblock tblock-stam">' +
               '<div class="ttag stam">スタミナ</div>' +
               '<div class="tval stam" id="stam-val-' + i + '">—:—</div>' +
-              '<div class="tsub"><span class="tsub-cur" id="stam-subcur-' + i + '"></span><span class="tsub-sep" id="stam-subsep-' + i + '">/</span><span class="tsub-max" id="stam-submax-' + i + '"></span><span class="tsub-clock" id="stam-subclock-' + i + '"></span></div>' +
+              '<div class="tsub" id="stam-sub-' + i + '"><span class="tsub-cur" id="stam-subcur-' + i + '"></span><input class="tsub-cur-input" type="text" id="stam-direct-cur-' + i + '" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" aria-label="スロット' + (i + 1) + 'の現在スタミナ"><span class="tsub-sep" id="stam-subsep-' + i + '">/</span><span class="tsub-max" id="stam-submax-' + i + '"></span><span class="tsub-clock" id="stam-subclock-' + i + '"></span></div>' +
               '<div class="pbar"><div class="pbar-fill stam" id="stam-bar-' + i + '" style="width:0%"></div></div>' +
             '</div>' +
-            '<div class="edit-panel" id="edit-' + i + '"><div class="edit-side-stam">' +
-              '<input type="number" id="stam-cur-' + i + '" value="' + s.stamCurrent + '" min="0" max="999" inputmode="numeric" aria-label="現在のスタミナ">' +
-              '<button type="button" class="ebtn stam" data-action="update" data-idx="' + i + '">更新</button>' +
-            '</div></div>' +
           '</div>' +
           '<div class="card abyss-idle-card ' + groupClass(i) + ' tblock-idle" id="idle-block-' + i + '" data-idle-receive="true" data-idx="' + i + '" role="button" aria-label="放置報酬を受け取る。2回タップで確定">' +
             '<div class="row-top abyss-idle-head">' +
@@ -949,26 +1042,24 @@ function buildG(){
   let html = '';
   for (let i = 0; i < GN; i++) {
     const s = state.g.slots[i];
+    const label = s.label ? escapeHtml(s.label) : ('G' + (i + 1));
     html +=
-      '<div class="gcard" id="gcard-' + i + '" data-gaction="card" data-idx="' + i + '">' +
+      '<div class="gcard" id="gcard-' + i + '" data-idx="' + i + '">' +
         '<div class="grow-top">' +
-          '<span class="gname-disp' + (s.label ? '' : ' empty') + '" id="g-name-disp-' + i + '">' +
-            (s.label ? escapeHtml(s.label) : ('G' + (i + 1))) + '</span>' +
-          '<input class="gname-input" id="g-name-' + i + '" value="' + escapeHtml(s.label || '') + '"' +
-          ' inputmode="text" enterkeyhint="done" aria-label="G' + (i + 1) + 'の名前">' +
-          '<button type="button" class="gmark' + (s.missionDone ? ' show' : '') + '" id="g-mark-' + i + '"' +
-          ' data-gaction="mark" data-idx="' + i + '" tabindex="-1" aria-label="G' + (i + 1) + 'のデイリー完了">✓</button>' +
+          '<span class="gname-disp' + (s.label ? '' : ' empty') + '" id="g-name-disp-' + i + '"><span class="gname-lp-hit">' + label + '</span></span>' +
+          '<input class="gname-input" id="g-name-' + i + '" value="' + escapeHtml(s.label || '') + '" inputmode="text" enterkeyhint="done" aria-label="G' + (i + 1) + 'の名前">' +
+          '<button type="button" class="gmark' + (s.missionDone ? ' show' : '') + '" id="g-mark-' + i + '" data-idx="' + i + '" tabindex="-1" aria-label="G' + (i + 1) + 'のデイリー完了。長押しで切替" aria-pressed="' + (s.missionDone ? 'true' : 'false') + '">✓</button>' +
         '</div>' +
         '<div class="gval" id="g-val-' + i + '">—:—</div>' +
-        '<div class="gsub"><span class="gsub-cur" id="g-subcur-' + i + '"></span><span class="gsub-sep" id="g-subsep-' + i + '">/</span><span class="gsub-max" id="g-submax-' + i + '"></span><span class="gsub-clock" id="g-subclock-' + i + '"></span></div>' +
-        '<div class="gbar"><div class="gbar-fill" id="g-bar-' + i + '" style="width:0%"></div></div>' +
-      '<div class="gedit" id="g-edit-' + i + '">' +
-        '<div class="gedit-row-oneline">' +
-          '<input type="number" id="g-cur-' + i + '" value="' + s.stamCurrent + '" min="0" max="999" inputmode="numeric" aria-label="G' + (i + 1) + 'の現在スタミナ">' +
-          '<button type="button" class="ebtn stam" data-gaction="update" data-idx="' + i + '">更新</button>' +
-          '<input type="number" class="g-max-input" id="g-max-input-' + i + '" value="' + s.stamMax + '" min="1" max="999" inputmode="numeric" aria-label="G' + (i + 1) + 'のスタミナ上限">' +
+        '<div class="gsub" id="g-sub-' + i + '">' +
+          '<span class="gsub-cur" id="g-subcur-' + i + '"></span>' +
+          '<input class="g-inline-field g-inline-current-field" type="text" id="g-cur-' + i + '" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" aria-label="G' + (i + 1) + 'の現在スタミナ">' +
+          '<input class="g-inline-field g-inline-max-field" type="text" id="g-max-input-' + i + '" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" aria-label="G' + (i + 1) + 'のスタミナ上限">' +
+          '<span class="gsub-sep" id="g-subsep-' + i + '">/</span>' +
+          '<span class="gsub-max" id="g-submax-' + i + '"></span>' +
+          '<span class="gsub-clock" id="g-subclock-' + i + '"></span>' +
         '</div>' +
-      '</div>' +
+        '<div class="gbar"><div class="gbar-fill" id="g-bar-' + i + '" style="width:0%"></div></div>' +
       '</div>';
   }
   wrap.innerHTML = html;
@@ -985,8 +1076,7 @@ function cacheRefsG(){
       subMax: document.getElementById('g-submax-' + i),
       subClock: document.getElementById('g-subclock-' + i),
       bar: document.getElementById('g-bar-' + i),
-      mark: document.getElementById('g-mark-' + i),
-      curEl: document.getElementById('g-cur-' + i)
+      mark: document.getElementById('g-mark-' + i)
     });
   }
 }
@@ -1094,8 +1184,7 @@ function closeSLCard(){
   Object.keys(slRefs).forEach(key => {
     if (slRefs[key] && slRefs[key].card) slRefs[key].card.classList.remove('open');
   });
-  const bd = document.getElementById('backdrop');
-  if (bd) bd.classList.toggle('show', openIdx >= 0 || gOpenIdx >= 0);
+  syncIdleConfirmBackdrop();
 }
 
 function toggleSLCard(type){
@@ -1267,7 +1356,8 @@ function cacheRefs(){
       idleBar: document.getElementById('idle-bar-' + i),
       mark: document.getElementById('daily-mark-' + i),
       weeklyMark: document.getElementById('weekly-mark-' + i),
-      curEl: document.getElementById('stam-cur-' + i)
+      stamSub: document.getElementById('stam-sub-' + i),
+      directCurEl: document.getElementById('stam-direct-cur-' + i)
     });
   }
 }
@@ -1280,7 +1370,9 @@ function softBlur(){
 
 function onCardClick(i, ev){
   const t = ev.target;
-  if (t.closest && (t.closest('input') || t.closest('button') || t.closest('.name-input') || t.closest('.rank-input'))) return;
+  // 現在値の操作は、名前・ランクではなくスタミナのタイマー表示領域だけで受け付ける。
+  if (!t.closest || !t.closest('.tblock-stam')) return;
+  if (t.closest('input') || t.closest('button') || t.closest('.name-input') || t.closest('.rank-input')) return;
   if (textEditIdx >= 0) {
     softBlur();
     textEditIdx = -1;
@@ -1288,29 +1380,26 @@ function onCardClick(i, ev){
     return;
   }
   if (Date.now() < suppressOpenAllUntil) return;
-  // 受取確認中は、スタミナ側を触れても最初のタップでは確認を解除するだけにする。
-  // 放置報酬カード同士と同じ安全クッションを適用し、誤操作を防ぐ。
+
+  // 放置報酬が確認待ちなら、スタミナ側の最初のタップは解除だけに使う。
   if (Object.keys(armedIdle).length > 0) {
     disarmAllIdle();
     return;
   }
-  disarmAllIdle();
 
-  // スタミナカードは、タップで編集を開閉する単一の役割だけを持つ。
-  if (openIdx === i) {
-    if (t.closest && t.closest('.edit-panel')) return;
-    restoreEditInputs(i);
-    openIdx = -1;
-    updateOpenState();
-    softBlur();
+  // 同じタイマーの2回目は、参考値をその場で即時確定する。
+  if (stamPreview[i]) {
+    if (stamPreview[i].phase === 'reference') commitStamPreview(i);
     return;
   }
-  const prevOpen = openIdx;
-  openIdx = i;
-  updateOpenState();
-  if (prevOpen >= 0) restoreEditInputs(prevOpen);
-  prefillsStamCur(i);
-  softBlur();
+  // 別タイマーの仮値が残っている場合は、段階に応じて取消または確定だけを行う。
+  if (Object.keys(stamPreview).length > 0) {
+    resolveAllStamPreviewsFromOutside();
+    return;
+  }
+
+  // 1回目は、40消費後の最小値を取消可能な参考表示として出す。
+  beginStamReference(i);
 }
 
 function updateOpenState(){
@@ -1334,18 +1423,29 @@ function updateOpenState(){
       }
     }
   }
-  const anyOpen = editing || gOpenIdx >= 0;
-  const bd = document.getElementById('backdrop');
-  if (bd) bd.classList.toggle('show', anyOpen);
   syncIdleConfirmBackdrop();
   _lastOpenIdx = openIdx;
 }
 
+function setAbyssNameDisplay(disp, text){
+  if (!disp) return;
+  const hit = document.createElement('span');
+  hit.className = 'name-lp-hit';
+  hit.textContent = text;
+  disp.replaceChildren(hit);
+}
+function setAbyssRankDisplay(disp, rank){
+  if (!disp) return;
+  const hit = document.createElement('span');
+  hit.className = 'rank-lp-hit';
+  hit.textContent = 'Lv.' + rank;
+  disp.replaceChildren(hit);
+}
 function endRankEditVisual(i){
   const el = document.getElementById('rank-' + i);
   const disp = document.getElementById('rank-disp-' + i);
   if (el) { el.classList.remove('editing'); el.value = String(state.slots[i].rank || 1); }
-  if (disp) { disp.style.display = ''; disp.textContent = 'Lv.' + (state.slots[i].rank || 1); }
+  if (disp) { disp.style.display = ''; setAbyssRankDisplay(disp, state.slots[i].rank || 1); }
 }
 function endNameEditVisual(i){
   const el = document.getElementById('name-' + i);
@@ -1354,8 +1454,8 @@ function endNameEditVisual(i){
   if (el) { el.classList.remove('editing'); el.value = val; }
   if (disp) {
     disp.style.display = '';
-    if (val) { disp.textContent = val; disp.classList.remove('empty'); }
-    else { disp.textContent = 'スロット ' + (i + 1); disp.classList.add('empty'); }
+    if (val) { setAbyssNameDisplay(disp, val); disp.classList.remove('empty'); }
+    else { setAbyssNameDisplay(disp, 'スロット ' + (i + 1)); disp.classList.add('empty'); }
   }
 }
 function beginNameEdit(i){
@@ -1389,10 +1489,10 @@ function onNameBlur(i){
   if (disp) {
     disp.style.display = '';
     if (val) {
-      disp.textContent = val;
+      setAbyssNameDisplay(disp, val);
       disp.classList.remove('empty');
     } else {
-      disp.textContent = 'スロット ' + (i + 1);
+      setAbyssNameDisplay(disp, 'スロット ' + (i + 1));
       disp.classList.add('empty');
     }
   }
@@ -1401,15 +1501,13 @@ function onNameBlur(i){
 }
 
 function closeAllPanels(){
+  resolveAllStamPreviewsFromOutside();
   disarmAllIdle();
   if (openIdx >= 0) restoreEditInputs(openIdx);
   openIdx = -1;
- 
-  updateOpenState();
-  if (gOpenIdx >= 0) restoreGEditInputs(gOpenIdx);
-  gOpenIdx = -1;
-  updateGOpenState();
+  if (typeof gCommitOutside === 'function') gCommitOutside();
   closeSLCard();
+  updateOpenState();
   softBlur();
 }
 
@@ -1418,7 +1516,7 @@ let activeAbyssGroup = 'g0';
 
 function switchAbyssGroup(group){
   if (!['g0', 'g1', 'g2'].includes(group) || group === activeAbyssGroup) return;
-
+	
   // 非表示になるカードの編集欄・フォーカスを残さない。
   if (openIdx >= 0) {
     restoreEditInputs(openIdx);
@@ -1466,13 +1564,10 @@ function switchGameTab(tab){
   if (tab === activeGameTab) return;
 
   // 非表示になる編集欄を閉じ、重ね表示や入力フォーカスを残さない。
-  if (gOpenIdx >= 0) {
-    restoreGEditInputs(gOpenIdx);
-    gOpenIdx = -1;
-    updateGOpenState();
-  }
+  if (typeof gCommitOutside === 'function') gCommitOutside();
   closeSLCard();
   softBlur();
+  syncIdleConfirmBackdrop();
 
   activeGameTab = tab;
   const gPanel = document.getElementById('game-panel-g');
@@ -1497,145 +1592,153 @@ function setupGameTabs(){
 }
 
 // ---- Gジェネ操作 ----
-function updateGOpenState(){
-  for (let i = 0; i < GN; i++) {
-    if (gRefs[i] && gRefs[i].card) gRefs[i].card.classList.toggle('open', gOpenIdx === i);
-  }
-  const anyOpen = openIdx >= 0 || gOpenIdx >= 0;
-  const bd = document.getElementById('backdrop');
-  if (bd) bd.classList.toggle('show', anyOpen);
+let gEditState = {};
+let gEditLastLongPress = 0;
+
+function gSetNameDisplay(disp, text){
+  if (!disp) return;
+  const hit = document.createElement('span');
+  hit.className = 'gname-lp-hit';
+  hit.textContent = text;
+  disp.replaceChildren(hit);
+}
+
+function gClear(i){
+  const card = document.getElementById('gcard-' + i);
+  const sub = document.getElementById('g-sub-' + i);
+  const cur = document.getElementById('g-cur-' + i);
+  const max = document.getElementById('g-max-input-' + i);
+  if (card) card.classList.remove('g-inline-active');
+  if (sub) sub.classList.remove('g-inline-editing', 'g-inline-current', 'g-inline-max');
+  if (cur) cur.value = '';
+  if (max) max.value = '';
+  delete gEditState[i];
   syncIdleConfirmBackdrop();
 }
-function restoreGEditInputs(i){
-  if (i < 0 || i >= GN) return;
+
+function gClearAll(){ Object.keys(gEditState).forEach(key => gClear(Number(key))); }
+
+function gBeginCurrent(i){
+  gClearAll();
+  const field = document.getElementById('g-cur-' + i);
+  const card = document.getElementById('gcard-' + i);
+  const sub = document.getElementById('g-sub-' + i);
+  if (!field || !card || !sub) return;
+  gEditState[i] = { mode: 'current' };
+  field.value = '';
+  card.classList.add('g-inline-active');
+  sub.classList.add('g-inline-editing', 'g-inline-current');
+  syncIdleConfirmBackdrop();
+  field.focus({ preventScroll: true });
+}
+
+function gBeginMax(i){
+  gClearAll();
+  const field = document.getElementById('g-max-input-' + i);
+  const card = document.getElementById('gcard-' + i);
+  const sub = document.getElementById('g-sub-' + i);
+  if (!field || !card || !sub) return;
+  gEditState[i] = { mode: 'max' };
+  field.value = '';
+  card.classList.add('g-inline-active');
+  sub.classList.add('g-inline-editing', 'g-inline-max');
+  syncIdleConfirmBackdrop();
+  field.focus({ preventScroll: true });
+}
+
+function gCommit(i){
+  const mode = gEditState[i] && gEditState[i].mode;
+  if (!mode) return;
   const s = state.g.slots[i];
-  const now = Date.now();
-  const live = s.stamRunning ? getGStamInfo(s, now).current : s.stamCurrent;
-  const curEl = document.getElementById('g-cur-' + i);
-  const maxInput = document.getElementById('g-max-input-' + i);
-  if (curEl) { curEl.value = String(live); curEl.dataset.prev = String(live); }
-  if (maxInput) { maxInput.value = String(s.stamMax); maxInput.dataset.prev = String(s.stamMax); }
+  const field = document.getElementById(mode === 'max' ? 'g-max-input-' + i : 'g-cur-' + i);
+  const text = field ? String(field.value || '').trim() : '';
+  if (text !== '') {
+    const n = parseInt(text, 10);
+    if (!isNaN(n)) {
+      if (mode === 'current') {
+        s.stamCurrent = Math.max(0, Math.min(n, s.stamMax));
+        s.stamStart = Date.now();
+        s.stamRunning = true;
+      } else {
+        s.stamMax = Math.max(1, Math.min(999, n));
+        if (s.stamCurrent > s.stamMax) s.stamCurrent = s.stamMax;
+      }
+      saveState();
+    }
+  }
+  gClear(i);
+  renderG();
+  startTicking();
+}
+
+function gArm(i){
+  if (Object.keys(gEditState).length > 0) { gClearAll(); return; }
+  gEditState[i] = { mode: 'armed' };
+  const card = document.getElementById('gcard-' + i);
+  if (card) card.classList.add('g-inline-active');
+  syncIdleConfirmBackdrop();
+}
+
+function gCommitOutside(){
+  Object.keys(gEditState).forEach(key => {
+    const i = Number(key);
+    if (gEditState[i] && gEditState[i].mode === 'armed') gClear(i);
+    else gCommit(i);
+  });
 }
 
 function endGNameEditVisual(i){
-  const el = document.getElementById('g-name-' + i);
+  const input = document.getElementById('g-name-' + i);
   const disp = document.getElementById('g-name-disp-' + i);
-  const val = (state.g.slots[i] && state.g.slots[i].label) || '';
-  if (el) { el.classList.remove('editing'); el.value = val; }
+  const label = (state.g.slots[i] && state.g.slots[i].label) || '';
+  if (input) { input.classList.remove('editing'); input.value = label; }
   if (disp) {
     disp.style.display = '';
-    if (val) { disp.textContent = val; disp.classList.remove('empty'); }
-    else { disp.textContent = 'G' + (i + 1); disp.classList.add('empty'); }
+    gSetNameDisplay(disp, label || ('G' + (i + 1)));
+    disp.classList.toggle('empty', !label);
   }
 }
+
 function beginGNameEdit(i){
-  if (openIdx >= 0) { restoreEditInputs(openIdx); openIdx = -1; updateOpenState(); }
-  if (gOpenIdx >= 0) { restoreGEditInputs(gOpenIdx); gOpenIdx = -1; updateGOpenState(); }
+  gClearAll();
   for (let j = 0; j < GN; j++) endGNameEditVisual(j);
-  for (let j = 0; j < N; j++) { endNameEditVisual(j); endRankEditVisual(j); }
-  const el = document.getElementById('g-name-' + i);
+  const input = document.getElementById('g-name-' + i);
   const disp = document.getElementById('g-name-disp-' + i);
-  if (!el) return;
+  if (!input) return;
   if (disp) disp.style.display = 'none';
-  el.classList.add('editing');
-  el.value = state.g.slots[i].label || '';
+  input.classList.add('editing');
+  input.value = state.g.slots[i].label || '';
   textEditIdx = 1000 + i;
-  // 長押し直後に発生し得る末尾のclickで、名前編集が即座に閉じないようにする。
   suppressOpenAllUntil = Date.now() + 450;
-  el.focus({ preventScroll: true });
-  const collapseSel = () => {
-    try { const n = el.value.length; el.setSelectionRange(n, n); } catch (e) {}
-  };
-  collapseSel();
-  setTimeout(collapseSel, 0);
-  setTimeout(collapseSel, 40);
+  input.focus({ preventScroll: true });
+  const atEnd = () => { try { input.setSelectionRange(input.value.length, input.value.length); } catch(e){} };
+  atEnd(); setTimeout(atEnd, 0); setTimeout(atEnd, 40);
 }
+
 function onGNameBlur(i){
-  const el = document.getElementById('g-name-' + i);
+  const input = document.getElementById('g-name-' + i);
   const disp = document.getElementById('g-name-disp-' + i);
-  if (!el) return;
-  const val = el.value;
-  state.g.slots[i].label = val;
-  clearTimeout(labelSaveTimer);
-  labelSaveTimer = setTimeout(saveState, 300);
-  el.classList.remove('editing');
+  if (!input) return;
+  state.g.slots[i].label = input.value;
+  saveState();
+  input.classList.remove('editing');
   if (disp) {
     disp.style.display = '';
-    if (val) { disp.textContent = val; disp.classList.remove('empty'); }
-    else { disp.textContent = 'G' + (i + 1); disp.classList.add('empty'); }
+    gSetNameDisplay(disp, input.value || ('G' + (i + 1)));
+    disp.classList.toggle('empty', !input.value);
   }
   if (textEditIdx === 1000 + i) textEditIdx = -1;
   suppressOpenAllUntil = Date.now() + 150;
 }
 
-function onGCardClick(i, ev){
-  const t = ev.target;
-  // 通常タップは名前・数値・バーを含めてカード編集を開く。入力欄とボタンだけは個別操作を優先する。
-  if (t.closest && (t.closest('input') || t.closest('button'))) return;
-  if (Date.now() < suppressOpenAllUntil) return;
-  if (textEditIdx >= 0) {
-    const ae = document.activeElement;
-    if (ae && ae.classList && (ae.classList.contains('gname-input') || ae.classList.contains('name-input') || ae.classList.contains('rank-input'))) ae.blur();
-    textEditIdx = -1;
-    suppressOpenAllUntil = Date.now() + 150;
-    return;
-  }
-  if (gOpenIdx === i) {
-    if (t.closest && t.closest('.gedit')) return;
-    if (document.activeElement) document.activeElement.blur();
-    restoreGEditInputs(i);
-    gOpenIdx = -1;
-    updateGOpenState();
-    return;
-  }
-  if (document.activeElement) document.activeElement.blur();
-  const prevOpen = gOpenIdx;
-  if (openIdx >= 0) { restoreEditInputs(openIdx); openIdx = -1; updateOpenState(); }
-  gOpenIdx = i;
-  updateGOpenState();
-  if (prevOpen >= 0) restoreGEditInputs(prevOpen);
-  const s = state.g.slots[i];
-  const now = Date.now();
-  const live = s.stamRunning ? getGStamInfo(s, now).current : s.stamCurrent;
-  const curEl = document.getElementById('g-cur-' + i);
-  const maxInput = document.getElementById('g-max-input-' + i);
-  if (curEl) { curEl.value = String(live); curEl.dataset.prev = String(live); }
-  if (maxInput) { maxInput.value = String(s.stamMax); maxInput.dataset.prev = String(s.stamMax); }
-}
-function onGCurFocus(el){ el.dataset.prev = el.value; el.value = ''; }
-function onGCurBlur(i, el){ if (el.value === '') el.value = el.dataset.prev || state.g.slots[i].stamCurrent; }
-function onGMaxFocus(el){ el.dataset.prev = el.value; el.value = ''; }
-function onGMaxBlur(i, el){ if (el.value === '') el.value = el.dataset.prev || state.g.slots[i].stamMax; }
-function applyG(i){
-  const curEl = document.getElementById('g-cur-' + i);
-  const maxInput = document.getElementById('g-max-input-' + i);
-  let cur = parseInt(curEl.value, 10);
-  let max = parseInt(maxInput ? maxInput.value : '', 10);
-  if (isNaN(cur)) cur = state.g.slots[i].stamCurrent;
-  if (isNaN(max) || max <= 0) max = state.g.slots[i].stamMax;
-  max = Math.max(1, Math.min(999, max));
-  if (document.activeElement) document.activeElement.blur();
-  state.g.slots[i].stamCurrent = Math.max(0, Math.min(cur, max));
-  state.g.slots[i].stamMax = max;
-  state.g.slots[i].stamStart = Date.now();
-  state.g.slots[i].stamRunning = true;
-  curEl.value = String(state.g.slots[i].stamCurrent);
-  if (maxInput) { maxInput.value = String(max); maxInput.dataset.prev = String(max); }
-  saveState();
-  gOpenIdx = -1;
-  updateGOpenState();
-  renderG();
-  startTicking();
-}
-
 function toggleGMark(i){
   const s = state.g.slots[i];
-  const mark = gRefs[i] && gRefs[i].mark;
+  const mark = document.getElementById('g-mark-' + i);
   s.missionDone = !s.missionDone;
   saveState();
   if (mark) {
     mark.classList.toggle('show', s.missionDone);
-    mark.classList.remove('armed');
+    mark.setAttribute('aria-pressed', s.missionDone ? 'true' : 'false');
     if (document.activeElement === mark) mark.blur();
   }
 }
@@ -1645,12 +1748,126 @@ function ensureGDailyDate(){
   if (state.g.dailyDate !== today) {
     state.g.dailyDate = today;
     state.g.slots.forEach(s => { s.missionDone = false; });
-    for (let i = 0; i < gRefs.length; i++) {
-      if (gRefs[i].mark) gRefs[i].mark.classList.remove('show');
-    }
+    gRefs.forEach(r => {
+      if (r.mark) { r.mark.classList.remove('show'); r.mark.setAttribute('aria-pressed', 'false'); }
+    });
     saveState();
   }
 }
+
+function setupGDelegatedEvents(){
+  const wrap = document.getElementById('gwrap');
+  if (!wrap || wrap.dataset.gInlineReady) return;
+  wrap.dataset.gInlineReady = '1';
+
+  wrap.addEventListener('click', (ev) => {
+    const target = ev.target;
+    if (target.closest && target.closest('input')) return;
+    const mark = target.closest && target.closest('.gmark');
+    // チェックは長押し専用。通常タップはカード操作にも流さない。
+    if (mark) return;
+    const card = target.closest && target.closest('.gcard');
+    if (!card) return;
+    const i = Number(card.dataset.idx);
+    if (Date.now() - gEditLastLongPress < 300) return;
+    if (gEditState[i] && gEditState[i].mode === 'armed') { gBeginCurrent(i); return; }
+    if (gEditState[i]) return;
+    gArm(i);
+  });
+
+  wrap.addEventListener('focusout', (ev) => {
+    const t = ev.target;
+    if (!t || !t.id) return;
+    if (t.id.indexOf('g-cur-') === 0 || t.id.indexOf('g-max-input-') === 0) gCommit(Number(t.id.split('-').pop()));
+    else if (t.classList && t.classList.contains('gname-input')) onGNameBlur(Number(t.id.split('-').pop()));
+  });
+
+  wrap.addEventListener('keydown', (ev) => {
+    const t = ev.target;
+    if (!t || !t.id || (t.id.indexOf('g-cur-') !== 0 && t.id.indexOf('g-max-input-') !== 0)) return;
+    if (ev.key === 'Enter') { ev.preventDefault(); t.blur(); }
+    if (ev.key === 'Escape') { ev.preventDefault(); t.value = ''; t.blur(); }
+  });
+
+  let timer = null, sx = 0, sy = 0;
+  const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } };
+  const start = (ev) => {
+    const target = ev.target;
+    if (!target) return;
+    const mark = target.closest && target.closest('.gmark');
+    const name = target.closest && target.closest('.gname-lp-hit');
+    const card = target.closest && target.closest('.gcard');
+    if (!mark && !name && !card) return;
+    const point = ev.touches && ev.touches[0] ? ev.touches[0] : ev;
+    sx = point.clientX; sy = point.clientY;
+    cancel();
+    timer = setTimeout(() => {
+      timer = null;
+      gEditLastLongPress = Date.now();
+      if (mark) { toggleGMark(Number(mark.dataset.idx)); return; }
+      if (name) { beginGNameEdit(Number(card.dataset.idx)); return; }
+      gBeginMax(Number(card.dataset.idx));
+    }, 500);
+  };
+  const move = (ev) => {
+    if (!timer) return;
+    const point = ev.touches && ev.touches[0] ? ev.touches[0] : ev;
+    const dx = point.clientX - sx, dy = point.clientY - sy;
+    if (dx * dx + dy * dy > 144) cancel();
+  };
+  wrap.addEventListener('touchstart', start, { passive:true });
+  wrap.addEventListener('touchmove', move, { passive:true });
+  wrap.addEventListener('touchend', cancel, { passive:true });
+  wrap.addEventListener('touchcancel', cancel, { passive:true });
+  wrap.addEventListener('mousedown', (ev) => { if (ev.button === 0) start(ev); });
+  wrap.addEventListener('mousemove', move);
+  wrap.addEventListener('mouseup', cancel);
+
+  document.addEventListener('click', (ev) => {
+    if (Object.keys(gEditState).length === 0) return;
+    if (ev.target && ev.target.closest && ev.target.closest('.gcard')) return;
+    gCommitOutside();
+  });
+}
+
+// ドットアビス上部の名前・ランク以外を長押しすると、現在スタミナの手入力を開く。
+function setupRowTopV73(){
+  const grid = document.getElementById('grid');
+  if (!grid || grid.dataset.rowTopReady) return;
+  grid.dataset.rowTopReady = '1';
+  let timer = null, sx = 0, sy = 0;
+  const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } };
+  const start = (ev) => {
+    const target = ev.target;
+    const row = target && target.closest && target.closest('.row-top');
+    if (!row || (target.closest && target.closest('.name-lp-hit, .rank-lp-hit, input, button'))) return;
+    const card = row.closest('.abyss-stam-card');
+    if (!card) return;
+    const point = ev.touches && ev.touches[0] ? ev.touches[0] : ev;
+    sx = point.clientX; sy = point.clientY;
+    cancel();
+    timer = setTimeout(() => {
+      timer = null;
+      const match = String(card.id || '').match(/(\d+)$/);
+      if (match) beginStamManualInput(Number(match[1]));
+    }, 500);
+  };
+  const move = (ev) => {
+    if (!timer) return;
+    const point = ev.touches && ev.touches[0] ? ev.touches[0] : ev;
+    const dx = point.clientX - sx, dy = point.clientY - sy;
+    if (dx * dx + dy * dy > 144) cancel();
+  };
+  grid.addEventListener('touchstart', start, { passive:true });
+  grid.addEventListener('touchmove', move, { passive:true });
+  grid.addEventListener('touchend', cancel, { passive:true });
+  grid.addEventListener('touchcancel', cancel, { passive:true });
+  grid.addEventListener('mousedown', (ev) => { if (ev.button === 0) start(ev); });
+  grid.addEventListener('mousemove', move);
+  grid.addEventListener('mouseup', cancel);
+}
+
+// ---- 放置報酬の二段階受取 ----
 
 function setLabel(i, val){
   state.slots[i].label = val;
@@ -1681,41 +1898,6 @@ function toggleMissionMark(i){
     if (document.activeElement === mark) mark.blur();
   }
   renderDailyProgress();
-}
-
-function onCurFocus(el){ el.dataset.prev = el.value; el.value = ''; }
-function onCurBlur(i, el){ if (el.value === '') el.value = el.dataset.prev || state.slots[i].stamCurrent; }
-
-function applyStam(i){
-  const curEl = document.getElementById('stam-cur-' + i);
-  const max = state.slots[i].stamMax;
-  const raw = (curEl.value == null ? '' : String(curEl.value)).trim();
-  let cur;
-  if (raw === '') {
-    const prev = parseInt(curEl.dataset.prev, 10);
-    if (!isNaN(prev)) cur = prev;
-    else {
-      const s = state.slots[i];
-      cur = s.stamRunning ? getStamInfo(s, Date.now()).current : s.stamCurrent;
-    }
-  } else {
-    cur = parseInt(raw, 10);
-  }
-  if (isNaN(cur)) {
-    const s = state.slots[i];
-    cur = s.stamRunning ? getStamInfo(s, Date.now()).current : s.stamCurrent;
-  }
-  if (document.activeElement) document.activeElement.blur();
-  state.slots[i].stamCurrent = Math.max(0, Math.min(cur, max));
-  state.slots[i].stamStart = Date.now();
-  state.slots[i].stamRunning = true;
-  curEl.value = state.slots[i].stamCurrent;
-  saveState();
-  openIdx = -1;
- 
-  updateOpenState();
-  render();
-  startTicking();
 }
 
 function beginRankEdit(i){
@@ -1760,7 +1942,7 @@ function onRankBlur(i){
   el.value = String(r);
   if (disp) {
     disp.style.display = '';
-    disp.textContent = 'Lv.' + r;
+    setAbyssRankDisplay(disp, r);
   }
   saveState();
   render();
@@ -1771,9 +1953,17 @@ function onRankBlur(i){
 function syncIdleConfirmBackdrop(){
   const bd = document.getElementById('backdrop');
   if (!bd) return;
-  // 編集中は既存の強い暗転を優先し、受取確認中だけ薄い暗転を使う。
-  const hasModal = openIdx >= 0 || gOpenIdx >= 0;
-  bd.classList.toggle('idle-confirm', Object.keys(armedIdle).length > 0 && !hasModal);
+  const hasAbyssEdit = openIdx >= 0;
+  const hasStamPreview = Object.keys(stamPreview).length > 0;
+  const hasGEdit = typeof gEditState !== 'undefined' && Object.keys(gEditState).length > 0;
+  const hasSLEdit = !!slOpenType;
+  if (hasAbyssEdit || hasStamPreview || hasGEdit || hasSLEdit) {
+    bd.classList.add('show');
+    bd.classList.remove('idle-confirm');
+    return;
+  }
+  bd.classList.remove('show');
+  bd.classList.toggle('idle-confirm', Object.keys(armedIdle).length > 0);
 }
 
 function updateIdleReceiveVisual(i, armed){
@@ -1800,10 +1990,11 @@ function disarmIdle(i){
 function disarmAllIdle(){ Object.keys(armedIdle).forEach(k => disarmIdle(Number(k))); }
 
 function closeAbyssEditForIdle(){
+  const active = document.activeElement;
+  if (active && active.id && active.id.indexOf('stam-direct-cur-') === 0) active.blur();
   if (openIdx < 0) return;
   restoreEditInputs(openIdx);
   openIdx = -1;
- 
   updateOpenState();
   softBlur();
 }
@@ -1882,6 +2073,8 @@ function render(){
         stamCurTxt = String(s.stamCurrent); stamMaxTxt = String(s.stamMax); stamClockTxt = ''; stamClockSuffix = '';
         stamBarCls = 'pbar-fill stam';
       }
+      // 40消費後の仮値を表示中は、状態を確定せずに現在値の表示だけ差し替える。
+      if (stamPreview[i]) stamCurTxt = String(stamPreview[i].value);
       setText(r.stamVal, stamMain); setClass(r.stamVal, stamCls);
       setText(r.stamSubCur, stamCurTxt);
       setText(r.stamSubMax, stamMaxTxt);
@@ -1989,6 +2182,9 @@ function setupDelegatedEvents(){
 
   grid.addEventListener('click', (ev) => {
     const t = ev.target;
+    // スタミナ長押し後の指離しクリックは、短いガードで次の参考表示へ進ませない。
+    const stamBlock = t.closest && t.closest('.tblock-stam');
+    if (stamBlock && Date.now() - lastLpTime < 300) { lpFired = false; return; }
     const idleBlock = t.closest && t.closest('[data-idle-receive]');
     if (idleBlock) {
       // 長押し直後のクリックや、内蔵チェック長押し後は受取確認へ進ませない（300msに短縮）。
@@ -2003,11 +2199,11 @@ function setupDelegatedEvents(){
       }
       return;
     }
-    if (t.classList && (t.classList.contains('name-disp') || t.classList.contains('rank-disp'))) {
+    const nameHit = t.closest && t.closest('.name-lp-hit');
+    const rankHit = t.closest && t.closest('.rank-lp-hit');
+    if (nameHit || rankHit) {
       if (lpFired) { lpFired = false; return; }
-      const cardEl = t.closest('.card');
-      const idx = cardEl ? Number(cardEl.dataset.idx) : NaN;
-      if (Number.isFinite(idx)) onCardClick(idx, ev);
+      // 表示文字以外の余白には長押し編集を割り当てない。
       return;
     }
     const el = t.closest('[data-action]');
@@ -2015,25 +2211,31 @@ function setupDelegatedEvents(){
       const action = el.dataset.action;
       const i = Number(el.dataset.idx);
       if (action === 'card') onCardClick(i, ev);
-      else if (action === 'update') applyStam(i);
       else if (action === 'mark' || action === 'weekly') { /* 長押し判定で制御 */ }
       return;
     }
     if (t.closest && (t.closest('input') || t.closest('.edit-panel'))) return;
   });
 
-  grid.addEventListener('focusin', (ev) => {
-    const t = ev.target;
-    if (!t.id) return;
-    if (t.id.indexOf('stam-cur-') === 0) onCurFocus(t);
-  });
-
   grid.addEventListener('focusout', (ev) => {
     const t = ev.target;
     if (!t.id) return;
-    if (t.id.indexOf('stam-cur-') === 0) onCurBlur(Number(t.id.split('-').pop()), t);
+    if (t.id.indexOf('stam-direct-cur-') === 0) commitStamPreview(Number(t.id.split('-').pop()), t.value);
     else if (t.classList && t.classList.contains('name-input')) onNameBlur(Number(t.id.split('-').pop()));
     else if (t.classList && t.classList.contains('rank-input')) onRankBlur(Number(t.id.split('-').pop()));
+  });
+
+  grid.addEventListener('keydown', (ev) => {
+    const t = ev.target;
+    if (!t || !t.id || t.id.indexOf('stam-direct-cur-') !== 0) return;
+    if (ev.key === 'Enter') {
+      ev.preventDefault();
+      t.blur();
+    } else if (ev.key === 'Escape') {
+      ev.preventDefault();
+      t.value = '';
+      t.blur();
+    }
   });
 
   grid.addEventListener('input', (ev) => {
@@ -2044,6 +2246,14 @@ function setupDelegatedEvents(){
       clearTimeout(labelSaveTimer);
       labelSaveTimer = setTimeout(saveState, 300);
     }
+  });
+
+  // 仮値中にタイマー以外を押したら、その仮値で静かに確定する。
+  document.addEventListener('click', (ev) => {
+    if (Object.keys(stamPreview).length === 0) return;
+    const t = ev.target;
+    if (t && t.closest && t.closest('.tblock-stam')) return;
+    resolveAllStamPreviewsFromOutside();
   });
 
   let lpTimer = null;
@@ -2058,14 +2268,19 @@ function setupDelegatedEvents(){
     if (!el) return;
     const weeklyEl = el.closest && el.closest('.weekly-mark');
     const markEl = el.closest && el.closest('.daily-mark');
+    const nameHit = el.closest && el.closest('.name-lp-hit');
+    const rankHit = el.closest && el.closest('.rank-lp-hit');
+    const stamBlock = el.closest && el.closest('.tblock-stam');
     let mode = null;
     if (weeklyEl) mode = 'weekly';
     else if (markEl) mode = 'mark';
-    else if (el.classList && el.classList.contains('name-disp')) mode = 'name';
-    else if (el.classList && el.classList.contains('rank-disp')) mode = 'rank';
+    else if (nameHit) mode = 'name';
+    else if (rankHit) mode = 'rank';
+    else if (stamBlock && !(el.closest && el.closest('input'))) mode = 'stam';
     else return;
-    const idEl = weeklyEl || markEl || el;
-    const i = Number((idEl.dataset && idEl.dataset.idx != null) ? idEl.dataset.idx : (idEl.id || '').split('-').pop());
+    const idEl = weeklyEl || markEl || nameHit || rankHit || stamBlock;
+    const cardEl = idEl && idEl.closest ? idEl.closest('.card') : null;
+    const i = Number((idEl.dataset && idEl.dataset.idx != null) ? idEl.dataset.idx : (cardEl && cardEl.dataset ? cardEl.dataset.idx : NaN));
     if (!Number.isFinite(i)) return;
     clearLp();
     lpFired = false;
@@ -2078,7 +2293,8 @@ function setupDelegatedEvents(){
       if (mode === 'weekly') toggleWeeklyMark(i);
       else if (mode === 'mark') toggleMissionMark(i);
       else if (mode === 'name') beginNameEdit(i);
-      else beginRankEdit(i);
+      else if (mode === 'rank') beginRankEdit(i);
+      else beginStamManualInput(i);
     }, LP_MS);
   };
   const lpMove = (ev) => {
@@ -2103,83 +2319,11 @@ document.addEventListener('contextmenu', (ev) => {
 }, { capture: true });
 
 document.addEventListener('selectstart', (ev) => {
-  // ランク表示を長押しして編集へ入る際に、表示文字をハイライトさせない。
+  // スタミナ、名前、ランクの長押し時に表示文字をハイライトさせない。
   const el = ev.target;
-  if (el && el.closest && el.closest('.rank-disp')) ev.preventDefault();
+  if (el && el.closest && el.closest('.rank-lp-hit, .name-lp-hit, .tblock-stam')) ev.preventDefault();
 }, { capture: true });
 
-function setupGDelegatedEvents(){
-  const wrap = document.getElementById('gwrap');
-  if (!wrap || wrap.dataset.delegated) return;
-  wrap.dataset.delegated = '1';
-
-  wrap.addEventListener('click', (ev) => {
-    const t = ev.target;
-    if (t.closest && t.closest('input')) return;
-    const el = t.closest('[data-gaction]');
-    if (!el) return;
-    const action = el.dataset.gaction;
-    const i = Number(el.dataset.idx);
-    if (action === 'card') onGCardClick(i, ev);
-    else if (action === 'update') applyG(i);
-    else if (action === 'mark') { /* 長押し判定 */ }
-  });
-
-  wrap.addEventListener('focusin', (ev) => {
-    const t = ev.target;
-    if (!t.id) return;
-    if (t.id.indexOf('g-cur-') === 0) onGCurFocus(t);
-    else if (t.id.indexOf('g-max-input-') === 0) onGMaxFocus(t);
-  });
-
-  wrap.addEventListener('focusout', (ev) => {
-    const t = ev.target;
-    if (!t.id) return;
-    if (t.id.indexOf('g-cur-') === 0) onGCurBlur(Number(t.id.split('-').pop()), t);
-    else if (t.id.indexOf('g-max-input-') === 0) onGMaxBlur(Number(t.id.split('-').pop()), t);
-    else if (t.classList && t.classList.contains('gname-input')) onGNameBlur(Number(t.id.split('-').pop()));
-  });
-
-  let glpTimer = null;
-  let glpX = 0, glpY = 0;
-  const GLP_MS = 500;
-  const GLP_MOVE2 = 12 * 12;
-  const clearGLp = () => { if (glpTimer) { clearTimeout(glpTimer); glpTimer = null; } };
-  const glpStart = (ev) => {
-    const el = ev.target;
-    if (!el) return;
-    const markEl = el.closest && el.closest('.gmark');
-    let mode = null;
-    if (markEl) mode = 'mark';
-    else if (el.classList && el.classList.contains('gname-disp')) mode = 'name';
-    else return;
-    const idEl = markEl || el;
-    const i = Number((idEl.dataset && idEl.dataset.idx != null) ? idEl.dataset.idx : (idEl.id || '').split('-').pop());
-    if (!Number.isFinite(i)) return;
-    clearGLp();
-    const pt = (ev.touches && ev.touches[0]) ? ev.touches[0] : ev;
-    glpX = pt.clientX; glpY = pt.clientY;
-    glpTimer = setTimeout(() => {
-      glpTimer = null;
-      if (mode === 'mark') toggleGMark(i);
-      else beginGNameEdit(i);
-    }, GLP_MS);
-  };
-  const glpMove = (ev) => {
-    if (!glpTimer) return;
-    const pt = (ev.touches && ev.touches[0]) ? ev.touches[0] : ev;
-    const dx = pt.clientX - glpX, dy = pt.clientY - glpY;
-    if (dx * dx + dy * dy > GLP_MOVE2) clearGLp();
-  };
-  wrap.addEventListener('touchstart', glpStart, { passive: true });
-  wrap.addEventListener('touchmove', glpMove, { passive: true });
-  wrap.addEventListener('touchend', clearGLp, { passive: true });
-  wrap.addEventListener('touchcancel', clearGLp, { passive: true });
-  wrap.addEventListener('mouseleave', clearGLp, { passive: true });
-  wrap.addEventListener('mousedown', (ev) => { if (ev.button === 0) glpStart(ev); });
-  wrap.addEventListener('mousemove', glpMove);
-  wrap.addEventListener('mouseup', clearGLp);
-}
 
 // 初期表示は同期的に完了させ、起動安定化は描画後に1回だけ実行する。
 // これにより、初期画面を遅らせずに復帰直後の表示・タイマー・PWA登録を整える。
@@ -2201,8 +2345,12 @@ function scheduleStartupStabilization(){
   else setTimeout(stabilize, 50);
 }
 
+</script>
+
+<script>
 loadState();
 setupDelegatedEvents();
+setupRowTopV73();
 setupGDelegatedEvents();
 setupSLDelegatedEvents();
 setupGameTabs();
