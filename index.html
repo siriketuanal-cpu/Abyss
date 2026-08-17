@@ -122,8 +122,8 @@ input,textarea{
 .card.g2.open{border-color:var(--g2);box-shadow:0 0 0 1.5px var(--g2);}
 .row-top{display:flex;align-items:center;gap:7px;margin-bottom:3px;}
 /* 放置報酬の内蔵チェック行は、スタミナ側の名前・ランク行と同じ高さでタイマー位置を揃える。 */
-.abyss-idle-head{height:16.6px;margin-bottom:3px;display:flex;align-items:center;justify-content:space-between;}
-.idle-marks{display:flex;align-items:center;gap:0;height:16.6px;margin-left:auto;}
+.abyss-idle-head{height:16.6px;margin-bottom:3px;display:flex;align-items:center;justify-content:flex-end;}
+.idle-marks{display:flex;align-items:center;height:16.6px;}
 .idle-mark{
   width:28px;height:26px;display:flex;align-items:center;justify-content:center;
   padding:0;border:1px solid #51607b;border-radius:6px;background:#0d131e;color:#aab6cd;opacity:1;
@@ -151,14 +151,6 @@ input,textarea{
 .idle-mark.g2.daily-mark.show{
   color:#d0d8e8;background:transparent;border:none;box-shadow:none;
   text-shadow:0 0 7px rgba(208,216,232,.55);
-}
-/* ウィークリーは放置報酬見出しの左上に置く小型✦。完了時だけ明るいミントで区別する。 */
-.idle-mark.weekly-mark{
-  width:14px;height:14px;border:none;border-radius:0;background:transparent;box-shadow:none;
-  color:#5f708b;font-size:11px;font-weight:900;line-height:1;text-shadow:none;
-}
-.idle-mark.weekly-mark.show{
-  color:#b9f7d0;font-size:12px;font-weight:900;background:transparent;border:none;box-shadow:none;text-shadow:none;
 }
 .idle-mark.disabled-by-edit{pointer-events:none;opacity:.25;}
 .rank-disp,.rank-input{
@@ -514,8 +506,7 @@ const defaultSlot = () => ({
   rank: 1,
   stamCurrent: 0, stamMax: 240, stamStart: null, stamRunning: false,
   idleStart: null, idleCapMs: IDLE_DEFAULT_CAP_MS, idleRunning: false,
-  missionDone: false,
-  weeklyDone: false
+  missionDone: false
 });
 
 function stamMaxFromRank(rank){
@@ -548,7 +539,7 @@ const defaultSLState = () => ({ stamina: defaultSLTimer(), orb: defaultSLTimer()
 let slOpenType = null;
 let slRefs = {};
 
-let state = { slots: Array.from({ length: N }, defaultSlot), dailyDate: '', weeklyWeekId: '', g: { slots: Array.from({ length: GN }, defaultGSlot), dailyDate: '' }, sl: defaultSLState() };
+let state = { slots: Array.from({ length: N }, defaultSlot), dailyDate: '', g: { slots: Array.from({ length: GN }, defaultGSlot), dailyDate: '' }, sl: defaultSLState() };
 
 let storageOk = true;
 let textEditIdx = -1;
@@ -652,29 +643,6 @@ function setSaveStamp(text){
   if (el) el.textContent = text;
 }
 
-function gameWeekId(){
-  const now = new Date();
-  const shifted = new Date(now.getTime() - 5 * 3600 * 1000);
-  const day = shifted.getDay();
-  const diffToMon = day === 0 ? -6 : 1 - day;
-  const mon = new Date(shifted.getFullYear(), shifted.getMonth(), shifted.getDate() + diffToMon);
-  const y = mon.getFullYear();
-  const m = String(mon.getMonth() + 1).padStart(2, '0');
-  const d = String(mon.getDate()).padStart(2, '0');
-  return y + '-' + m + '-' + d;
-}
-function ensureWeeklyDate(){
-  const wid = gameWeekId();
-  if (state.weeklyWeekId !== wid) {
-    state.weeklyWeekId = wid;
-    state.slots.forEach(s => { s.weeklyDone = false; });
-    for (let i = 0; i < refs.length; i++) {
-      if (refs[i] && refs[i].weeklyMark) refs[i].weeklyMark.classList.remove('show');
-    }
-    saveState();
-  }
-}
-
 function ensureDailyDate(){
   const today = gameDayStr();
   if (state.dailyDate !== today) {
@@ -721,7 +689,7 @@ function renderDailyProgress(){
 function parseStoredState(){
   if (typeof localStorage === 'undefined') throw new Error('no localStorage');
   const raw = localStorage.getItem(STORAGE_KEY);
-  const result = { slots: null, dailyDate: gameDayStr(), weeklyWeekId: '', g: { slots: null, dailyDate: dayStrAt(G_RESET_HOUR) }, sl: defaultSLState() };
+  const result = { slots: null, dailyDate: gameDayStr(), g: { slots: null, dailyDate: dayStrAt(G_RESET_HOUR) }, sl: defaultSLState() };
   if (raw) {
     const parsed = JSON.parse(raw);
     if (parsed.slots && Array.isArray(parsed.slots) && parsed.slots.length === N) {
@@ -758,13 +726,10 @@ function parseStoredState(){
           o.idleRunning = true;
         }
         o.missionDone = !!s.missionDone;
-        o.weeklyDone = !!s.weeklyDone;
         return o;
       });
     }
     result.dailyDate = typeof parsed.dailyDate === 'string' ? parsed.dailyDate : gameDayStr();
-    result.weeklyWeekId = typeof parsed.weeklyWeekId === 'string' ? parsed.weeklyWeekId : '';
-
     result.g = result.g || { slots: null, dailyDate: dayStrAt(G_RESET_HOUR) };
     if (parsed.g && Array.isArray(parsed.g.slots) && parsed.g.slots.length === GN) {
       const now2 = Date.now();
@@ -813,7 +778,6 @@ function loadState(){
     const parsed = parseStoredState();
     if (parsed.slots) state.slots = parsed.slots;
     state.dailyDate = parsed.dailyDate;
-    state.weeklyWeekId = parsed.weeklyWeekId || '';
     if (parsed.g && parsed.g.slots) state.g.slots = parsed.g.slots;
     if (parsed.g) state.g.dailyDate = parsed.g.dailyDate;
     if (parsed.sl) state.sl = parsed.sl;
@@ -1036,8 +1000,6 @@ function build(){
           '</div>' +
           '<div class="card abyss-idle-card ' + groupClass(i) + ' tblock-idle" id="idle-block-' + i + '" data-idle-receive="true" data-idx="' + i + '" role="button" aria-label="放置報酬を受け取る。2回タップで確定">' +
             '<div class="row-top abyss-idle-head">' +
-              '<button type="button" class="idle-mark weekly-mark' + (s.weeklyDone ? ' show' : '') + '" id="weekly-mark-' + i + '"' +
-              ' data-action="weekly" data-idx="' + i + '" tabindex="-1" aria-label="スロット' + (i + 1) + 'のウィークリー。長押しで切替" aria-pressed="' + (s.weeklyDone ? 'true' : 'false') + '">✦</button>' +
               '<div class="idle-marks" aria-label="デイリー。長押しで切替">' +
                 '<button type="button" class="idle-mark daily-mark ' + groupClass(i) + (s.missionDone ? ' show' : '') + '" id="daily-mark-' + i + '"' +
                 ' data-action="mark" data-idx="' + i + '" tabindex="-1" aria-label="スロット' + (i + 1) + 'のデイリー完了。長押しで切替" aria-pressed="' + (s.missionDone ? 'true' : 'false') + '">✔</button>' +
@@ -1377,7 +1339,6 @@ function cacheRefs(){
       idleSub: document.getElementById('idle-sub-' + i),
       idleBar: document.getElementById('idle-bar-' + i),
       mark: document.getElementById('daily-mark-' + i),
-      weeklyMark: document.getElementById('weekly-mark-' + i),
       stamSub: document.getElementById('stam-sub-' + i),
       directCurEl: document.getElementById('stam-direct-cur-' + i)
     });
@@ -1792,17 +1753,6 @@ function setLabel(i, val){
   labelSaveTimer = setTimeout(saveState, 300);
 }
 
-function toggleWeeklyMark(i){
-  const s = state.slots[i];
-  const mark = refs[i] && refs[i].weeklyMark;
-  s.weeklyDone = !s.weeklyDone;
-  saveState();
-  if (mark) {
-    mark.classList.toggle('show', s.weeklyDone);
-    setAttr(mark, 'aria-pressed', s.weeklyDone);
-    if (document.activeElement === mark) mark.blur();
-  }
-}
 function toggleMissionMark(i){
   const s = state.slots[i];
   const mark = refs[i] && refs[i].mark;
@@ -1927,7 +1877,6 @@ function onIdleTimerTap(i){
 function render(){
   try {
     ensureDailyDate();
-    ensureWeeklyDate();
     const now = Date.now();
     if (!refs.length) return;
     // カード描画で求めた放置報酬情報を再利用し、タブ用の二重計算を避ける。
@@ -2114,7 +2063,7 @@ function setupDelegatedEvents(){
       const action = el.dataset.action;
       const i = Number(el.dataset.idx);
       if (action === 'card') onCardClick(i, ev);
-      else if (action === 'mark' || action === 'weekly') { /* 長押し判定で制御 */ }
+      else if (action === 'mark') { /* 長押し判定で制御 */ }
       return;
     }
     if (t.closest && (t.closest('input') || t.closest('.edit-panel'))) return;
@@ -2169,19 +2118,17 @@ function setupDelegatedEvents(){
   const lpStart = (ev) => {
     const el = ev.target;
     if (!el) return;
-    const weeklyEl = el.closest && el.closest('.weekly-mark');
     const markEl = el.closest && el.closest('.daily-mark');
     const nameHit = el.closest && el.closest('.name-lp-hit');
     const rankHit = el.closest && el.closest('.rank-lp-hit');
     const stamBlock = el.closest && el.closest('.tblock-stam');
     let mode = null;
-    if (weeklyEl) mode = 'weekly';
-    else if (markEl) mode = 'mark';
+    if (markEl) mode = 'mark';
     else if (nameHit) mode = 'name';
     else if (rankHit) mode = 'rank';
     else if (stamBlock && !(el.closest && el.closest('input'))) mode = 'stam';
     else return;
-    const idEl = weeklyEl || markEl || nameHit || rankHit || stamBlock;
+    const idEl = markEl || nameHit || rankHit || stamBlock;
     const cardEl = idEl && idEl.closest ? idEl.closest('.card') : null;
     const i = Number((idEl.dataset && idEl.dataset.idx != null) ? idEl.dataset.idx : (cardEl && cardEl.dataset ? cardEl.dataset.idx : NaN));
     if (!Number.isFinite(i)) return;
@@ -2190,8 +2137,7 @@ function setupDelegatedEvents(){
     lpX = pt.clientX; lpY = pt.clientY;
     lpTimer = setTimeout(() => {
       lpTimer = null;
-      if (mode === 'weekly') toggleWeeklyMark(i);
-      else if (mode === 'mark') toggleMissionMark(i);
+      if (mode === 'mark') toggleMissionMark(i);
       else if (mode === 'name') beginNameEdit(i);
       else if (mode === 'rank') beginRankEdit(i);
       else beginStamManualInput(i);
