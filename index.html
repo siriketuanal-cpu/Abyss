@@ -1387,8 +1387,9 @@ function softBlur(){
 
 function onCardClick(i, ev){
   const t = ev.target;
-  // 現在値の操作は、名前・ランクではなくスタミナのタイマー表示領域だけで受け付ける。
-  if (!t.closest || !t.closest('.tblock-stam')) return;
+  // 放置報酬と同様に、スタミナカード内の空白を含むタップを受け付ける。
+  // 名前・ランクの実際の文字部分だけは、上位の長押し専用判定で静かに除外される。
+  if (!t || !t.closest) return;
   if (t.closest('input') || t.closest('button') || t.closest('.name-input') || t.closest('.rank-input')) return;
 
   // 手入力欄を閉じるために同じタイマーを押した場合、このclickは確定操作としてのみ消費する。
@@ -2070,8 +2071,8 @@ function setupDelegatedEvents(){
 
   const markManualStamTap = (ev) => {
     const target = ev.target;
-    const block = target && target.closest && target.closest('.tblock-stam');
-    const card = block && block.closest('.abyss-stam-card');
+    // カード内のどこを押しても、手入力を閉じるためのタップとして扱う。
+    const card = target && target.closest && target.closest('.abyss-stam-card');
     const i = card ? Number(card.dataset.idx) : NaN;
     if (stamEdit && stamEdit.index === i && stamEdit.phase === DOT_EDIT_PHASE.MANUAL && document.activeElement === refs[i].directCurEl) {
       pendingManualStamTap = i;
