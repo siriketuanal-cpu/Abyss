@@ -131,11 +131,17 @@ input,textarea{
   box-shadow:inset 0 0 0 1px rgba(255,255,255,.035);
   -webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;user-select:none;
 }
-/* デイリーは未完了時に記号を出さず、完了時だけ濃いチェックと大きめの記号で明確に示す。 */
-.idle-mark.daily-mark{color:transparent;background:transparent;border-color:transparent;box-shadow:none;}
-.idle-mark.daily-mark.show{color:#ffbf4f;background:#2b214f;border-color:#8f72eb;box-shadow:0 0 0 1px rgba(143,114,235,.36);font-size:22px;}
-.idle-mark.g1.daily-mark.show{color:#ffbf4f;background:#17324f;border-color:#6baeff;box-shadow:0 0 0 1px rgba(107,174,255,.36);font-size:22px;}
-.idle-mark.g2.daily-mark.show{color:#ffbf4f;background:#2a3448;border-color:#aabbd9;box-shadow:0 0 0 1px rgba(170,187,217,.36);font-size:22px;}
+/* デイリーは四角い枠を外し、完了時だけシアンブルーの太いチェック（✔）で際立たせる。 */
+.idle-mark.daily-mark{
+  width:auto;height:auto;border:none;border-radius:0;background:transparent;box-shadow:none;
+  color:transparent;font-size:24px;text-shadow:none;
+}
+.idle-mark.daily-mark.show{
+  color:#6fe8ff;background:transparent;border:none;box-shadow:none;
+  text-shadow:0 0 7px rgba(111,232,255,.55);
+}
+.idle-mark.g1.daily-mark.show{color:#6fe8ff;}
+.idle-mark.g2.daily-mark.show{color:#6fe8ff;}
 /* ウィークリーは枠なしの星をさらに大きく表示する。 */
 .idle-mark.weekly-mark{font-size:24px;color:#4e472f;border:none;border-radius:0;background:transparent;box-shadow:none;}
 .idle-mark.weekly-mark.show{font-size:25px;color:#ffcc33;background:transparent;border:none;box-shadow:none;text-shadow:0 0 7px rgba(255,204,51,.58);}
@@ -908,7 +914,7 @@ function build(){
                 '<button type="button" class="idle-mark weekly-mark' + (s.weeklyDone ? ' show' : '') + '" id="weekly-mark-' + i + '"' +
                 ' data-action="weekly" data-idx="' + i + '" tabindex="-1" aria-label="スロット' + (i + 1) + 'のウィークリー。長押しで切替" aria-pressed="' + (s.weeklyDone ? 'true' : 'false') + '">☆</button>' +
                 '<button type="button" class="idle-mark daily-mark ' + groupClass(i) + (s.missionDone ? ' show' : '') + '" id="daily-mark-' + i + '"' +
-                ' data-action="mark" data-idx="' + i + '" tabindex="-1" aria-label="スロット' + (i + 1) + 'のデイリー完了。長押しで切替" aria-pressed="' + (s.missionDone ? 'true' : 'false') + '">✓</button>' +
+                ' data-action="mark" data-idx="' + i + '" tabindex="-1" aria-label="スロット' + (i + 1) + 'のデイリー完了。長押しで切替" aria-pressed="' + (s.missionDone ? 'true' : 'false') + '">✔</button>' +
               '</div>' +
             '</div>' +
             '<div class="ttag idle">放置報酬</div>' +
@@ -1975,7 +1981,8 @@ function setupDelegatedEvents(){
     const t = ev.target;
     const idleBlock = t.closest && t.closest('[data-idle-receive]');
     if (idleBlock) {
-      // 内蔵チェックの長押し後は、続いて発生するクリックで受取確認へ進ませない。
+      // 長押し直後のクリックや、内蔵チェック長押し後は受取確認へ進ませない。
+      if (Date.now() - lastLpTime < 600) return;
       if (t.closest && t.closest('.idle-mark') && lpFired) { lpFired = false; return; }
       const cardEl = idleBlock.closest('.card');
       const idx = cardEl ? Number(cardEl.dataset.idx) : NaN;
@@ -2031,6 +2038,7 @@ function setupDelegatedEvents(){
 
   let lpTimer = null;
   let lpFired = false;
+  let lastLpTime = 0;
   let lpX = 0, lpY = 0;
   const LP_MS = 500;
   const LP_MOVE2 = 12 * 12;
@@ -2056,6 +2064,7 @@ function setupDelegatedEvents(){
     lpTimer = setTimeout(() => {
       lpTimer = null;
       lpFired = true;
+      lastLpTime = Date.now();
       if (mode === 'weekly') toggleWeeklyMark(i);
       else if (mode === 'mark') toggleMissionMark(i);
       else if (mode === 'name') beginNameEdit(i);
