@@ -122,8 +122,8 @@ input,textarea{
 .card.g2.open{border-color:var(--g2);box-shadow:0 0 0 1.5px var(--g2);}
 .row-top{display:flex;align-items:center;gap:7px;margin-bottom:3px;}
 /* 放置報酬の内蔵チェック行は、スタミナ側の名前・ランク行と同じ高さでタイマー位置を揃える。 */
-.abyss-idle-head{height:16.6px;margin-bottom:3px;display:flex;align-items:center;justify-content:flex-end;}
-.idle-marks{display:flex;align-items:center;gap:8px;height:16.6px;}
+.abyss-idle-head{height:16.6px;margin-bottom:3px;display:flex;align-items:center;justify-content:space-between;}
+.idle-marks{display:flex;align-items:center;gap:0;height:16.6px;margin-left:auto;}
 .idle-mark{
   width:28px;height:26px;display:flex;align-items:center;justify-content:center;
   padding:0;border:1px solid #51607b;border-radius:6px;background:#0d131e;color:#aab6cd;opacity:1;
@@ -152,13 +152,13 @@ input,textarea{
   color:#d0d8e8;background:transparent;border:none;box-shadow:none;
   text-shadow:0 0 7px rgba(208,216,232,.55);
 }
-/* ウィークリーは日常時に位置が分かる小型✦、完了時だけ静かな金色で区別する。 */
+/* ウィークリーは放置報酬見出しの左上に置く小型✦。完了時だけ明るいミントで区別する。 */
 .idle-mark.weekly-mark{
-  width:18px;height:18px;border:none;border-radius:0;background:transparent;box-shadow:none;
-  color:#77869e;font-size:15px;font-weight:900;line-height:1;text-shadow:none;
+  width:14px;height:14px;border:none;border-radius:0;background:transparent;box-shadow:none;
+  color:#5f708b;font-size:11px;font-weight:900;line-height:1;text-shadow:none;
 }
 .idle-mark.weekly-mark.show{
-  color:#ffd166;font-size:17px;font-weight:900;background:transparent;border:none;box-shadow:none;text-shadow:none;
+  color:#b9f7d0;font-size:12px;font-weight:900;background:transparent;border:none;box-shadow:none;text-shadow:none;
 }
 .idle-mark.disabled-by-edit{pointer-events:none;opacity:.25;}
 .rank-disp,.rank-input{
@@ -1036,9 +1036,9 @@ function build(){
           '</div>' +
           '<div class="card abyss-idle-card ' + groupClass(i) + ' tblock-idle" id="idle-block-' + i + '" data-idle-receive="true" data-idx="' + i + '" role="button" aria-label="放置報酬を受け取る。2回タップで確定">' +
             '<div class="row-top abyss-idle-head">' +
-              '<div class="idle-marks" aria-label="デイリー・ウィークリー。長押しで切替">' +
-                '<button type="button" class="idle-mark weekly-mark' + (s.weeklyDone ? ' show' : '') + '" id="weekly-mark-' + i + '"' +
-                ' data-action="weekly" data-idx="' + i + '" tabindex="-1" aria-label="スロット' + (i + 1) + 'のウィークリー。長押しで切替" aria-pressed="' + (s.weeklyDone ? 'true' : 'false') + '">✦</button>' +
+              '<button type="button" class="idle-mark weekly-mark' + (s.weeklyDone ? ' show' : '') + '" id="weekly-mark-' + i + '"' +
+              ' data-action="weekly" data-idx="' + i + '" tabindex="-1" aria-label="スロット' + (i + 1) + 'のウィークリー。長押しで切替" aria-pressed="' + (s.weeklyDone ? 'true' : 'false') + '">✦</button>' +
+              '<div class="idle-marks" aria-label="デイリー。長押しで切替">' +
                 '<button type="button" class="idle-mark daily-mark ' + groupClass(i) + (s.missionDone ? ' show' : '') + '" id="daily-mark-' + i + '"' +
                 ' data-action="mark" data-idx="' + i + '" tabindex="-1" aria-label="スロット' + (i + 1) + 'のデイリー完了。長押しで切替" aria-pressed="' + (s.missionDone ? 'true' : 'false') + '">✔</button>' +
               '</div>' +
