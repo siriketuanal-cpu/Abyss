@@ -1993,14 +1993,16 @@ function setupDelegatedEvents(){
       if (Number.isFinite(idx)) onCardClick(idx, ev);
       return;
     }
-    if (t.closest && (t.closest('input') || t.closest('.edit-panel'))) return;
     const el = t.closest('[data-action]');
-    if (!el) return;
-    const action = el.dataset.action;
-    const i = Number(el.dataset.idx);
-    if (action === 'card') onCardClick(i, ev);
-    else if (action === 'update') applyStam(i);
-    else if (action === 'mark' || action === 'weekly') { /* 長押し判定で制御 */ }
+    if (el) {
+      const action = el.dataset.action;
+      const i = Number(el.dataset.idx);
+      if (action === 'card') onCardClick(i, ev);
+      else if (action === 'update') applyStam(i);
+      else if (action === 'mark' || action === 'weekly') { /* 長押し判定で制御 */ }
+      return;
+    }
+    if (t.closest && (t.closest('input') || t.closest('.edit-panel'))) return;
   });
 
   grid.addEventListener('focusin', (ev) => {
