@@ -88,6 +88,8 @@ input,textarea{
 .abyss-tab.active.g0{border-color:var(--g0);background:#1a1530;box-shadow:0 0 0 1px rgba(124,95,214,.25);}
 .abyss-tab.active.g1{border-color:var(--g1);background:#10233c;box-shadow:0 0 0 1px rgba(91,157,255,.25);}
 .abyss-tab.active.g2{border-color:var(--g2);background:#1c2330;box-shadow:0 0 0 1px rgba(143,163,196,.25);}
+/* スタミナが2時間未満のグループは、該当タブの識別文字だけを太い赤で知らせる。 */
+.abyss-tab.urgent .abyss-tab-name{color:#ff5656;font-weight:900;text-shadow:0 0 5px rgba(255,86,86,.28);}
 .grid{display:grid;grid-template-columns:1fr;gap:6px;margin-top:6px;}
 @media (min-width:620px){.grid{grid-template-columns:1fr 1fr;}}
 .grid[data-group] .card-row{display:none;margin-top:0!important;padding-top:0!important;border-top:none!important;}
@@ -121,20 +123,22 @@ input,textarea{
 .row-top{display:flex;align-items:center;gap:7px;margin-bottom:3px;}
 /* 放置報酬の内蔵チェック行は、スタミナ側の名前・ランク行と同じ高さでタイマー位置を揃える。 */
 .abyss-idle-head{height:16.6px;margin-bottom:3px;display:flex;align-items:center;justify-content:flex-end;}
-.idle-marks{display:flex;align-items:center;gap:14px;height:16.6px;}
+.idle-marks{display:flex;align-items:center;gap:10px;height:16.6px;}
 .idle-mark{
-  width:20px;height:20px;display:flex;align-items:center;justify-content:center;
-  padding:0;border:1px solid #51607b;border-radius:5px;background:#0d131e;color:#aab6cd;opacity:1;
-  font:900 16px/1 inherit;cursor:pointer;outline:none;appearance:none;-webkit-appearance:none;
+  width:28px;height:26px;display:flex;align-items:center;justify-content:center;
+  padding:0;border:1px solid #51607b;border-radius:6px;background:#0d131e;color:#aab6cd;opacity:1;
+  font:900 21px/1 inherit;cursor:pointer;outline:none;appearance:none;-webkit-appearance:none;
   box-shadow:inset 0 0 0 1px rgba(255,255,255,.035);
   -webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;user-select:none;
 }
-/* 未完了でも輪郭と記号を明瞭にし、完了時だけ色・背景・外周で状態を分ける。 */
-.idle-mark.daily-mark.show{color:#f3efff;background:#211a3d;border-color:var(--g0);box-shadow:0 0 0 1px rgba(124,95,214,.32);}
-.idle-mark.g1.daily-mark.show{background:#10233c;border-color:var(--g1);box-shadow:0 0 0 1px rgba(91,157,255,.32);}
-.idle-mark.g2.daily-mark.show{background:#1c2330;border-color:var(--g2);box-shadow:0 0 0 1px rgba(143,163,196,.32);}
-.idle-mark.weekly-mark{font-size:17px;color:#d3bd74;border-color:#6d5e38;background:#15130d;}
-.idle-mark.weekly-mark.show{color:#fff2a8;background:#3a2d08;border-color:#ffcc33;box-shadow:0 0 0 1px rgba(255,204,51,.28);}
+/* デイリーは未完了時に記号を出さず、完了時だけ濃いチェックと大きめの記号で明確に示す。 */
+.idle-mark.daily-mark{color:transparent;background:transparent;border-color:transparent;box-shadow:none;}
+.idle-mark.daily-mark.show{color:#ffbf4f;background:#2b214f;border-color:#8f72eb;box-shadow:0 0 0 1px rgba(143,114,235,.36);font-size:22px;}
+.idle-mark.g1.daily-mark.show{color:#ffbf4f;background:#17324f;border-color:#6baeff;box-shadow:0 0 0 1px rgba(107,174,255,.36);font-size:22px;}
+.idle-mark.g2.daily-mark.show{color:#ffbf4f;background:#2a3448;border-color:#aabbd9;box-shadow:0 0 0 1px rgba(170,187,217,.36);font-size:22px;}
+/* ウィークリーは枠なしの星をさらに大きく表示する。 */
+.idle-mark.weekly-mark{font-size:24px;color:#4e472f;border:none;border-radius:0;background:transparent;box-shadow:none;}
+.idle-mark.weekly-mark.show{font-size:25px;color:#ffcc33;background:transparent;border:none;box-shadow:none;text-shadow:0 0 7px rgba(255,204,51,.58);}
 .idle-mark.disabled-by-edit{pointer-events:none;opacity:.25;}
 .rank-disp,.rank-input{
   margin-left:auto;flex-shrink:0;width:4.2em;max-width:38%;
@@ -386,12 +390,17 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   .sltag.orb{color:#b9a7ff;}
   .slmain{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--ok);line-height:1.1;white-space:nowrap;overflow:hidden;}
   .slmain.full{color:var(--stam-full-c);}
-  .slorbs{letter-spacing:2px;color:#c9b8ff;font-size:16px;}
-  .slsub{height:13px;margin-top:1px;font-size:9.5px;color:#c9b8ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums;}
-  .slbar{height:3px;background:var(--line);border-radius:2px;overflow:hidden;margin-top:5px;}
+  .slorbs{letter-spacing:2px;color:#f2a4b7;font-size:16px;}
+.slorbs.full{color:#f2a4b7;}
+.slsub{height:13px;margin-top:1px;font-size:9.5px;color:#c9b8ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums;}
+.slsub.orb-sub{display:flex;align-items:center;gap:5px;overflow:visible;text-overflow:clip;}
+.orb-sub-left{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.orb-full-at{margin-left:auto;color:#ffca6e;font-weight:800;white-space:nowrap;font-variant-numeric:tabular-nums;}
+.slbar{height:3px;background:var(--line);border-radius:2px;overflow:hidden;margin-top:5px;}
   .slbar-fill{height:100%;border-radius:2px;background:var(--ok);transition:width .3s linear;}
-  .slbar-fill.orb{background:#b9a7ff;}
-  .slbar-fill.full{background:var(--stam-full-c);}
+.slbar-fill.orb{background:#f2a4b7;}
+.slbar-fill.orb.full{background:#f2a4b7;}
+.slbar-fill.full{background:var(--stam-full-c);}
   .sledit{
     display:none;position:absolute;z-index:31;top:calc(100% + 6px);left:0;right:0;
     margin:0;padding:7px 9px;background:#000;border:1px solid #6fe8ff;border-radius:12px;
@@ -985,7 +994,7 @@ function buildSL(){
       '<div class="slhead"><span class="slname">御大樹の恵み</span><span class="slbadge">6時間 / 1</span></div>' +
       '<div class="sltag orb">素材収集</div>' +
       '<div class="slmain slorbs" id="sl-orb-main">○○○○</div>' +
-      '<div class="slsub" id="sl-orb-sub"></div>' +
+      '<div class="slsub orb-sub"><span class="orb-sub-left" id="sl-orb-sub"></span><span class="orb-full-at" id="sl-orb-full-at"></span></div>' +
       '<div class="slbar"><div class="slbar-fill orb" id="sl-orb-bar" style="width:0%"></div></div>' +
       '<div class="sledit">' +
       '<input type="text" class="sl-orb-full-input" id="sl-orb-full" placeholder="1800" inputmode="numeric" pattern="[0-9:]*" aria-label="オーブ全回復までの残り時間。18:00または1800で入力" title="全回復までを18:00または1800で入力">' +
@@ -994,7 +1003,7 @@ function buildSL(){
     '</div>';
   slRefs = {
     stamina: { card: document.getElementById('sl-card-stamina'), main: document.getElementById('sl-stamina-main'), sub: document.getElementById('sl-stamina-sub'), bar: document.getElementById('sl-stamina-bar'), input: document.getElementById('sl-stamina-current') },
-    orb: { card: document.getElementById('sl-card-orb'), main: document.getElementById('sl-orb-main'), sub: document.getElementById('sl-orb-sub'), bar: document.getElementById('sl-orb-bar'), fullInput: document.getElementById('sl-orb-full') }
+    orb: { card: document.getElementById('sl-card-orb'), main: document.getElementById('sl-orb-main'), sub: document.getElementById('sl-orb-sub'), fullAt: document.getElementById('sl-orb-full-at'), bar: document.getElementById('sl-orb-bar'), fullInput: document.getElementById('sl-orb-full') }
   };
 }
 
@@ -1174,7 +1183,9 @@ function renderSL(){
   setText(slRefs.orb.main, filled);
   setClass(slRefs.orb.main, 'slmain slorbs' + (orb.isFull ? ' full' : ''));
   const orbText = orb.isFull ? '4/4　満タン' : (orbCfg.timer.running ? '次 ' + formatFixedDuration(orb.nextIn) + '　全 ' + formatFixedDuration(orb.fullIn) : orb.current + '/4　未開始');
+  const orbFullAtText = (!orb.isFull && orbCfg.timer.running && orb.fullAt) ? formatClock(orb.fullAt) : '';
   setText(slRefs.orb.sub, orbText);
+  setText(slRefs.orb.fullAt, orbFullAtText);
   setWidth(slRefs.orb.bar, orb.pct);
   setClass(slRefs.orb.bar, 'slbar-fill orb' + (orb.isFull ? ' full' : ''));
 }
@@ -1421,11 +1432,13 @@ function setupAbyssTabs(){
   });
 }
 
-function renderAbyssTabIdle(shortestByGroup){
+function renderAbyssTabIdle(shortestByGroup, urgentByGroup){
   ['g0', 'g1', 'g2'].forEach((group) => {
     const shortest = shortestByGroup[group];
     const text = shortest === undefined ? '未開始' : (shortest <= 0 ? 'MAX' : formatTime(shortest));
     setText(document.getElementById('abyss-idle-' + group), text);
+    const tab = document.querySelector('[data-abyss-group="' + group + '"]');
+    if (tab) tab.classList.toggle('urgent', !!urgentByGroup[group]);
   });
 }
 
@@ -1818,14 +1831,18 @@ function render(){
     if (!refs.length) return;
     // カード描画で求めた放置報酬情報を再利用し、タブ用の二重計算を避ける。
     const abyssTabShortest = Object.create(null);
+    const abyssTabUrgent = Object.create(null);
     for (let i = 0; i < N; i++) {
       const s = state.slots[i];
       const r = refs[i];
       if (!r || !r.stamVal) continue;
       const stam = getStamInfo(s, now);
       const idle = getIdleInfo(s, now);
+      const group = groupClass(i);
+      // 2時間未満に入った後は、MAX到達後も同じ計測サイクル中はタブの注意表示を維持する。
+      const stamUrgent = s.stamRunning && stam.fullAt != null && stam.fullAt <= now + URGENT_MS;
+      if (stamUrgent) abyssTabUrgent[group] = true;
       if (idle.remainingMs != null) {
-        const group = groupClass(i);
         if (abyssTabShortest[group] === undefined || idle.remainingMs < abyssTabShortest[group]) {
           abyssTabShortest[group] = idle.remainingMs;
         }
@@ -1839,7 +1856,6 @@ function render(){
           stamBarCls = 'pbar-fill stam full';
         } else {
           stamMain = formatTime(stam.fullIn);
-          const stamUrgent = stam.fullIn != null && stam.fullIn < URGENT_MS;
           stamCls = 'tval stam' + (stamUrgent ? ' urgent' : '');
           stamCurTxt = String(stam.current); stamMaxTxt = String(s.stamMax);
           stamClockTxt = stam.fullAt ? formatClock(stam.fullAt) : ''; stamClockSuffix = '';
@@ -1879,7 +1895,7 @@ function render(){
       setWidth(r.idleBar, idle.pct);
       setClass(r.idleBar, 'pbar-fill idle' + (idle.isFull ? ' full' : (idleCls.indexOf('urgent') >= 0 ? ' urgent' : '')));
     }
-    renderAbyssTabIdle(abyssTabShortest);
+    renderAbyssTabIdle(abyssTabShortest, abyssTabUrgent);
   } catch (e) { console.warn(e); }
   renderG();
   renderSL();
