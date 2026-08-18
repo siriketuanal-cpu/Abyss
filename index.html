@@ -90,6 +90,8 @@ input,textarea{
 .abyss-tab.active.g2{border-color:var(--g2);background:#1c2330;box-shadow:0 0 0 1px rgba(143,163,196,.25);}
 /* スタミナが2時間未満のグループは、該当タブの識別文字だけを太い赤で知らせる。 */
 .abyss-tab.urgent .abyss-tab-name{color:#ff5656;font-weight:900;text-shadow:0 0 5px rgba(255,86,86,.28);}
+/* 放置報酬の実タイマーと同じ緊急条件では、タブ内の放置タイマーだけを赤字にする。 */
+.abyss-tab.idle-urgent .abyss-tab-idle{color:var(--stam-full-c);font-weight:900;text-shadow:0 0 5px rgba(255,86,86,.28);}
 .grid{display:grid;grid-template-columns:1fr;gap:6px;margin-top:6px;}
 @media (min-width:620px){.grid{grid-template-columns:1fr 1fr;}}
 .grid[data-group] .card-row{display:none;margin-top:0!important;padding-top:0!important;border-top:none!important;}
@@ -911,6 +913,12 @@ function getIdleInfo(s, now){
   };
 }
 
+// 実カードとタブ表示で同じ放置報酬の注意状態を使う。満タン到達後も赤字を維持する。
+function getIdleAlertClass(s, idle){
+  if (!idle || !s.idleRunning) return '';
+  return (idle.isFull || (idle.remainingMs != null && idle.remainingMs < URGENT_MS)) ? 'urgent' : '';
+}
+
 function stamRemainderAfter40s(current){
   const c = Math.max(0, Math.floor(Number(current) || 0));
   return c % 40;
@@ -1461,7 +1469,7 @@ function setupAbyssTabs(){
   });
 }
 
-function renderAbyssTabIdle(shortestByGroup, urgentByGroup){
+function renderAbyssTabIdle(shortestByGroup, stamUrgentByGroup, idleUrgentByGroup){
   ['g0', 'g1', 'g2'].forEach((group) => {
     const shortest = shortestByGroup[group];
     const hasTimer = shortest !== undefined;
@@ -1469,7 +1477,10 @@ function renderAbyssTabIdle(shortestByGroup, urgentByGroup){
     setText(document.getElementById('abyss-idle-time-' + group), timeText);
     setText(document.getElementById('abyss-idle-status-' + group), hasTimer ? '' : '未開始');
     const tab = document.querySelector('[data-abyss-group="' + group + '"]');
-    if (tab) tab.classList.toggle('urgent', !!urgentByGroup[group]);
+    if (tab) {
+      tab.classList.toggle('urgent', !!stamUrgentByGroup[group]);
+      tab.classList.toggle('idle-urgent', !!idleUrgentByGroup[group]);
+    }
   });
 }
 
@@ -1850,7 +1861,8 @@ function render(){
     if (!refs.length) return;
     // カード描画で求めた放置報酬情報を再利用し、タブ用の二重計算を避ける。
     const abyssTabShortest = Object.create(null);
-    const abyssTabUrgent = Object.create(null);
+    const abyssTabStamUrgent = Object.create(null);
+    const abyssTabIdleUrgent = Object.create(null);
     for (let i = 0; i < N; i++) {
       const s = state.slots[i];
       const r = refs[i];
@@ -1860,7 +1872,9 @@ function render(){
       const group = groupClass(i);
       // 2時間未満に入った後は、MAX到達後も同じ計測サイクル中はタブの注意表示を維持する。
       const stamUrgent = s.stamRunning && stam.fullAt != null && stam.fullAt <= now + URGENT_MS;
-      if (stamUrgent) abyssTabUrgent[group] = true;
+      if (stamUrgent) abyssTabStamUrgent[group] = true;
+      const idleAlertClass = getIdleAlertClass(s, idle);
+      if (idleAlertClass) abyssTabIdleUrgent[group] = true;
       if (idle.remainingMs != null) {
         if (abyssTabShortest[group] === undefined || idle.remainingMs < abyssTabShortest[group]) {
           abyssTabShortest[group] = idle.remainingMs;
@@ -1900,7 +1914,7 @@ function render(){
       setWidth(r.stamBar, stam.pct); setClass(r.stamBar, stamBarCls);
       let idleCls = 'tval idle';
       if (idle.isFull) idleCls += ' full';
-      else if (s.idleRunning && idle.remainingMs != null && idle.remainingMs < URGENT_MS) idleCls += ' urgent';
+      else if (idleAlertClass) idleCls += ' ' + idleAlertClass;
       const idleArmed = Object.prototype.hasOwnProperty.call(armedIdle, i);
       if (idleArmed) {
         // 受取待機中も残りタイマーを維持し、色と操作案内だけを変える。
@@ -1918,7 +1932,7 @@ function render(){
       setWidth(r.idleBar, idle.pct);
       setClass(r.idleBar, 'pbar-fill idle' + (idle.isFull ? ' full' : (idleCls.indexOf('urgent') >= 0 ? ' urgent' : '')));
     }
-    renderAbyssTabIdle(abyssTabShortest, abyssTabUrgent);
+    renderAbyssTabIdle(abyssTabShortest, abyssTabStamUrgent, abyssTabIdleUrgent);
   } catch (e) { console.warn(e); }
   renderG();
   renderSL();
