@@ -253,7 +253,7 @@ input,textarea{
 .tval.urgent{color:var(--stam-full-c)!important;}
 .tsub{font-size:10px;color:var(--ink);height:13px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-variant-numeric:tabular-nums;}
 .tsub{position:relative;}
-.tsub-cur{display:inline-block;width:3ch;font-weight:700;color:#ffb35e;font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;}
+.tsub-cur{display:inline-block;width:calc(3ch + 2px);font-weight:700;text-align:right;color:#ffb35e;font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;}
 /* 現在値だけを元の3文字幅の領域で置き換える。後続の/上限値と時刻は動かさない。 */
 .tsub-cur-input{
   display:none;position:absolute;left:0;top:0;width:3ch;height:13px;box-sizing:border-box;margin:0;padding:0;
@@ -408,7 +408,7 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 .gval.full{color:var(--reach-g)!important;}
 .gval.reached{color:var(--reach-g)!important;}
 .gsub{position:relative;font-size:10px;color:var(--ink);margin-top:1px;}
-.gsub .gsub-cur{display:inline-block;width:3ch;font-weight:700;color:#ffb35e;font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;}
+.gsub .gsub-cur{display:inline-block;width:calc(3ch + 2px);font-weight:700;text-align:right;color:#ffb35e;font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;}
 .gsub .gsub-sep{font-weight:600;color:var(--ink-dim);margin:0 1px;}
 .gsub .gsub-max{display:inline-block;width:3ch;font-weight:700;color:var(--stam-cur-c);font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;}
 .gsub .gsub-clock{color:var(--reach-plan);font-weight:700;margin-left:3px;}
@@ -418,7 +418,7 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 .g-inline-current .gsub-cur{visibility:hidden;}
 .g-inline-current .g-inline-current-field{display:block;left:0;color:#ffb35e;}
 .g-inline-max .gsub-max{visibility:hidden;}
-.g-inline-max .g-inline-max-field{display:block;left:4.4ch;color:var(--stam-cur-c);}
+.g-inline-max .g-inline-max-field{display:block;left:calc(4.4ch + 2px);color:var(--stam-cur-c);}
 .gbar{height:3px;background:var(--line);border-radius:2px;overflow:hidden;margin-top:5px;}
 .gbar-fill{height:100%;border-radius:2px;background:var(--ok);transition:width .3s linear;}
 .gbar-fill.full{background:var(--reach-g)!important;}
@@ -439,7 +439,7 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
     cursor:pointer;position:relative;min-width:0;overflow:visible;-webkit-tap-highlight-color:transparent;
   }
   .slcard.sl-inline-active{border-color:#6fe8ff;z-index:30;}
-  .slhead{display:flex;align-items:center;justify-content:space-between;gap:5px;margin-bottom:2px;}
+  .slhead{display:flex;align-items:center;justify-content:space-between;gap:5px;min-height:22px;margin-bottom:2px;}
   .slname{font-size:10.5px;font-weight:800;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .slbadge{font-size:8.5px;font-weight:700;color:#c8eef8;background:#1a2a33;border:1px solid #3d6a7a;border-radius:4px;padding:1px 5px;white-space:nowrap;}
   .sltag{font-size:9px;font-weight:700;color:#8fd6a8;letter-spacing:.04em;}
@@ -449,7 +449,7 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   .slorbs{letter-spacing:2px;color:var(--reach-orb);font-size:16px;}
   .slorbs.full{color:var(--reach-orb);}
   .orb-sub-left.reached{color:var(--reach-orb);font-weight:800;}
-  .slsub{height:13px;margin-top:1px;font-size:9.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums;}
+  .slsub{height:15px;margin-top:1px;font-size:9.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums;}
   .slsub.sl-stamina-sub{position:relative;overflow:visible;text-overflow:clip;}
   .slsub.orb-sub{display:flex;align-items:center;gap:4px;overflow:visible;text-overflow:clip;}
   .orb-sub-left{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--orb-next);font-weight:700;}
@@ -1136,15 +1136,13 @@ function buildSL(){
   if (!wrap) return;
   wrap.innerHTML =
     '<div class="slcard stam-card" id="sl-card-stamina" data-slaction="card" data-sltype="stamina">' +
-      '<div class="slhead"><span class="slname">スタミナ</span><span class="slbadge">12分 / 1</span></div>' +
-      '<div class="sltag">討伐依頼</div>' +
+      '<div class="slhead"><span class="slname">討伐依頼</span><span class="slbadge">12分 / 1</span></div>' +
       '<div class="slmain" id="sl-stamina-main">—:—</div>' +
       '<div class="slsub sl-stamina-sub" id="sl-stamina-sub"><span class="sl-stamina-current-display" id="sl-stamina-current-display"></span><input class="sl-inline-field sl-stamina-current-input" id="sl-stamina-current-input" type="text" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" aria-label="現在のスタミナ"><span class="sl-stamina-sep">/</span><span class="sl-stamina-max-display" id="sl-stamina-max-display"></span><span id="sl-stamina-clock"></span></div>' +
       '<div class="slbar"><div class="slbar-fill" id="sl-stamina-bar" style="width:0%"></div></div>' +
     '</div>' +
     '<div class="slcard orb-card" id="sl-card-orb" data-slaction="card" data-sltype="orb">' +
       '<div class="slhead"><span class="slname">御大樹の恵み</span><span class="slbadge">6時間 / 1</span></div>' +
-      '<div class="sltag orb">素材収集</div>' +
       '<div class="slmain slorbs" id="sl-orb-main">○○○○</div>' +
       '<div class="slsub orb-sub"><span class="orb-sub-left" id="sl-orb-next"></span><span class="sl-orb-full-wrap"><span class="sl-orb-full-display" id="sl-orb-full-display"></span><input class="sl-inline-field sl-orb-full-input" id="sl-orb-full-input" type="text" inputmode="numeric" pattern="[0-9:]*" enterkeyhint="done" aria-label="オーブ全回復までの残り時間。数字は4桁まで。342、1800、または18:00で入力"></span><span class="orb-full-at" id="sl-orb-full-at"></span></div>' +
       '<div class="slbar"><div class="slbar-fill orb" id="sl-orb-bar" style="width:0%"></div></div>' +
