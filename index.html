@@ -572,6 +572,11 @@ let storageOk = true;
 let textEditIdx = -1;
 let refs = [];
 let tickId = null;
+// 描画実体の消失を検知して復旧するための軽量監視。進行中タイマーがある時だけ動く。
+let tickWatchdogId = null;
+let lastRenderAt = 0;
+// 1操作内で複数clickが起きても、次フレームの復旧は1回だけにまとめる。
+let interactionTickRecoveryFrame = 0;
 let resetCheckTimer = null;
 let swRegistrationScheduled = false;
 let armedIdle = {};
@@ -1941,6 +1946,8 @@ function render(){
   renderSL();
   // すべて満タン・未開始なら、不要な毎秒描画を停止する。
   if (tickId && !needsTicking()) stopTicking();
+  // 全タイマーの差分描画が完了した時刻を記録し、停止検知の基準にする。
+  lastRenderAt = Date.now();
 }
 
 function renderG(){
@@ -1995,15 +2002,42 @@ function needsTicking(){
   return false;
 }
 
-function startTicking(){
+function ensureTickWatchdog(){
+  if (tickWatchdogId || !needsTicking()) return;
+  tickWatchdogId = setInterval(() => {
+    // 非表示中の実行制御はブラウザに委ね、可視時に長時間描画されなければ復旧する。
+    if (document.hidden || !needsTicking()) return;
+    if (Date.now() - lastRenderAt < 3200) return;
+    render();
+    startTicking(true);
+  }, 2500);
+}
+function startTicking(forceRestart = false){
   if (!needsTicking()) {
     stopTicking();
     return;
   }
+  // タスク復帰後にIDだけ残り実体が止まるケースでは、既存IDを破棄して確実に再生成する。
+  if (forceRestart && tickId) {
+    clearInterval(tickId);
+    tickId = null;
+  }
   if (!tickId) tickId = setInterval(render, 1000);
+  ensureTickWatchdog();
 }
 function stopTicking(){
   if (tickId) { clearInterval(tickId); tickId = null; }
+  if (tickWatchdogId) { clearInterval(tickWatchdogId); tickWatchdogId = null; }
+}
+// 編集の開閉・タブ切替・確定待機への移行後に、停止した実体だけを安全に再生成する。
+// 常駐監視ではなく、ユーザー操作の次フレームに1回だけ実行する軽量な保険。
+function scheduleInteractionTickRecovery(){
+  if (interactionTickRecoveryFrame) return;
+  interactionTickRecoveryFrame = requestAnimationFrame(() => {
+    interactionTickRecoveryFrame = 0;
+    if (document.hidden || !needsTicking()) return;
+    startTicking(true);
+  });
 }
 
 function setupDelegatedEvents(){
@@ -2206,6 +2240,8 @@ setupGDelegatedEvents();
 setupSLDelegatedEvents();
 setupGameTabs();
 setupAbyssTabs();
+const appRootForTickRecovery = document.querySelector('.wrap');
+if (appRootForTickRecovery) appRootForTickRecovery.addEventListener('click', scheduleInteractionTickRecovery);
 scheduleStartupStabilization();
 const startupGraceUntil = Date.now() + 3000;
 
@@ -2233,7 +2269,8 @@ function resumeTicking(force){
   const restart = () => {
     if (document.hidden) return;
     render();
-    startTicking();
+    // 復帰時は、見かけ上のIDが残っていても実体を再生成して連続更新を保証する。
+    startTicking(true);
     scheduleResetCheck();
   };
 
@@ -2293,7 +2330,7 @@ document.addEventListener('resume', () => resumeTicking(true));
 
 window.addEventListener('pageshow', () => resumeTicking(true));
 // visibilitychangeが届かないPWAシェルでも、フォーカス復帰を保険として同期入口にする。
-window.addEventListener('focus', () => resumeTicking(false));
+window.addEventListener('focus', () => resumeTicking(true));
 
 function scheduleServiceWorkerRegistration(){
   if (swRegistrationScheduled) return;
