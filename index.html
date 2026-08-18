@@ -459,6 +459,20 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   .slbar-fill.orb.full{background:#f2a4b7;}
   .slbar-fill.full{background:var(--stam-full-c);}
 
+  /*
+   * 任意の数値表示用フォント（外部通信・追加ファイルなし）。
+   * 不要なら、このブロック全体だけを削除すれば従来の表示へ戻る。
+   * 日本語ラベル・名前・補助文には適用しない。
+   */
+  :root{--timer-pop-system-font:ui-rounded,"Arial Rounded MT Bold","Trebuchet MS",Roboto,system-ui,sans-serif;}
+  .tval,.gval,.slmain,.abyss-tab-name,.abyss-tab-idle-time,
+  .tsub-cur,.tsub-max,.gsub .gsub-cur,.gsub .gsub-max,.sl-stamina-current-display,
+  .tsub-cur-input,.g-inline-field,.sl-stamina-current-input,
+  .sl-orb-full-display,.sl-inline-field.sl-orb-full-input,.orb-full-at{
+    font-family:var(--timer-pop-system-font);
+    font-variant-numeric:tabular-nums;
+  }
+
   /* 数値インライン入力の共通基準。キャレットの高さ・太さは文字サイズと行高に従うため、全タイマーで同じ値へ揃える。 */
   .tsub-cur-input,.g-inline-field,.sl-stamina-current-input,.sl-inline-field.sl-orb-full-input{
     font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;
@@ -478,9 +492,9 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
     <span class="daily-progress" id="dailyProgress"></span>
   </div>
   <div class="abyss-tabs" id="abyssTabs" role="tablist" aria-label="ドットアビスのグループ">
-    <button type="button" class="abyss-tab g0 active" data-abyss-group="g0" role="tab" aria-selected="true" aria-label="グループA"><span class="abyss-tab-name">A</span><span class="abyss-tab-idle" id="abyss-idle-g0">未開始</span></button>
-    <button type="button" class="abyss-tab g1" data-abyss-group="g1" role="tab" aria-selected="false" aria-label="グループB"><span class="abyss-tab-name">B</span><span class="abyss-tab-idle" id="abyss-idle-g1">未開始</span></button>
-    <button type="button" class="abyss-tab g2" data-abyss-group="g2" role="tab" aria-selected="false" aria-label="グループC"><span class="abyss-tab-name">C</span><span class="abyss-tab-idle" id="abyss-idle-g2">未開始</span></button>
+    <button type="button" class="abyss-tab g0 active" data-abyss-group="g0" role="tab" aria-selected="true" aria-label="グループA"><span class="abyss-tab-name">A</span><span class="abyss-tab-idle"><span class="abyss-tab-idle-time" id="abyss-idle-time-g0"></span><span id="abyss-idle-status-g0">未開始</span></span></button>
+    <button type="button" class="abyss-tab g1" data-abyss-group="g1" role="tab" aria-selected="false" aria-label="グループB"><span class="abyss-tab-name">B</span><span class="abyss-tab-idle"><span class="abyss-tab-idle-time" id="abyss-idle-time-g1"></span><span id="abyss-idle-status-g1">未開始</span></span></button>
+    <button type="button" class="abyss-tab g2" data-abyss-group="g2" role="tab" aria-selected="false" aria-label="グループC"><span class="abyss-tab-name">C</span><span class="abyss-tab-idle"><span class="abyss-tab-idle-time" id="abyss-idle-time-g2"></span><span id="abyss-idle-status-g2">未開始</span></span></button>
   </div>
   <div class="grid" id="grid" data-group="g0"></div>
   <div class="game-tabs" id="gameTabs" role="tablist" aria-label="ゲームタイマー">
@@ -1446,8 +1460,10 @@ function setupAbyssTabs(){
 function renderAbyssTabIdle(shortestByGroup, urgentByGroup){
   ['g0', 'g1', 'g2'].forEach((group) => {
     const shortest = shortestByGroup[group];
-    const text = shortest === undefined ? '未開始' : (shortest <= 0 ? 'MAX' : formatTime(shortest));
-    setText(document.getElementById('abyss-idle-' + group), text);
+    const hasTimer = shortest !== undefined;
+    const timeText = hasTimer ? (shortest <= 0 ? 'MAX' : formatTime(shortest)) : '';
+    setText(document.getElementById('abyss-idle-time-' + group), timeText);
+    setText(document.getElementById('abyss-idle-status-' + group), hasTimer ? '' : '未開始');
     const tab = document.querySelector('[data-abyss-group="' + group + '"]');
     if (tab) tab.classList.toggle('urgent', !!urgentByGroup[group]);
   });
