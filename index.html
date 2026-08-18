@@ -456,14 +456,12 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   .sl-orb-full-wrap{display:inline-flex;align-items:center;gap:1px;white-space:nowrap;}
   .orb-full-at{margin-left:auto;color:var(--orb-full);font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums;}
   #sl-stamina-clock{color:var(--reach-plan);font-weight:700;margin-left:3px;}
-  /* 予定時刻だけは白い時計記号を先頭に置き、残り時間と文字なしで見分ける。 */
-  .idle-clock.plan-clock::before,.gsub-clock.plan-clock::before,#sl-stamina-clock.plan-clock::before,.orb-full-at.plan-clock::before{content:'◷';display:inline-block;color:#fff;font-size:8px;line-height:1;font-weight:900;margin-right:2px;vertical-align:1px;}
   .sl-stamina-sep{font-weight:600;color:var(--ink-dim);margin:0 1px;}
   .sl-stamina-max-display{display:inline;font-weight:700;color:var(--stam-cur-c);font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;}
   .sl-inline-field:not(.sl-stamina-current-input){display:none;box-sizing:border-box;height:16px;background:var(--bg-inset);border:1px solid #4a5a78;border-radius:4px;color:var(--ink);padding:0 3px;font-size:10px;line-height:14px;font-family:inherit;text-align:center;vertical-align:baseline;outline:none;}
-  /* 通常時は現在値の桁幅だけを使い、2桁時の余白を残さない。 */
-  .sl-stamina-current-display{display:inline-block;width:auto;font-weight:700;color:#ffb35e;font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;}
-  /* 手入力中だけ3桁分を確保し、絶対配置の入力欄と後続の/上限値を安定させる。 */
+  /* 現在値は3桁分の固定領域で右寄せし、1桁・2桁でも /上限値の直前へ揃える。 */
+  .sl-stamina-current-display{display:inline-block;width:calc(3ch + 2px);font-weight:700;text-align:right;color:#ffb35e;font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;}
+  /* 手入力中も同じ3桁領域を使い、入力欄と後続の/上限値を安定させる。 */
   .slcard.sl-inline-current .sl-stamina-current-display{visibility:hidden;width:calc(3ch + 2px);}
   .slcard.sl-inline-current .sl-stamina-current-input{display:block;left:0;color:#ffb35e;}
   .slcard.sl-inline-orb .sl-orb-full-display{display:none;}
@@ -660,12 +658,9 @@ function escapeHtml(s){
 }
 function setText(el, text){ if (!el) return; if (el.dataset._h !== undefined) delete el.dataset._h; if (el.textContent !== text) el.textContent = text; }
 // 時刻値と接尾辞は固定DOMへ差分テキストだけを流し込み、毎秒のinnerHTML差替えを避ける。
-// HH:MMだけを予定時刻として扱い、白い時計記号は編集・受取案内に付けない。
 function setClockParts(timeEl, suffixEl, timeText, suffixText){
-  const text = timeText || '';
-  setText(timeEl, text);
+  setText(timeEl, timeText || '');
   setText(suffixEl, suffixText || '');
-  if (timeEl) timeEl.classList.toggle('plan-clock', /^\d{2}:\d{2}$/.test(String(text).trim()));
 }
 function setClass(el, cls){ if (el && el.className !== cls) el.className = cls; }
 function setWidth(el, pct){
@@ -1311,9 +1306,7 @@ function renderSL(){
   setClass(slRefs.stamina.main, 'slmain' + (stamina.isFull ? ' reached' : ''));
   setText(slRefs.stamina.current, String(stamina.current));
   setText(slRefs.stamina.max, String(SL_STAM_MAX));
-  const staminaClockTxt = stamina.isFull ? '' : (stamina.fullAt ? '　' + formatPlanClock(stamina.fullAt) : '');
-  setText(slRefs.stamina.clock, staminaClockTxt);
-  setClass(slRefs.stamina.clock, staminaClockTxt ? 'plan-clock' : '');
+  setText(slRefs.stamina.clock, stamina.isFull ? '' : (stamina.fullAt ? '　' + formatPlanClock(stamina.fullAt) : ''));
   setWidth(slRefs.stamina.bar, stamina.pct);
   setClass(slRefs.stamina.bar, 'slbar-fill' + (stamina.isFull ? ' full' : ''));
 
@@ -1323,9 +1316,7 @@ function renderSL(){
   setText(slRefs.orb.next, orb.isFull ? (orb.fullAt ? (formatClock(orb.fullAt) + ' 到達') : '到達') : (orbCfg.timer.running ? '次 ' + formatGameMinute(orb.nextIn) : orb.current + '/4　未開始'));
   setClass(slRefs.orb.next, 'orb-sub-left' + (orb.isFull ? ' reached' : ''));
   setText(slRefs.orb.full, '');
-  const orbFullAtTxt = (!orb.isFull && orbCfg.timer.running && orb.fullAt) ? ('全 ' + formatPlanClock(orb.fullAt)) : '';
-  setText(slRefs.orb.fullAt, orbFullAtTxt);
-  setClass(slRefs.orb.fullAt, 'orb-full-at' + (orbFullAtTxt ? ' plan-clock' : ''));
+  setText(slRefs.orb.fullAt, (!orb.isFull && orbCfg.timer.running && orb.fullAt) ? ('全 ' + formatPlanClock(orb.fullAt)) : '');
   setWidth(slRefs.orb.bar, orb.pct);
   setClass(slRefs.orb.bar, 'slbar-fill orb' + (orb.isFull ? ' full' : ''));
 }
@@ -2078,7 +2069,6 @@ function renderG(){
       }
       setText(r.val, main); setClass(r.val, cls);
       setText(r.subCur, curTxt); setText(r.subMax, maxTxt); setText(r.subClock, clockTxt);
-      setClass(r.subClock, 'gsub-clock' + (clockTxt ? ' plan-clock' : ''));
       setWidth(r.bar, stam.pct); setClass(r.bar, barCls);
     }
   } catch (e) { console.warn(e); }
