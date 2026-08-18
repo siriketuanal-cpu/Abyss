@@ -478,6 +478,11 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
     font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;
     font-size:10px;line-height:11px;font-weight:700;caret-color:currentColor;outline:none;
   }
+  /*
+   * スタミナ入力とオーブ時間入力は、入力・確定の挙動を変えずに点滅キャレットだけを隠す。
+   * 名前・ランクなどの文字入力欄には適用しない。
+   */
+  .tsub-cur-input,.g-inline-field,.sl-stamina-current-input,.sl-inline-field.sl-orb-full-input{caret-color:transparent;}
   /* 現在値・上限値は数字の高さに合わせた11pxの枠なし部分置換に統一する。 */
   .tsub-cur-input,.g-inline-field,.sl-stamina-current-input{height:11px;top:1px;}
   /* オーブは時間入力の幅を保ちつつ、文字とキャレットの基準線だけ共通化する。 */
