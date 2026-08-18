@@ -147,20 +147,12 @@ input,textarea{
 .abyss-tab.active.g1{border-color:#77b7ff;background:#101824;box-shadow:0 0 0 1px rgba(119,183,255,.34);}
 .abyss-tab.active.g2{border-color:#b5c5e0;background:#101824;box-shadow:0 0 0 1px rgba(181,197,224,.34);}
 .row-top{display:flex;align-items:center;gap:7px;margin-bottom:3px;}
-/* 放置報酬の内蔵チェック行は、スタミナ側の名前・ランク行と同じ高さでタイマー位置を揃える。 */
-.abyss-idle-head{height:16.6px;margin-bottom:3px;display:flex;align-items:center;justify-content:flex-end;}
-.idle-marks{display:flex;align-items:center;height:16.6px;}
-.idle-mark{
-  width:28px;height:26px;display:flex;align-items:center;justify-content:center;
-  padding:0;border:1px solid #51607b;border-radius:6px;background:#0d131e;color:#aab6cd;opacity:1;
-  font:900 21px/1 inherit;cursor:pointer;outline:none;appearance:none;-webkit-appearance:none;
-  box-shadow:inset 0 0 0 1px rgba(255,255,255,.035);
-  -webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;user-select:none;
-}
-/* デイリーは四角い枠を外し、完了時だけシアンブルーの太いチェック（✔）で際立たせる。 */
-.idle-mark.daily-mark{
+/* 放置報酬は一枚の受取カードとして扱い、デイリー✔だけを右上へ重ねる。 */
+.abyss-idle-card .daily-mark{
+  position:absolute;z-index:2;top:7px;right:11px;
   width:auto;height:auto;border:none;border-radius:0;background:transparent;box-shadow:none;
-  color:transparent;font-size:24px;text-shadow:none;pointer-events:none;cursor:inherit;
+  color:transparent;font-size:24px;line-height:1;text-shadow:none;pointer-events:none;cursor:inherit;
+  -webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;user-select:none;
 }
 .idle-mark.daily-mark.show{
   color:#b9aaff;background:transparent;border:none;box-shadow:none;
@@ -523,8 +515,7 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 const N = 6;
 const STAM_INTERVAL = 3 * 60 * 1000;
 const IDLE_DEFAULT_CAP_MS = 12 * 3600 * 1000;
-// 確認待ちは短く保ち、連続操作を止めずに自然に元の表示へ戻す。
-const ABYSS_CONFIRM_TIMEOUT_MS = 2000;
+// ドットアビスの確認待ちは、画面外を押すまで維持し、再タップで確定する。
 const IDLE_LEAD_MS = 2 * 60 * 1000;
 const URGENT_MS = 2 * 60 * 60 * 1000;
 const STAM_MAX_BASE = 240;
@@ -581,7 +572,6 @@ let tickId = null;
 let resetCheckTimer = null;
 let swRegistrationScheduled = false;
 let armedIdle = {};
-let stamConfirmTimer = null;
 // ドットアビスのスタミナ操作は同時に1枚だけ開けるため、編集状態を単一値で保持する。
 let stamEdit = null;
 // 手入力中に同じタイマーをタップした際、そのタップは確定操作として一度だけ消費する。
@@ -932,7 +922,6 @@ function getLiveStamCurrent(i){
 }
 
 function clearStamEdit(){
-  if (stamConfirmTimer) { clearTimeout(stamConfirmTimer); stamConfirmTimer = null; }
   if (!stamEdit) return;
   const i = stamEdit.index;
   const r = refs[i];
@@ -942,7 +931,7 @@ function clearStamEdit(){
   stamEdit = null;
 }
 
-// 1回目: 40消費後の参考値だけを表示する。画面外タップでは保存せずに戻す。
+// 1回目: 40消費後の参考値を表示する。画面外で取消、再タップで確定する。
 function beginStamReference(i){
   const r = refs[i];
   if (!r) return;
@@ -952,12 +941,6 @@ function beginStamReference(i){
   if (r.card) r.card.classList.add('stam-preview');
   syncIdleConfirmBackdrop();
   render();
-  stamConfirmTimer = setTimeout(() => {
-    if (!stamEdit || stamEdit.index !== i || stamEdit.phase !== DOT_EDIT_PHASE.REFERENCE) return;
-    clearStamEdit();
-    syncIdleConfirmBackdrop();
-    render();
-  }, ABYSS_CONFIRM_TIMEOUT_MS);
 }
 
 // スタミナタイマー領域の長押しで、任意値を空欄から直接入力する。
@@ -1045,12 +1028,8 @@ function build(){
               '<div class="pbar"><div class="pbar-fill stam" id="stam-bar-' + i + '" style="width:0%"></div></div>' +
             '</div>' +
           '</div>' +
-          '<div class="card abyss-idle-card ' + groupClass(i) + ' tblock-idle" id="idle-block-' + i + '" data-idle-receive="true" data-idx="' + i + '" role="button" aria-label="放置報酬。1回タップで確認、長押しで受取">' +
-            '<div class="row-top abyss-idle-head">' +
-              '<div class="idle-marks" aria-hidden="true">' +
-                '<span class="idle-mark daily-mark ' + groupClass(i) + (s.missionDone ? ' show' : '') + '" id="daily-mark-' + i + '">✔</span>' +
-              '</div>' +
-            '</div>' +
+          '<div class="card abyss-idle-card ' + groupClass(i) + ' tblock-idle" id="idle-block-' + i + '" data-idle-receive="true" data-idx="' + i + '" role="button" aria-label="放置報酬。1回タップで確認、もう一度タップで受取">' +
+            '<span class="idle-mark daily-mark ' + groupClass(i) + (s.missionDone ? ' show' : '') + '" id="daily-mark-' + i + '" aria-hidden="true">✔</span>' +
             '<div class="ttag idle">放置報酬</div>' +
             '<div class="tval idle" id="idle-val-' + i + '">—:—</div>' +
             '<div class="tsub idle-meta" id="idle-sub-' + i + '"><span class="idle-clock" id="idle-subclock-time-' + i + '"></span><span id="idle-subclock-suffix-' + i + '"></span></div>' +
@@ -1366,7 +1345,7 @@ function softBlur(){
 
 function onCardClick(i, ev){
   const t = ev.target;
-  // 放置報酬と同様に、スタミナカード内の空白を含むタップを受け付ける。
+  // スタミナカード全体（上部空白・タイマー部を含む）を単一の通常タップ入口として扱う。
   // 名前・ランクの実際の文字部分だけは、上位の長押し専用判定で静かに除外される。
   if (!t || !t.closest) return;
   if (t.closest('input') || t.closest('button') || t.closest('.name-input') || t.closest('.rank-input')) return;
@@ -1389,8 +1368,11 @@ function onCardClick(i, ev){
     return;
   }
 
-  // 参考表示中の通常タップは確定せず、長押し確定を待つ。手入力中は入力状態を保つ。
-  if (stamEdit && stamEdit.index === i) return;
+  // 参考表示中の再タップは40基準値を確定し、手入力中は入力状態を保つ。
+  if (stamEdit && stamEdit.index === i) {
+    if (stamEdit.phase === DOT_EDIT_PHASE.REFERENCE) commitStamEdit();
+    return;
+  }
   // 別タイマーの仮値が残っている場合は、段階に応じて取消または確定だけを行う。
   if (stamEdit) {
     resolveStamEditFromOutside();
@@ -1727,42 +1709,7 @@ function setupGDelegatedEvents(){
   });
 }
 
-// ドットアビス上部の名前・ランク以外を長押しすると、現在スタミナの手入力を開く。
-function setupRowTopV73(){
-  const grid = document.getElementById('grid');
-  if (!grid || grid.dataset.rowTopReady) return;
-  grid.dataset.rowTopReady = '1';
-  let timer = null, sx = 0, sy = 0;
-  const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } };
-  const start = (ev) => {
-    const target = ev.target;
-    const row = target && target.closest && target.closest('.row-top');
-    if (!row || (target.closest && target.closest('.name-lp-hit, .rank-lp-hit, input, button'))) return;
-    const card = row.closest('.abyss-stam-card');
-    if (!card) return;
-    const point = ev.touches && ev.touches[0] ? ev.touches[0] : ev;
-    sx = point.clientX; sy = point.clientY;
-    cancel();
-    timer = setTimeout(() => {
-      timer = null;
-      const match = String(card.id || '').match(/(\d+)$/);
-      if (match) beginStamManualInput(Number(match[1]));
-    }, 500);
-  };
-  const move = (ev) => {
-    if (!timer) return;
-    const point = ev.touches && ev.touches[0] ? ev.touches[0] : ev;
-    const dx = point.clientX - sx, dy = point.clientY - sy;
-    if (dx * dx + dy * dy > 144) cancel();
-  };
-  grid.addEventListener('touchstart', start, { passive:true });
-  grid.addEventListener('touchmove', move, { passive:true });
-  grid.addEventListener('touchend', cancel, { passive:true });
-  grid.addEventListener('touchcancel', cancel, { passive:true });
-  grid.addEventListener('mousedown', (ev) => { if (ev.button === 0) start(ev); });
-  grid.addEventListener('mousemove', move);
-  grid.addEventListener('mouseup', cancel);
-}
+
 
 // ---- 放置報酬の二段階受取 ----
 
@@ -1838,12 +1785,12 @@ function updateIdleReceiveVisual(i, armed){
   if (!block || !val || !sub) return;
   block.classList.toggle('receive-armed', armed);
   if (armed) {
-    // 残りタイマーは隠さず、強調色と操作案内だけで受取待機を示す。
+    // 残りタイマーは隠さず、強調色と再タップ案内だけで受取待機を示す。
     const idle = getIdleInfo(state.slots[i], Date.now());
     setText(val, idle.display);
     const time = document.getElementById('idle-subclock-time-' + i);
     const suffix = document.getElementById('idle-subclock-suffix-' + i);
-    setClockParts(time, suffix, '', '長押しで受取');
+    setClockParts(time, suffix, '', 'もう一度タップで受取');
   }
   syncIdleConfirmBackdrop();
 }
@@ -1878,8 +1825,11 @@ function commitIdleReceive(i){
   return true;
 }
 function onIdleTimerTap(i){
-  // 確認待ち中の通常タップは何も確定せず、長押し確定を待つ。
-  if (Object.prototype.hasOwnProperty.call(armedIdle, i)) return;
+  // 同じ放置報酬の再タップは受取確定。長押しは通常時のデイリー切替だけに使う。
+  if (Object.prototype.hasOwnProperty.call(armedIdle, i)) {
+    commitIdleReceive(i);
+    return;
+  }
   // 別スロットが受取確認中なら、最初のタップは確認を解除するだけにする。
   // 意図せず別の放置報酬をそのまま受取待機へ切り替えないための安全クッション。
   const hasOtherArmedIdle = Object.keys(armedIdle).some((key) => Number(key) !== i);
@@ -1889,11 +1839,7 @@ function onIdleTimerTap(i){
   }
   disarmAllIdle();
   updateIdleReceiveVisual(i, true);
-  armedIdle[i] = setTimeout(() => {
-    delete armedIdle[i];
-    updateIdleReceiveVisual(i, false);
-    render();
-  }, ABYSS_CONFIRM_TIMEOUT_MS);
+  armedIdle[i] = true;
   syncIdleConfirmBackdrop();
 }
 
@@ -1959,7 +1905,7 @@ function render(){
       if (idleArmed) {
         // 受取待機中も残りタイマーを維持し、色と操作案内だけを変える。
         setText(r.idleVal, idle.display);
-        setClockParts(r.idleSubClockTime, r.idleSubClockSuffix, '', '長押しで受取');
+        setClockParts(r.idleSubClockTime, r.idleSubClockSuffix, '', 'もう一度タップで受取');
       } else {
         setText(r.idleVal, idle.display);
         if (idle.clockTxt) {
@@ -2154,18 +2100,20 @@ function setupDelegatedEvents(){
     const nameHit = el.closest && el.closest('.name-lp-hit');
     const rankHit = el.closest && el.closest('.rank-lp-hit');
     const stamBlock = el.closest && el.closest('.tblock-stam');
-    const stamCard = stamBlock && stamBlock.closest ? stamBlock.closest('.abyss-stam-card') : null;
+    const stamCard = (stamBlock && stamBlock.closest ? stamBlock.closest('.abyss-stam-card') : null) || (el.closest && el.closest('.abyss-stam-card'));
     let mode = null;
     if (nameHit) mode = 'name';
     else if (rankHit) mode = 'rank';
     else if (idleBlock) {
       const idleIndex = Number(idleBlock.dataset.idx);
-      mode = Object.prototype.hasOwnProperty.call(armedIdle, idleIndex) ? 'idle-confirm' : 'idle-mark';
-    } else if (stamBlock && !(el.closest && el.closest('input'))) {
+      // 確認待ちの放置報酬は再タップ確定。長押し後のclickだけを抑止して何もしない。
+      mode = Object.prototype.hasOwnProperty.call(armedIdle, idleIndex) ? 'idle-armed' : 'idle-mark';
+    } else if (stamCard && !(el.closest && el.closest('input'))) {
       const stamIndex = stamCard ? Number(stamCard.dataset.idx) : NaN;
-      mode = stamEdit && stamEdit.index === stamIndex && stamEdit.phase === DOT_EDIT_PHASE.REFERENCE ? 'stam-confirm' : 'stam-manual';
+      // 40基準の確認待ちからは、長押しで現在値手入力へ切り替える。
+      mode = 'stam-manual';
     } else return;
-    const idEl = idleBlock || nameHit || rankHit || stamBlock;
+    const idEl = idleBlock || nameHit || rankHit || stamCard;
     const cardEl = idEl && idEl.closest ? idEl.closest('.card') : null;
     const i = Number((idEl.dataset && idEl.dataset.idx != null) ? idEl.dataset.idx : (cardEl && cardEl.dataset ? cardEl.dataset.idx : NaN));
     if (!Number.isFinite(i)) return;
@@ -2174,17 +2122,14 @@ function setupDelegatedEvents(){
     lpX = pt.clientX; lpY = pt.clientY;
     lpTimer = setTimeout(() => {
       lpTimer = null;
-      if (mode === 'idle-confirm') {
-        if (commitIdleReceive(i)) pendingLongPressClick = { kind: 'idle-confirm', index: i };
+      if (mode === 'idle-armed') {
+        pendingLongPressClick = { kind: 'idle-armed', index: i };
       } else if (mode === 'idle-mark') {
         toggleMissionMark(i);
         pendingLongPressClick = { kind: 'idle-mark', index: i };
       } else if (mode === 'name') beginNameEdit(i);
       else if (mode === 'rank') beginRankEdit(i);
-      else if (mode === 'stam-confirm') {
-        commitStamEdit();
-        pendingLongPressClick = { kind: 'stam-confirm', index: i };
-      } else beginStamManualInput(i);
+      else beginStamManualInput(i);
     }, LP_MS);
   };
   const lpMove = (ev) => {
@@ -2240,7 +2185,6 @@ function scheduleStartupStabilization(){
 <script>
 loadState();
 setupDelegatedEvents();
-setupRowTopV73();
 setupGDelegatedEvents();
 setupSLDelegatedEvents();
 setupGameTabs();
