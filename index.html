@@ -102,7 +102,8 @@ input,textarea{
 /* ドットアビスはスタミナと放置報酬を独立カードとして横並びにする。 */
 .abyss-timers{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;flex:1 1 auto;min-width:0;}
 .abyss-timers > .card{min-width:0;}
-.abyss-idle-card{cursor:pointer;}
+/* 放置報酬は一枚カードのまま、スタミナ側の名前・ランク行ぶんだけ上部余白を確保する。 */
+.card.abyss-idle-card{cursor:pointer;padding-top:29px;}
 .card-row:nth-child(3),.card-row:nth-child(5){
   margin-top:2px;padding-top:8px;border-top:1px solid #5a6a88;
 }
@@ -1849,9 +1850,11 @@ function onIdleTimerTap(i){
     return;
   }
   disarmAllIdle();
-  updateIdleReceiveVisual(i, true);
+  // 受取確認へ入る時点で状態を登録し、即時描画と毎秒更新を必ず開始する。
   armedIdle[i] = true;
-  syncIdleConfirmBackdrop();
+  updateIdleReceiveVisual(i, true);
+  render();
+  startTicking();
 }
 
 function render(){
@@ -1903,7 +1906,7 @@ function render(){
       if (stamEdit && stamEdit.index === i) {
         stamCurTxt = String(stamEdit.value);
         if (stamEdit.phase === DOT_EDIT_PHASE.REFERENCE) {
-          stamClockTxt = '長押しで確定';
+          stamClockTxt = 'もう一度タップで確定';
           stamClockSuffix = '';
         }
       }
@@ -2273,7 +2276,8 @@ document.addEventListener('visibilitychange', () => {
     // 次の復帰を直前イベントの抑止対象にしない。
     lastResumeAt = 0;
     if (Date.now() < startupGraceUntil) return;
-    stopTicking();
+    // Android Chrome／PWAシェルでは復帰通知が欠ける場合があるため、
+    // 進行中の描画ループはここで止めない。非表示中はブラウザ側が自然に抑制する。
     if (resumeDebounceTimer) {
       clearTimeout(resumeDebounceTimer);
       resumeDebounceTimer = null;
@@ -2287,9 +2291,9 @@ document.addEventListener('visibilitychange', () => {
 // 一部のWebView・PWAシェルが送る復帰通知も同じ経路で扱う。
 document.addEventListener('resume', () => resumeTicking(true));
 
-window.addEventListener('pageshow', (ev) => {
-  if (ev.persisted) resumeTicking(true);
-});
+window.addEventListener('pageshow', () => resumeTicking(true));
+// visibilitychangeが届かないPWAシェルでも、フォーカス復帰を保険として同期入口にする。
+window.addEventListener('focus', () => resumeTicking(false));
 
 function scheduleServiceWorkerRegistration(){
   if (swRegistrationScheduled) return;
