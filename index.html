@@ -406,7 +406,7 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 .gsub .gsub-max{display:inline-block;width:3ch;font-weight:700;color:var(--stam-cur-c);font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;}
 .gsub .gsub-clock{color:#c9b8ff;font-weight:600;margin-left:3px;}
 .gname-lp-hit{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 1px;cursor:pointer;touch-action:manipulation;-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important;}
-.g-inline-field{display:none;position:absolute;top:0;width:3ch;height:13px;box-sizing:border-box;background:transparent;border:0;border-radius:0;font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;font-size:10px;line-height:13px;font-weight:700;text-align:left;outline:none;padding:0;margin:0;appearance:textfield;-moz-appearance:textfield;}
+.g-inline-field,.sl-stamina-current-input{display:none;position:absolute;top:0;width:3ch;height:13px;box-sizing:border-box;background:transparent;border:0;border-radius:0;font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;font-size:10px;line-height:13px;font-weight:700;text-align:left;outline:none;padding:0;margin:0;appearance:textfield;-moz-appearance:textfield;}
 .g-inline-field::-webkit-outer-spin-button,.g-inline-field::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
 .g-inline-current .gsub-cur{visibility:hidden;}
 .g-inline-current .g-inline-current-field{display:block;left:0;color:#ffb35e;}
@@ -431,7 +431,7 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
     background:var(--bg-card);border:1.5px solid #3a3a3a;border-radius:12px;padding:7px 9px;
     cursor:pointer;position:relative;min-width:0;overflow:visible;-webkit-tap-highlight-color:transparent;
   }
-  .slcard.open{border-color:#6fe8ff;z-index:30;}
+  .slcard.sl-inline-active{border-color:#6fe8ff;z-index:30;}
   .slhead{display:flex;align-items:center;justify-content:space-between;gap:5px;margin-bottom:2px;}
   .slname{font-size:10.5px;font-weight:800;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .slbadge{font-size:8.5px;font-weight:700;color:#c8eef8;background:#1a2a33;border:1px solid #3d6a7a;border-radius:4px;padding:1px 5px;white-space:nowrap;}
@@ -440,48 +440,24 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   .slmain{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--ok);line-height:1.1;white-space:nowrap;overflow:hidden;}
   .slmain.full{color:var(--stam-full-c);}
   .slorbs{letter-spacing:2px;color:#f2a4b7;font-size:16px;}
-.slorbs.full{color:#f2a4b7;}
-.slsub{height:13px;margin-top:1px;font-size:9.5px;color:#c9b8ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums;}
-.slsub.orb-sub{display:flex;align-items:center;gap:5px;overflow:visible;text-overflow:clip;}
-.orb-sub-left{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.orb-full-at{margin-left:auto;color:#ffca6e;font-weight:800;white-space:nowrap;font-variant-numeric:tabular-nums;}
-.slbar{height:3px;background:var(--line);border-radius:2px;overflow:hidden;margin-top:5px;}
+  .slorbs.full{color:#f2a4b7;}
+  .slsub{height:13px;margin-top:1px;font-size:9.5px;color:#c9b8ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums;}
+  .slsub.sl-stamina-sub{position:relative;overflow:visible;text-overflow:clip;}
+  .slsub.orb-sub{display:flex;align-items:center;gap:4px;overflow:visible;text-overflow:clip;}
+  .orb-sub-left{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .sl-orb-full-wrap{display:inline-flex;align-items:center;gap:1px;white-space:nowrap;}
+  .orb-full-at{margin-left:auto;color:#ffca6e;font-weight:800;white-space:nowrap;font-variant-numeric:tabular-nums;}
+  .sl-inline-field:not(.sl-stamina-current-input){display:none;box-sizing:border-box;height:16px;background:var(--bg-inset);border:1px solid #4a5a78;border-radius:4px;color:var(--ink);padding:0 3px;font-size:10px;line-height:14px;font-family:inherit;text-align:center;vertical-align:baseline;outline:none;}
+  .sl-stamina-current-display{display:inline-block;width:3ch;font-weight:700;color:#ffb35e;font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;}
+  .slcard.sl-inline-current .sl-stamina-current-display{visibility:hidden;}
+  .slcard.sl-inline-current .sl-stamina-current-input{display:block;left:0;color:#ffb35e;}
+  .slcard.sl-inline-orb .sl-orb-full-display{display:none;}
+  .slcard.sl-inline-orb .sl-orb-full-input{display:inline-block;width:42px;}
+  .slbar{height:3px;background:var(--line);border-radius:2px;overflow:hidden;margin-top:5px;}
   .slbar-fill{height:100%;border-radius:2px;background:var(--ok);transition:width .3s linear;}
-.slbar-fill.orb{background:#f2a4b7;}
-.slbar-fill.orb.full{background:#f2a4b7;}
-.slbar-fill.full{background:var(--stam-full-c);}
-  .sledit{
-    display:none;position:absolute;z-index:31;top:calc(100% + 6px);left:0;right:0;
-    margin:0;padding:7px 9px;background:#000;border:1px solid #6fe8ff;border-radius:12px;
-    box-shadow:0 8px 18px rgba(0,0,0,.45);cursor:default;
-  }
-  .slcard.open .sledit{display:flex;align-items:center;gap:3px;}
-  .sledit input{box-sizing:border-box;height:28px;background:var(--bg-inset);border:1px solid #4a5a78;border-radius:6px;color:var(--ink);padding:4px 4px;font-size:11.5px;font-family:inherit;text-align:center;min-width:0;}
-  .sledit-current{flex:0 0 36px;width:36px;}
-  .sledit-next-input{flex:0 0 43px;width:43px;text-align:right;padding-right:4px;}
-  .slbtn{box-sizing:border-box;height:30px;border:none;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:800;cursor:pointer;font-family:inherit;color:#08131b;background:#8ec5ff;white-space:nowrap;}
-  .slbtn.sync{background:linear-gradient(135deg,#8ec5ff,#5b9dff);color:#0b1220;min-width:3.4em;}
-  .slbtn.consume{
-    flex:0 0 auto;min-width:2.4em;padding:5px 12px;font-size:16px;line-height:1;
-    background:linear-gradient(135deg,#ffc48a,#ff9a4a);color:#2a1400;
-  }
-  /* 通常スタミナ編集は、ドットアビスの .edit-side-stam と同じ入力寸法・更新位置に統一。 */
-  .slcard.stam-card .sledit{height:56px;padding:10px 12px;}
-  .slcard.stam-card .sledit-current{
-    flex:0 0 42px;width:42px;height:auto;
-    padding:4px 5px;font-size:11.5px;
-  }
-  .slcard.stam-card .slbtn.sync{
-    position:absolute;left:58%;transform:translateX(-50%);
-    height:auto;min-width:0;padding:6px 12px;font-size:11.5px;font-weight:700;letter-spacing:.03em;border-radius:8px;
-  }
-  .slcard.stam-card .slbtn.sync:active{transform:translateX(-50%) translateY(1px);}
-  /* オーブは「全回復まで」の時間だけで現在数と次回復時刻を逆算する。 */
-  /* スターリープ・オーブはv35までのカード幅を保ち、ラベルなしの入力欄と更新ボタンだけを中央に置く。 */
-  .slcard.orb-card .sledit{min-height:42px;justify-content:center;align-items:center;gap:6px;flex-wrap:nowrap;}
-  .slcard.orb-card .sl-orb-full-input{flex:0 0 56px;width:56px;height:28px;padding:4px 4px;font-size:11.5px;text-align:center;}
-  .slcard.orb-card .slbtn.orb-full-sync{flex:0 0 auto;height:28px;min-width:0;padding:5px 9px;font-size:11px;background:linear-gradient(135deg,#8ec5ff,#5b9dff);color:#0b1220;}
-  .slbtn:active{transform:translateY(1px);}
+  .slbar-fill.orb{background:#f2a4b7;}
+  .slbar-fill.orb.full{background:#f2a4b7;}
+  .slbar-fill.full{background:var(--stam-full-c);}
   </style>
 </head>
 <body>
@@ -518,6 +494,8 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 const N = 6;
 const STAM_INTERVAL = 3 * 60 * 1000;
 const IDLE_DEFAULT_CAP_MS = 12 * 3600 * 1000;
+// 確認待ちは短く保ち、連続操作を止めずに自然に元の表示へ戻す。
+const ABYSS_CONFIRM_TIMEOUT_MS = 2000;
 const IDLE_LEAD_MS = 2 * 60 * 1000;
 const URGENT_MS = 2 * 60 * 60 * 1000;
 const STAM_MAX_BASE = 240;
@@ -562,7 +540,7 @@ const SL_ORB_MAX = 4;
 const SL_ORB_INTERVAL = 6 * 60 * 60 * 1000;
 const defaultSLTimer = () => ({ current: 0, start: null, running: false });
 const defaultSLState = () => ({ stamina: defaultSLTimer(), orb: defaultSLTimer() });
-let slOpenType = null;
+let slEdit = null;
 let slRefs = {};
 
 let state = { slots: Array.from({ length: N }, defaultSlot), dailyDate: '', g: { slots: Array.from({ length: GN }, defaultGSlot), dailyDate: '' }, sl: defaultSLState() };
@@ -574,6 +552,7 @@ let tickId = null;
 let resetCheckTimer = null;
 let swRegistrationScheduled = false;
 let armedIdle = {};
+let stamConfirmTimer = null;
 // ドットアビスのスタミナ操作は同時に1枚だけ開けるため、編集状態を単一値で保持する。
 let stamEdit = null;
 // 手入力中に同じタイマーをタップした際、そのタップは確定操作として一度だけ消費する。
@@ -920,6 +899,7 @@ function getLiveStamCurrent(i){
 }
 
 function clearStamEdit(){
+  if (stamConfirmTimer) { clearTimeout(stamConfirmTimer); stamConfirmTimer = null; }
   if (!stamEdit) return;
   const i = stamEdit.index;
   const r = refs[i];
@@ -939,6 +919,12 @@ function beginStamReference(i){
   if (r.card) r.card.classList.add('stam-preview');
   syncIdleConfirmBackdrop();
   render();
+  stamConfirmTimer = setTimeout(() => {
+    if (!stamEdit || stamEdit.index !== i || stamEdit.phase !== DOT_EDIT_PHASE.REFERENCE) return;
+    clearStamEdit();
+    syncIdleConfirmBackdrop();
+    render();
+  }, ABYSS_CONFIRM_TIMEOUT_MS);
 }
 
 // スタミナタイマー領域の長押しで、任意値を空欄から直接入力する。
@@ -1095,35 +1081,26 @@ function cacheRefsG(){
 function buildSL(){
   const wrap = document.getElementById('slwrap');
   if (!wrap) return;
-  const stamina = state.sl.stamina;
-  const orb = state.sl.orb;
   wrap.innerHTML =
     '<div class="slcard stam-card" id="sl-card-stamina" data-slaction="card" data-sltype="stamina">' +
       '<div class="slhead"><span class="slname">スタミナ</span><span class="slbadge">12分 / 1</span></div>' +
       '<div class="sltag">討伐依頼</div>' +
       '<div class="slmain" id="sl-stamina-main">—:—</div>' +
-      '<div class="slsub" id="sl-stamina-sub"></div>' +
+      '<div class="slsub sl-stamina-sub" id="sl-stamina-sub"><span class="sl-stamina-current-display" id="sl-stamina-current-display"></span><input class="sl-inline-field sl-stamina-current-input" id="sl-stamina-current-input" type="text" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" aria-label="現在のスタミナ"><span>/</span><span id="sl-stamina-max-display"></span><span id="sl-stamina-clock"></span></div>' +
       '<div class="slbar"><div class="slbar-fill" id="sl-stamina-bar" style="width:0%"></div></div>' +
-      '<div class="sledit"><input type="text" class="sledit-current" id="sl-stamina-current" value="" inputmode="numeric" pattern="[0-9]*" aria-label="現在のスタミナ">' +
-      '<button type="button" class="slbtn sync" data-slaction="sync" data-sltype="stamina">更新</button></div>' +
     '</div>' +
     '<div class="slcard orb-card" id="sl-card-orb" data-slaction="card" data-sltype="orb">' +
       '<div class="slhead"><span class="slname">御大樹の恵み</span><span class="slbadge">6時間 / 1</span></div>' +
       '<div class="sltag orb">素材収集</div>' +
       '<div class="slmain slorbs" id="sl-orb-main">○○○○</div>' +
-      '<div class="slsub orb-sub"><span class="orb-sub-left" id="sl-orb-sub"></span><span class="orb-full-at" id="sl-orb-full-at"></span></div>' +
+      '<div class="slsub orb-sub"><span class="orb-sub-left" id="sl-orb-next"></span><span class="sl-orb-full-wrap"><span class="sl-orb-full-display" id="sl-orb-full-display"></span><input class="sl-inline-field sl-orb-full-input" id="sl-orb-full-input" type="text" inputmode="numeric" pattern="[0-9:]*" enterkeyhint="done" aria-label="オーブ全回復までの残り時間。18:00、1800、または180000で入力"></span><span class="orb-full-at" id="sl-orb-full-at"></span></div>' +
       '<div class="slbar"><div class="slbar-fill orb" id="sl-orb-bar" style="width:0%"></div></div>' +
-      '<div class="sledit">' +
-      '<input type="text" class="sl-orb-full-input" id="sl-orb-full" placeholder="1800" inputmode="numeric" pattern="[0-9:]*" aria-label="オーブ全回復までの残り時間。18:00または1800で入力" title="全回復までを18:00または1800で入力">' +
-      '<button type="button" class="slbtn orb-full-sync" data-slaction="orb-full-sync" aria-label="全回復時間からオーブ状態を更新">更新</button>' +
-      '</div>' +
     '</div>';
   slRefs = {
-    stamina: { card: document.getElementById('sl-card-stamina'), main: document.getElementById('sl-stamina-main'), sub: document.getElementById('sl-stamina-sub'), bar: document.getElementById('sl-stamina-bar'), input: document.getElementById('sl-stamina-current') },
-    orb: { card: document.getElementById('sl-card-orb'), main: document.getElementById('sl-orb-main'), sub: document.getElementById('sl-orb-sub'), fullAt: document.getElementById('sl-orb-full-at'), bar: document.getElementById('sl-orb-bar'), fullInput: document.getElementById('sl-orb-full') }
+    stamina: { card: document.getElementById('sl-card-stamina'), main: document.getElementById('sl-stamina-main'), current: document.getElementById('sl-stamina-current-display'), max: document.getElementById('sl-stamina-max-display'), clock: document.getElementById('sl-stamina-clock'), bar: document.getElementById('sl-stamina-bar'), input: document.getElementById('sl-stamina-current-input') },
+    orb: { card: document.getElementById('sl-card-orb'), main: document.getElementById('sl-orb-main'), next: document.getElementById('sl-orb-next'), full: document.getElementById('sl-orb-full-display'), fullAt: document.getElementById('sl-orb-full-at'), bar: document.getElementById('sl-orb-bar'), input: document.getElementById('sl-orb-full-input') }
   };
 }
-
 function getSLConfig(type){
   return type === 'orb'
     ? { timer: state.sl.orb, max: SL_ORB_MAX, interval: SL_ORB_INTERVAL }
@@ -1155,32 +1132,35 @@ function formatSLFullRecoveryInput(ms){
 
 function parseSLFullRecoveryInput(value){
   const raw = String(value || '').trim().replace(/：/g, ':');
-  let hours, minutes;
-
+  let hours, minutes, seconds = 0;
   if (raw.includes(':')) {
     const parts = raw.split(':');
-    if (parts.length !== 2) return null;
+    if (parts.length !== 2 && parts.length !== 3) return null;
     hours = Number(parts[0]);
     minutes = Number(parts[1]);
-  } else if (/^\d{1,4}$/.test(raw)) {
-    // 数字のみは末尾2桁を分として扱う。例: 342 → 3時間42分、1800 → 18時間00分。
+    if (parts.length === 3) seconds = Number(parts[2]);
+  } else if (/^\d{1,6}$/.test(raw)) {
+    // 数字のみは、1〜4桁をHMM、5〜6桁をHHMMSSとして読む。
+    // 例: 342 → 3時間42分、1800 → 18時間00分、111150 → 11時間11分50秒。
     if (raw.length <= 2) {
       hours = 0;
       minutes = Number(raw);
-    } else {
+    } else if (raw.length <= 4) {
       hours = Number(raw.slice(0, -2));
       minutes = Number(raw.slice(-2));
+    } else {
+      hours = Number(raw.slice(0, -4));
+      minutes = Number(raw.slice(-4, -2));
+      seconds = Number(raw.slice(-2));
     }
   } else {
     return null;
   }
-
-  if (!Number.isInteger(hours) || !Number.isInteger(minutes) || hours < 0 || minutes < 0 || minutes > 59) return null;
-  const ms = (hours * 60 + minutes) * 60 * 1000;
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes) || !Number.isInteger(seconds) || hours < 0 || minutes < 0 || minutes > 59 || seconds < 0 || seconds > 59) return null;
+  const ms = (hours * 3600 + minutes * 60 + seconds) * 1000;
   if (ms < 0 || ms > SL_ORB_MAX * SL_ORB_INTERVAL) return null;
   return ms;
 }
-
 function placeCaretAtEnd(el){
   requestAnimationFrame(() => {
     try {
@@ -1190,97 +1170,80 @@ function placeCaretAtEnd(el){
   });
 }
 
-function closeSLCard(){
-  slOpenType = null;
+function slClearEdit(){
+  if (!slEdit) return;
   Object.keys(slRefs).forEach(key => {
-    if (slRefs[key] && slRefs[key].card) slRefs[key].card.classList.remove('open');
+    const r = slRefs[key];
+    if (!r || !r.card) return;
+    r.card.classList.remove('sl-inline-active', 'sl-inline-current', 'sl-inline-orb');
+    if (r.input) r.input.value = '';
   });
+  slEdit = null;
   syncIdleConfirmBackdrop();
 }
-
-function toggleSLCard(type){
-  if (slOpenType === type) {
-    closeSLCard();
-    return;
-  }
-  slOpenType = type;
-  const cfg = getSLConfig(type);
-  const live = normalizeSLTimer(type, Date.now());
-  if (slRefs[type] && slRefs[type].input) {
-    const input = slRefs[type].input;
-    input.dataset.prev = String(live.current);
-    input.value = String(live.current); // Gジェネと同じく、開いた直後は現在値を表示する。
-  }
-  if (type === 'orb' && slRefs.orb && slRefs.orb.fullInput) {
-    const fullIn = live.isFull ? 0 : (cfg.timer.running ? live.fullIn : null);
-    slRefs.orb.fullInput.value = fullIn == null ? '' : formatSLFullRecoveryInput(fullIn);
-    slRefs.orb.fullInput.dataset.prev = slRefs.orb.fullInput.value;
-  }
-  Object.keys(slRefs).forEach(key => {
-    if (slRefs[key] && slRefs[key].card) slRefs[key].card.classList.toggle('open', slOpenType === key);
-  });
-  const bd = document.getElementById('backdrop');
-  if (bd) bd.classList.add('show');
+function closeSLCard(){ slClearEdit(); }
+function slArm(type){
+  if (slEdit) { slClearEdit(); return; }
+  const r = slRefs[type];
+  if (!r || !r.card) return;
+  slEdit = { type, mode: 'armed' };
+  r.card.classList.add('sl-inline-active');
+  syncIdleConfirmBackdrop();
 }
-
-function syncSL(type){
-  const cfg = getSLConfig(type);
-  const input = slRefs[type] && slRefs[type].input;
-  const raw = (input && input.value != null) ? String(input.value).trim() : '';
-  let parsed;
-  if (raw === '') {
-    const prev = parseInt(input && input.dataset.prev, 10);
-    parsed = Number.isFinite(prev) ? prev : cfg.timer.current;
-  } else {
-    parsed = parseInt(raw, 10);
-  }
-  if (!Number.isFinite(parsed)) parsed = cfg.timer.current;
-  const value = Math.max(0, Math.min(cfg.max, parsed));
-  cfg.timer.current = value;
-  cfg.timer.running = value < cfg.max;
-  cfg.timer.start = cfg.timer.running ? Date.now() : null;
-  saveState();
-  renderSL();
-  if (input) input.value = String(value);
-  closeSLCard();
-  startTicking();
+function slBeginEdit(type){
+  if (slEdit) slClearEdit();
+  const r = slRefs[type];
+  if (!r || !r.card || !r.input) return;
+  slEdit = { type, mode: 'input' };
+  r.card.classList.add('sl-inline-active', type === 'orb' ? 'sl-inline-orb' : 'sl-inline-current');
+  r.input.value = '';
+  syncIdleConfirmBackdrop();
+  // ドットアビス／Gジェネと同じ共通フォーカス補助を使い、端末差なく入力位置を整える。
+  focusEditAtEnd(r.input);
 }
-
-function syncSLOrbFullRecovery(){
-  const cfg = getSLConfig('orb');
-  const input = slRefs.orb && slRefs.orb.fullInput;
-  const raw = (input && input.value != null) ? String(input.value).trim() : '';
-  let fullIn = parseSLFullRecoveryInput(raw);
-  if (fullIn === null && raw === '' && input && input.dataset.prev != null) {
-    fullIn = parseSLFullRecoveryInput(input.dataset.prev);
-  }
-  if (fullIn === null) return;
-
+function slCommit(){
+  if (!slEdit || slEdit.mode !== 'input') return;
+  const type = slEdit.type;
+  const cfg = getSLConfig(type);
+  const r = slRefs[type];
+  const raw = r && r.input ? String(r.input.value || '').trim() : '';
   const now = Date.now();
-  const missing = fullIn === 0 ? 0 : Math.ceil(fullIn / cfg.interval);
-  const current = cfg.max - missing;
-  const nextIn = fullIn === 0 ? 0 : fullIn - (missing - 1) * cfg.interval;
-
-  cfg.timer.current = current;
-  if (current >= cfg.max) {
-    cfg.timer.running = false;
-    cfg.timer.start = null;
+  let changed = false;
+  if (type === 'stamina') {
+    const value = clampInt(raw, 0, cfg.max, null);
+    if (value !== null) {
+      cfg.timer.current = value;
+      cfg.timer.running = value < cfg.max;
+      cfg.timer.start = cfg.timer.running ? now : null;
+      changed = true;
+    }
   } else {
-    cfg.timer.running = true;
-    // 次の1個までの残り時間から、直列回復の開始時刻を復元する。
-    cfg.timer.start = now - (cfg.interval - nextIn);
+    const fullIn = parseSLFullRecoveryInput(raw);
+    if (fullIn !== null) {
+      const missing = fullIn === 0 ? 0 : Math.ceil(fullIn / cfg.interval);
+      const current = cfg.max - missing;
+      const nextIn = fullIn === 0 ? 0 : fullIn - (missing - 1) * cfg.interval;
+      cfg.timer.current = current;
+      if (current >= cfg.max) {
+        cfg.timer.running = false;
+        cfg.timer.start = null;
+      } else {
+        cfg.timer.running = true;
+        cfg.timer.start = now - (cfg.interval - nextIn);
+      }
+      changed = true;
+    }
   }
-
-  saveState();
+  slClearEdit();
+  if (changed) saveState();
   renderSL();
-  if (input) {
-    input.value = formatSLFullRecoveryInput(fullIn);
-    input.dataset.prev = input.value;
-  }
-  closeSLCard();
-  startTicking();
+  if (changed) startTicking();
 }
-
+function slCommitOutside(){
+  if (!slEdit) return;
+  if (slEdit.mode === 'armed') slClearEdit();
+  else slCommit();
+}
 function renderSL(){
   if (!slRefs.stamina || !slRefs.orb) return;
   const now = Date.now();
@@ -1291,66 +1254,52 @@ function renderSL(){
 
   setText(slRefs.stamina.main, stamina.isFull ? 'MAX' : (stamCfg.timer.running ? formatTime(stamina.fullIn) : '—:—'));
   setClass(slRefs.stamina.main, 'slmain' + (stamina.isFull ? ' full' : ''));
-  setText(slRefs.stamina.sub, stamina.current + '/' + SL_STAM_MAX + (stamina.fullAt ? '　' + formatClock(stamina.fullAt) + (stamina.isFull ? ' 到達' : '') : ''));
+  setText(slRefs.stamina.current, String(stamina.current));
+  setText(slRefs.stamina.max, String(SL_STAM_MAX));
+  setText(slRefs.stamina.clock, stamina.fullAt ? '　' + formatClock(stamina.fullAt) + (stamina.isFull ? ' 到達' : '') : '');
   setWidth(slRefs.stamina.bar, stamina.pct);
   setClass(slRefs.stamina.bar, 'slbar-fill' + (stamina.isFull ? ' full' : ''));
 
   const filled = '●'.repeat(orb.current) + '○'.repeat(SL_ORB_MAX - orb.current);
   setText(slRefs.orb.main, filled);
   setClass(slRefs.orb.main, 'slmain slorbs' + (orb.isFull ? ' full' : ''));
-  const orbText = orb.isFull ? '4/4　満タン' : (orbCfg.timer.running ? '次 ' + formatFixedDuration(orb.nextIn) + '　全 ' + formatFixedDuration(orb.fullIn) : orb.current + '/4　未開始');
-  const orbFullAtText = (!orb.isFull && orbCfg.timer.running && orb.fullAt) ? formatClock(orb.fullAt) : '';
-  setText(slRefs.orb.sub, orbText);
-  setText(slRefs.orb.fullAt, orbFullAtText);
+  setText(slRefs.orb.next, orb.isFull ? '4/4　満タン' : (orbCfg.timer.running ? '次 ' + formatFixedDuration(orb.nextIn) : orb.current + '/4　未開始'));
+  setText(slRefs.orb.full, (!orb.isFull && orbCfg.timer.running) ? '全 ' + formatFixedDuration(orb.fullIn) : '');
+  setText(slRefs.orb.fullAt, (!orb.isFull && orbCfg.timer.running && orb.fullAt) ? formatClock(orb.fullAt) : '');
   setWidth(slRefs.orb.bar, orb.pct);
   setClass(slRefs.orb.bar, 'slbar-fill orb' + (orb.isFull ? ' full' : ''));
 }
-
 function setupSLDelegatedEvents(){
   const wrap = document.getElementById('slwrap');
   if (!wrap || wrap.dataset.delegated) return;
   wrap.dataset.delegated = '1';
   wrap.addEventListener('click', (ev) => {
-    const el = ev.target.closest('[data-slaction]');
-    if (!el) return;
-    const action = el.dataset.slaction;
-    const type = el.dataset.sltype;
-    if (action === 'card') {
-      // 編集パネル内部の余白・入力欄は、カードを閉じる対象にしない。
-      if (ev.target.closest('.sledit')) return;
-      toggleSLCard(type);
-    } else if (action === 'sync') {
-      syncSL(type);
-    } else if (action === 'orb-full-sync') {
-      syncSLOrbFullRecovery();
-    }
-  });
-  wrap.addEventListener('keydown', (ev) => {
-    if (ev.key === 'Enter' && ev.target && ev.target.id === 'sl-orb-full') {
-      ev.preventDefault();
-      syncSLOrbFullRecovery();
-    }
-  });
-  wrap.addEventListener('focusin', (ev) => {
-    const input = ev.target;
-    if (!input || input.tagName !== 'INPUT') return;
-    // 現在値欄・オーブ全回復時間欄はフォーカスでブランク（入力しやすく）。
-    if (input.classList && (input.classList.contains('sledit-current') || input.id === 'sl-orb-full')) {
-      if (input.value !== '') input.dataset.prev = input.value;
-      input.value = '';
-      return;
-    }
-    placeCaretAtEnd(input);
+    const target = ev.target;
+    if (target.closest && target.closest('input')) return;
+    const card = target.closest && target.closest('.slcard');
+    if (!card) return;
+    const type = card.dataset.sltype;
+    if (slEdit && slEdit.type === type && slEdit.mode === 'armed') { slBeginEdit(type); return; }
+    if (slEdit) return;
+    slArm(type);
   });
   wrap.addEventListener('focusout', (ev) => {
     const input = ev.target;
-    if (!input || !input.classList || (!input.classList.contains('sledit-current') && input.id !== 'sl-orb-full')) return;
-    if (String(input.value).trim() === '' && input.dataset.prev != null) {
-      input.value = input.dataset.prev;
-    }
+    if (!input || !input.id || (input.id !== 'sl-stamina-current-input' && input.id !== 'sl-orb-full-input')) return;
+    slCommit();
+  });
+  wrap.addEventListener('keydown', (ev) => {
+    const input = ev.target;
+    if (!input || !input.id || (input.id !== 'sl-stamina-current-input' && input.id !== 'sl-orb-full-input')) return;
+    if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); }
+    else if (ev.key === 'Escape') { ev.preventDefault(); input.value = ''; input.blur(); }
+  });
+  document.addEventListener('click', (ev) => {
+    if (!slEdit) return;
+    if (ev.target && ev.target.closest && ev.target.closest('.slcard')) return;
+    slCommitOutside();
   });
 }
-
 function cacheRefs(){
   refs = [];
   for (let i = 0; i < N; i++) {
@@ -1450,7 +1399,7 @@ function closeAllPanels(){
   resolveStamEditFromOutside();
   disarmAllIdle();
   if (typeof gCommitOutside === 'function') gCommitOutside();
-  closeSLCard();
+  slCommitOutside();
   syncIdleConfirmBackdrop();
   softBlur();
 }
@@ -1503,7 +1452,7 @@ function switchGameTab(tab){
 
   // 非表示になる編集欄を閉じ、重ね表示や入力フォーカスを残さない。
   if (typeof gCommitOutside === 'function') gCommitOutside();
-  closeSLCard();
+  slCommitOutside();
   softBlur();
   syncIdleConfirmBackdrop();
 
@@ -1826,7 +1775,7 @@ function syncIdleConfirmBackdrop(){
   if (!bd) return;
   const hasStamEdit = !!stamEdit;
   const hasGEdit = typeof gEdit !== 'undefined' && !!gEdit;
-  const hasSLEdit = !!slOpenType;
+  const hasSLEdit = !!slEdit;
   if (hasStamEdit || hasGEdit || hasSLEdit) {
     bd.classList.add('show');
     bd.classList.remove('idle-confirm');
@@ -1843,8 +1792,9 @@ function updateIdleReceiveVisual(i, armed){
   if (!block || !val || !sub) return;
   block.classList.toggle('receive-armed', armed);
   if (armed) {
-    // 派手な動きは使わず、受取待機だけを静かな文字変更で示す。
-    setText(val, '受取');
+    // 残りタイマーは隠さず、強調色と操作案内だけで受取待機を示す。
+    const idle = getIdleInfo(state.slots[i], Date.now());
+    setText(val, idle.display);
     setText(sub, '長押しで受取');
   }
   syncIdleConfirmBackdrop();
@@ -1895,7 +1845,7 @@ function onIdleTimerTap(i){
     delete armedIdle[i];
     updateIdleReceiveVisual(i, false);
     render();
-  }, 4000);
+  }, ABYSS_CONFIRM_TIMEOUT_MS);
   syncIdleConfirmBackdrop();
 }
 
@@ -1963,8 +1913,8 @@ function render(){
       else if (s.idleRunning && idle.remainingMs != null && idle.remainingMs < URGENT_MS) idleCls += ' urgent';
       const idleArmed = Object.prototype.hasOwnProperty.call(armedIdle, i);
       if (idleArmed) {
-        // 受取待機中は毎秒描画でも静かな確認表示を維持する。
-        setText(r.idleVal, '受取');
+        // 受取待機中も残りタイマーを維持し、色と操作案内だけを変える。
+        setText(r.idleVal, idle.display);
         setText(r.idleSub, '長押しで受取');
       } else {
         setText(r.idleVal, idle.display);
