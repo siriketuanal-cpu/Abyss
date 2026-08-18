@@ -22,8 +22,11 @@
   --reach-g:#6fe8ff;
   --reach-sl:#b9aaff;
   --reach-orb:#f2a4b7;
-  /* 未到達時の小さい予定時刻はゲームをまたいで同じ柔らかな色に統一する。 */
+  /* 小さい予定時刻はゲームをまたいで同じ柔らかな色に統一する。 */
   --reach-plan:#c9b8ff;
+  /* オーブは次回（ラベンダー）と全回復予定（桜色）を役割別に区別する。 */
+  --orb-next:#c9b8ff;
+  --orb-full:#f2a4b7;
   --g0:#7c5fd6; --g1:#5b9dff; --g2:#8fa3c4;
   --stam-cur-c:#6fe8ff; --idle-c:#ffd166;
 }
@@ -446,13 +449,15 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   .slorbs{letter-spacing:2px;color:var(--reach-orb);font-size:16px;}
   .slorbs.full{color:var(--reach-orb);}
   .orb-sub-left.reached{color:var(--reach-orb);font-weight:800;}
-  .slsub{height:13px;margin-top:1px;font-size:9.5px;color:#c9b8ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums;}
+  .slsub{height:13px;margin-top:1px;font-size:9.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums;}
   .slsub.sl-stamina-sub{position:relative;overflow:visible;text-overflow:clip;}
   .slsub.orb-sub{display:flex;align-items:center;gap:4px;overflow:visible;text-overflow:clip;}
-  .orb-sub-left{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .orb-sub-left{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--orb-next);font-weight:700;}
   .sl-orb-full-wrap{display:inline-flex;align-items:center;gap:1px;white-space:nowrap;}
-  .orb-full-at{margin-left:auto;color:var(--reach-plan);font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums;}
-  #sl-stamina-clock{color:var(--reach-plan);font-weight:700;}
+  .orb-full-at{margin-left:auto;color:var(--orb-full);font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums;}
+  #sl-stamina-clock{color:var(--reach-plan);font-weight:700;margin-left:3px;}
+  .sl-stamina-sep{font-weight:600;color:var(--ink-dim);margin:0 1px;}
+  .sl-stamina-max-display{display:inline-block;width:3ch;font-weight:700;color:var(--stam-cur-c);font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;}
   .sl-inline-field:not(.sl-stamina-current-input){display:none;box-sizing:border-box;height:16px;background:var(--bg-inset);border:1px solid #4a5a78;border-radius:4px;color:var(--ink);padding:0 3px;font-size:10px;line-height:14px;font-family:inherit;text-align:center;vertical-align:baseline;outline:none;}
   .sl-stamina-current-display{display:inline-block;width:3ch;font-weight:700;color:#ffb35e;font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;}
   .slcard.sl-inline-current .sl-stamina-current-display{visibility:hidden;}
@@ -628,8 +633,8 @@ function formatClock(ts){
   const d = new Date(ts);
   return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
 }
-// 未到達の小さい予定表示と、到達後の主表示で同じ時刻＋到達の語法を使う。
-function formatReachLabel(ts){ return ts ? (formatClock(ts) + ' 到達') : ''; }
+// 小さい予定表示は時刻だけにし、到達後の主表示だけに「到達」を付ける。
+function formatPlanClock(ts){ return ts ? formatClock(ts) : ''; }
 function formatFixedDuration(ms){
   ms = Math.max(0, safeNum(ms, 0));
   const totalSeconds = Math.floor(ms / 1000);
@@ -1132,7 +1137,7 @@ function buildSL(){
       '<div class="slhead"><span class="slname">スタミナ</span><span class="slbadge">12分 / 1</span></div>' +
       '<div class="sltag">討伐依頼</div>' +
       '<div class="slmain" id="sl-stamina-main">—:—</div>' +
-      '<div class="slsub sl-stamina-sub" id="sl-stamina-sub"><span class="sl-stamina-current-display" id="sl-stamina-current-display"></span><input class="sl-inline-field sl-stamina-current-input" id="sl-stamina-current-input" type="text" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" aria-label="現在のスタミナ"><span>/</span><span id="sl-stamina-max-display"></span><span id="sl-stamina-clock"></span></div>' +
+      '<div class="slsub sl-stamina-sub" id="sl-stamina-sub"><span class="sl-stamina-current-display" id="sl-stamina-current-display"></span><input class="sl-inline-field sl-stamina-current-input" id="sl-stamina-current-input" type="text" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" aria-label="現在のスタミナ"><span class="sl-stamina-sep">/</span><span class="sl-stamina-max-display" id="sl-stamina-max-display"></span><span id="sl-stamina-clock"></span></div>' +
       '<div class="slbar"><div class="slbar-fill" id="sl-stamina-bar" style="width:0%"></div></div>' +
     '</div>' +
     '<div class="slcard orb-card" id="sl-card-orb" data-slaction="card" data-sltype="orb">' +
@@ -1299,7 +1304,7 @@ function renderSL(){
   setClass(slRefs.stamina.main, 'slmain' + (stamina.isFull ? ' reached' : ''));
   setText(slRefs.stamina.current, String(stamina.current));
   setText(slRefs.stamina.max, String(SL_STAM_MAX));
-  setText(slRefs.stamina.clock, stamina.isFull ? '' : (stamina.fullAt ? '　' + formatReachLabel(stamina.fullAt) : ''));
+  setText(slRefs.stamina.clock, stamina.isFull ? '' : (stamina.fullAt ? '　' + formatPlanClock(stamina.fullAt) : ''));
   setWidth(slRefs.stamina.bar, stamina.pct);
   setClass(slRefs.stamina.bar, 'slbar-fill' + (stamina.isFull ? ' full' : ''));
 
@@ -1308,8 +1313,8 @@ function renderSL(){
   setClass(slRefs.orb.main, 'slmain slorbs' + (orb.isFull ? ' full' : ''));
   setText(slRefs.orb.next, orb.isFull ? (orb.fullAt ? (formatClock(orb.fullAt) + ' 到達') : '到達') : (orbCfg.timer.running ? '次 ' + formatGameMinute(orb.nextIn) : orb.current + '/4　未開始'));
   setClass(slRefs.orb.next, 'orb-sub-left' + (orb.isFull ? ' reached' : ''));
-  setText(slRefs.orb.full, (!orb.isFull && orbCfg.timer.running) ? '全 ' + formatGameMinute(orb.fullIn) : '');
-  setText(slRefs.orb.fullAt, (!orb.isFull && orbCfg.timer.running && orb.fullAt) ? formatReachLabel(orb.fullAt) : '');
+  setText(slRefs.orb.full, '');
+  setText(slRefs.orb.fullAt, (!orb.isFull && orbCfg.timer.running && orb.fullAt) ? ('全 ' + formatPlanClock(orb.fullAt)) : '');
   setWidth(slRefs.orb.bar, orb.pct);
   setClass(slRefs.orb.bar, 'slbar-fill orb' + (orb.isFull ? ' full' : ''));
 }
@@ -1964,7 +1969,7 @@ function render(){
           stamMain = formatTime(stam.fullIn);
           stamCls = 'tval stam' + (stamUrgent ? ' urgent' : '');
           stamCurTxt = String(stam.current); stamMaxTxt = String(s.stamMax);
-          stamClockTxt = formatReachLabel(stam.fullAt); stamClockSuffix = '';
+          stamClockTxt = formatPlanClock(stam.fullAt); stamClockSuffix = '';
           stamBarCls = 'pbar-fill stam';
         }
       } else {
@@ -2001,7 +2006,7 @@ function render(){
           if (idle.isFull) {
             setClockParts(r.idleSubClockTime, r.idleSubClockSuffix, '', '');
           } else if (idle.clockTxt) {
-            setClockParts(r.idleSubClockTime, r.idleSubClockSuffix, idle.clockTxt + ' 到達', '');
+            setClockParts(r.idleSubClockTime, r.idleSubClockSuffix, idle.clockTxt, '');
           } else {
             setClockParts(r.idleSubClockTime, r.idleSubClockSuffix, '', idle.meta);
           }
@@ -2052,7 +2057,7 @@ function renderG(){
           main = formatGameMinute(stam.fullIn);
           cls = 'gval';
           curTxt = String(stam.current); maxTxt = String(s.stamMax);
-          clockTxt = formatReachLabel(stam.fullAt);
+          clockTxt = formatPlanClock(stam.fullAt);
           barCls = 'gbar-fill';
         }
       } else {
