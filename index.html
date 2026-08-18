@@ -458,6 +458,16 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   .slbar-fill.orb{background:#f2a4b7;}
   .slbar-fill.orb.full{background:#f2a4b7;}
   .slbar-fill.full{background:var(--stam-full-c);}
+
+  /* 数値インライン入力の共通基準。キャレットの高さ・太さは文字サイズと行高に従うため、全タイマーで同じ値へ揃える。 */
+  .tsub-cur-input,.g-inline-field,.sl-stamina-current-input,.sl-inline-field.sl-orb-full-input{
+    font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;
+    font-size:10px;line-height:11px;font-weight:700;caret-color:currentColor;outline:none;
+  }
+  /* 現在値・上限値は数字の高さに合わせた11pxの枠なし部分置換に統一する。 */
+  .tsub-cur-input,.g-inline-field,.sl-stamina-current-input{height:11px;top:1px;}
+  /* オーブは時間入力の幅を保ちつつ、文字とキャレットの基準線だけ共通化する。 */
+  .sl-inline-field.sl-orb-full-input{height:14px;line-height:11px;}
   </style>
 </head>
 <body>
