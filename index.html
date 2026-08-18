@@ -625,6 +625,14 @@ function formatFixedDuration(ms){
   const seconds = totalSeconds % 60;
   return String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
 }
+// Gジェネ・スターリープの分単位表示用。残り時間を過小に見せないよう切り上げる。
+function formatGameMinute(ms){
+  ms = Math.max(0, safeNum(ms, 0));
+  const totalMinutes = Math.max(1, Math.ceil(ms / 60000));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return hours + ':' + String(minutes).padStart(2, '0');
+}
 function escapeHtml(s){
   return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
@@ -1118,7 +1126,7 @@ function buildSL(){
       '<div class="slhead"><span class="slname">御大樹の恵み</span><span class="slbadge">6時間 / 1</span></div>' +
       '<div class="sltag orb">素材収集</div>' +
       '<div class="slmain slorbs" id="sl-orb-main">○○○○</div>' +
-      '<div class="slsub orb-sub"><span class="orb-sub-left" id="sl-orb-next"></span><span class="sl-orb-full-wrap"><span class="sl-orb-full-display" id="sl-orb-full-display"></span><input class="sl-inline-field sl-orb-full-input" id="sl-orb-full-input" type="text" inputmode="numeric" pattern="[0-9:]*" enterkeyhint="done" aria-label="オーブ全回復までの残り時間。18:00、1800、または180000で入力"></span><span class="orb-full-at" id="sl-orb-full-at"></span></div>' +
+      '<div class="slsub orb-sub"><span class="orb-sub-left" id="sl-orb-next"></span><span class="sl-orb-full-wrap"><span class="sl-orb-full-display" id="sl-orb-full-display"></span><input class="sl-inline-field sl-orb-full-input" id="sl-orb-full-input" type="text" inputmode="numeric" pattern="[0-9:]*" enterkeyhint="done" aria-label="オーブ全回復までの残り時間。数字は4桁まで。342、1800、または18:00で入力"></span><span class="orb-full-at" id="sl-orb-full-at"></span></div>' +
       '<div class="slbar"><div class="slbar-fill orb" id="sl-orb-bar" style="width:0%"></div></div>' +
     '</div>';
   slRefs = {
@@ -1157,32 +1165,29 @@ function formatSLFullRecoveryInput(ms){
 
 function parseSLFullRecoveryInput(value){
   const raw = String(value || '').trim().replace(/：/g, ':');
-  let hours, minutes, seconds = 0;
+  let hours, minutes;
   if (raw.includes(':')) {
     const parts = raw.split(':');
-    if (parts.length !== 2 && parts.length !== 3) return null;
+    // H:MMのみを許容し、秒を含むH:MM:SSは受け付けない。
+    if (parts.length !== 2 || parts.some(p => !/^\d+$/.test(p))) return null;
     hours = Number(parts[0]);
     minutes = Number(parts[1]);
-    if (parts.length === 3) seconds = Number(parts[2]);
-  } else if (/^\d{1,6}$/.test(raw)) {
-    // 数字のみは、1〜4桁をHMM、5〜6桁をHHMMSSとして読む。
-    // 例: 342 → 3時間42分、1800 → 18時間00分、111150 → 11時間11分50秒。
+  } else if (/^\d+$/.test(raw)) {
+    // 数字のみは1〜2桁を分、3桁以上をHMM/HHMMとして読む。
+    // 入力欄側で数字を4桁に打ち止めるため、ここでは重複した桁数拒否を持たない。
+    // 例: 42 → 42分、342 → 3時間42分、1800 → 18時間00分。
     if (raw.length <= 2) {
       hours = 0;
       minutes = Number(raw);
-    } else if (raw.length <= 4) {
+    } else {
       hours = Number(raw.slice(0, -2));
       minutes = Number(raw.slice(-2));
-    } else {
-      hours = Number(raw.slice(0, -4));
-      minutes = Number(raw.slice(-4, -2));
-      seconds = Number(raw.slice(-2));
     }
   } else {
     return null;
   }
-  if (!Number.isInteger(hours) || !Number.isInteger(minutes) || !Number.isInteger(seconds) || hours < 0 || minutes < 0 || minutes > 59 || seconds < 0 || seconds > 59) return null;
-  const ms = (hours * 3600 + minutes * 60 + seconds) * 1000;
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes) || hours < 0 || minutes < 0 || minutes > 59) return null;
+  const ms = (hours * 3600 + minutes * 60) * 1000;
   if (ms < 0 || ms > SL_ORB_MAX * SL_ORB_INTERVAL) return null;
   return ms;
 }
@@ -1277,7 +1282,7 @@ function renderSL(){
   const stamina = getSLTimerInfo(stamCfg.timer, stamCfg.max, stamCfg.interval, now);
   const orb = getSLTimerInfo(orbCfg.timer, orbCfg.max, orbCfg.interval, now);
 
-  setText(slRefs.stamina.main, stamina.isFull ? 'MAX' : (stamCfg.timer.running ? formatTime(stamina.fullIn) : '—:—'));
+  setText(slRefs.stamina.main, stamina.isFull ? 'MAX' : (stamCfg.timer.running ? formatGameMinute(stamina.fullIn) : '—:—'));
   setClass(slRefs.stamina.main, 'slmain' + (stamina.isFull ? ' full' : ''));
   setText(slRefs.stamina.current, String(stamina.current));
   setText(slRefs.stamina.max, String(SL_STAM_MAX));
@@ -1288,8 +1293,8 @@ function renderSL(){
   const filled = '●'.repeat(orb.current) + '○'.repeat(SL_ORB_MAX - orb.current);
   setText(slRefs.orb.main, filled);
   setClass(slRefs.orb.main, 'slmain slorbs' + (orb.isFull ? ' full' : ''));
-  setText(slRefs.orb.next, orb.isFull ? '4/4　満タン' : (orbCfg.timer.running ? '次 ' + formatFixedDuration(orb.nextIn) : orb.current + '/4　未開始'));
-  setText(slRefs.orb.full, (!orb.isFull && orbCfg.timer.running) ? '全 ' + formatFixedDuration(orb.fullIn) : '');
+  setText(slRefs.orb.next, orb.isFull ? '4/4　満タン' : (orbCfg.timer.running ? '次 ' + formatGameMinute(orb.nextIn) : orb.current + '/4　未開始'));
+  setText(slRefs.orb.full, (!orb.isFull && orbCfg.timer.running) ? '全 ' + formatGameMinute(orb.fullIn) : '');
   setText(slRefs.orb.fullAt, (!orb.isFull && orbCfg.timer.running && orb.fullAt) ? formatClock(orb.fullAt) : '');
   setWidth(slRefs.orb.bar, orb.pct);
   setClass(slRefs.orb.bar, 'slbar-fill orb' + (orb.isFull ? ' full' : ''));
@@ -1307,6 +1312,26 @@ function setupSLDelegatedEvents(){
     if (slEdit && slEdit.type === type && slEdit.mode === 'armed') { slBeginEdit(type); return; }
     if (slEdit) return;
     slArm(type);
+  });
+  // 数字を4桁で打ち止めにする。H:MMのコロンは数字数に含めない。
+  // キー入力と貼り付けの双方で同じ制限を適用し、5桁・6桁の確定時拒否を不要にする。
+  wrap.addEventListener('input', (ev) => {
+    const input = ev.target;
+    if (!input || input.id !== 'sl-orb-full-input') return;
+    const raw = String(input.value || '');
+    let digits = 0;
+    let next = '';
+    for (const ch of raw) {
+      if (/^\d$/.test(ch)) {
+        if (digits < 4) { next += ch; digits += 1; }
+      } else if (ch === ':' && !next.includes(':')) {
+        next += ch;
+      }
+    }
+    if (next !== raw) {
+      input.value = next;
+      input.setSelectionRange(next.length, next.length);
+    }
   });
   wrap.addEventListener('focusout', (ev) => {
     const input = ev.target;
@@ -1447,6 +1472,9 @@ function closeAllPanels(){
 
 // ---- テスト用: ドットアビスのグループタブ ----
 let activeAbyssGroup = 'g0';
+// 非表示タブの目安は分単位で同期し、タブ切替時だけ即時同期する。
+let abyssTabMinuteKey = '';
+let forceAbyssTabRefresh = true;
 
 function switchAbyssGroup(group){
   if (!['g0', 'g1', 'g2'].includes(group) || group === activeAbyssGroup) return;
@@ -1462,6 +1490,9 @@ function switchAbyssGroup(group){
     tab.classList.toggle('active', selected);
     setAttr(tab, 'aria-selected', selected);
   });
+  // 新たに非表示となるタブの目安も含め、切替直後は実時刻から即時同期する。
+  forceAbyssTabRefresh = true;
+  render();
 }
 
 function setupAbyssTabs(){
@@ -1474,15 +1505,30 @@ function setupAbyssTabs(){
   });
 }
 
-function renderAbyssTabIdle(shortestByGroup, stamUrgentByGroup, idleUrgentByGroup){
+function formatAbyssTabMinute(remainingMs){
+  if (remainingMs == null) return '';
+  if (remainingMs <= 0) return 'MAX';
+  const totalMinutes = Math.max(1, Math.ceil(remainingMs / 60000));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return hours + ':' + String(minutes).padStart(2, '0');
+}
+function renderAbyssTabIdle(shortestByGroup, stamUrgentByGroup, idleUrgentByGroup, updateInactiveTabs){
   ['g0', 'g1', 'g2'].forEach((group) => {
+    const isActive = group === activeAbyssGroup;
     const shortest = shortestByGroup[group];
     const hasTimer = shortest !== undefined;
-    const timeText = hasTimer ? (shortest <= 0 ? 'MAX' : formatTime(shortest)) : '';
-    setText(document.getElementById('abyss-idle-time-' + group), timeText);
-    setText(document.getElementById('abyss-idle-status-' + group), hasTimer ? '' : '未開始');
     const tab = document.querySelector('[data-abyss-group="' + group + '"]');
-    if (tab) {
+    if (isActive) {
+      // 表示中のグループはカード本体が正確な秒表示を担うため、タブの重複目安は消す。
+      setText(document.getElementById('abyss-idle-time-' + group), '');
+      setText(document.getElementById('abyss-idle-status-' + group), '');
+    } else if (updateInactiveTabs) {
+      // 非表示タブは分単位の目安に抑え、切替時には即時同期する。
+      setText(document.getElementById('abyss-idle-time-' + group), hasTimer ? formatAbyssTabMinute(shortest) : '');
+      setText(document.getElementById('abyss-idle-status-' + group), hasTimer ? '' : '未開始');
+    }
+    if (tab && (isActive || updateInactiveTabs)) {
       tab.classList.toggle('urgent', !!stamUrgentByGroup[group]);
       tab.classList.toggle('idle-urgent', !!idleUrgentByGroup[group]);
     }
@@ -1491,6 +1537,9 @@ function renderAbyssTabIdle(shortestByGroup, stamUrgentByGroup, idleUrgentByGrou
 
 // ---- テスト用ゲームタブ ----
 let activeGameTab = 'g';
+// ゲームタブは分単位で描画し、非表示側はタブ切替時だけ即時同期する。
+let gameTabMinuteKey = '';
+let forceGameTabRefresh = true;
 
 function switchGameTab(tab){
   if (tab !== 'g' && tab !== 'sl') return;
@@ -1510,6 +1559,8 @@ function switchGameTab(tab){
   if (slPanel) { slPanel.classList.toggle('active', !isG); slPanel.hidden = isG; }
   if (gTab) { gTab.classList.toggle('active', isG); setAttr(gTab, 'aria-selected', isG); }
   if (slTab) { slTab.classList.toggle('active', !isG); setAttr(slTab, 'aria-selected', !isG); }
+  forceGameTabRefresh = true;
+  render();
 }
 
 function setupGameTabs(){
@@ -1887,6 +1938,7 @@ function render(){
           abyssTabShortest[group] = idle.remainingMs;
         }
       }
+      const renderVisibleCard = group === activeAbyssGroup;
       let stamMain, stamCls, stamCurTxt, stamMaxTxt, stamClockTxt, stamClockSuffix, stamBarCls;
       if (s.stamRunning) {
         if (stam.isFull) {
@@ -1914,35 +1966,50 @@ function render(){
           stamClockSuffix = '';
         }
       }
-      setText(r.stamVal, stamMain); setClass(r.stamVal, stamCls);
-      setText(r.stamSubCur, stamCurTxt);
-      setText(r.stamSubMax, stamMaxTxt);
-      setClockParts(r.stamSubClockTime, r.stamSubClockSuffix, stamClockTxt, stamClockSuffix);
-      setWidth(r.stamBar, stam.pct); setClass(r.stamBar, stamBarCls);
-      let idleCls = 'tval idle';
-      if (idle.isFull) idleCls += ' full';
-      else if (idleAlertClass) idleCls += ' ' + idleAlertClass;
-      const idleArmed = Object.prototype.hasOwnProperty.call(armedIdle, i);
-      if (idleArmed) {
-        // 受取待機中も残りタイマーを維持し、色と操作案内だけを変える。
-        setText(r.idleVal, idle.display);
-        setClockParts(r.idleSubClockTime, r.idleSubClockSuffix, '', 'もう一度タップで受取');
-      } else {
-        setText(r.idleVal, idle.display);
-        if (idle.clockTxt) {
-          setClockParts(r.idleSubClockTime, r.idleSubClockSuffix, idle.clockTxt, idle.suffix);
+      // DOM更新は表示中の2枚だけに集中する。非表示カードはタブ切替時に即時追従する。
+      if (renderVisibleCard) {
+        setText(r.stamVal, stamMain); setClass(r.stamVal, stamCls);
+        setText(r.stamSubCur, stamCurTxt);
+        setText(r.stamSubMax, stamMaxTxt);
+        setClockParts(r.stamSubClockTime, r.stamSubClockSuffix, stamClockTxt, stamClockSuffix);
+        setWidth(r.stamBar, stam.pct); setClass(r.stamBar, stamBarCls);
+        let idleCls = 'tval idle';
+        if (idle.isFull) idleCls += ' full';
+        else if (idleAlertClass) idleCls += ' ' + idleAlertClass;
+        const idleArmed = Object.prototype.hasOwnProperty.call(armedIdle, i);
+        if (idleArmed) {
+          // 受取待機中も残りタイマーを維持し、色と操作案内だけで受取待機を示す。
+          setText(r.idleVal, idle.display);
+          setClockParts(r.idleSubClockTime, r.idleSubClockSuffix, '', 'もう一度タップで受取');
         } else {
-          setClockParts(r.idleSubClockTime, r.idleSubClockSuffix, '', idle.meta);
+          setText(r.idleVal, idle.display);
+          if (idle.clockTxt) {
+            setClockParts(r.idleSubClockTime, r.idleSubClockSuffix, idle.clockTxt, idle.suffix);
+          } else {
+            setClockParts(r.idleSubClockTime, r.idleSubClockSuffix, '', idle.meta);
+          }
         }
+        setClass(r.idleVal, idleCls);
+        setWidth(r.idleBar, idle.pct);
+        setClass(r.idleBar, 'pbar-fill idle' + (idle.isFull ? ' full' : (idleCls.indexOf('urgent') >= 0 ? ' urgent' : '')));
       }
-      setClass(r.idleVal, idleCls);
-      setWidth(r.idleBar, idle.pct);
-      setClass(r.idleBar, 'pbar-fill idle' + (idle.isFull ? ' full' : (idleCls.indexOf('urgent') >= 0 ? ' urgent' : '')));
     }
-    renderAbyssTabIdle(abyssTabShortest, abyssTabStamUrgent, abyssTabIdleUrgent);
+    const minuteKey = String(Math.floor(now / 60000));
+    const updateInactiveTabs = forceAbyssTabRefresh || minuteKey !== abyssTabMinuteKey;
+    renderAbyssTabIdle(abyssTabShortest, abyssTabStamUrgent, abyssTabIdleUrgent, updateInactiveTabs);
+    if (updateInactiveTabs) {
+      abyssTabMinuteKey = minuteKey;
+      forceAbyssTabRefresh = false;
+    }
   } catch (e) { console.warn(e); }
-  renderG();
-  renderSL();
+  const gameMinuteKeyNow = String(Math.floor(Date.now() / 60000));
+  const updateActiveGameTab = forceGameTabRefresh || gameMinuteKeyNow !== gameTabMinuteKey;
+  if (updateActiveGameTab) {
+    if (activeGameTab === 'g') renderG();
+    else renderSL();
+    gameTabMinuteKey = gameMinuteKeyNow;
+    forceGameTabRefresh = false;
+  }
   // すべて満タン・未開始なら、不要な毎秒描画を停止する。
   if (tickId && !needsTicking()) stopTicking();
 }
@@ -1965,7 +2032,7 @@ function renderG(){
           clockTxt = stam.fullAt ? (formatClock(stam.fullAt) + ' 到達') : '';
           barCls = 'gbar-fill full';
         } else {
-          main = formatTime(stam.fullIn);
+          main = formatGameMinute(stam.fullIn);
           cls = 'gval';
           curTxt = String(stam.current); maxTxt = String(s.stamMax);
           clockTxt = stam.fullAt ? formatClock(stam.fullAt) : '';
@@ -2000,9 +2067,20 @@ function needsTicking(){
 }
 
 // 1回の描画完了後に次回だけを予約する。重複したループは世代番号で無効化する。
+function needsSecondPrecision(){
+  const now = Date.now();
+  for (let i = 0; i < N; i++) {
+    if (groupClass(i) !== activeAbyssGroup) continue;
+    const s = state.slots[i];
+    if (s.stamRunning && !getStamInfo(s, now).isFull) return true;
+    if (s.idleRunning && !getIdleInfo(s, now).isFull) return true;
+  }
+  return false;
+}
 function scheduleNextTick(generation){
   if (generation !== tickGeneration || !needsTicking()) return;
-  const delay = Math.max(80, 1000 - (Date.now() % 1000));
+  const unitMs = needsSecondPrecision() ? 1000 : 60000;
+  const delay = Math.max(80, unitMs - (Date.now() % unitMs));
   tickId = setTimeout(() => {
     tickId = null;
     if (generation !== tickGeneration) return;
