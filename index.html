@@ -572,9 +572,8 @@ let storageOk = true;
 let textEditIdx = -1;
 let refs = [];
 let tickId = null;
-// 描画実体の消失を検知して復旧するための軽量監視。進行中タイマーがある時だけ動く。
-let tickWatchdogId = null;
-let lastRenderAt = 0;
+// 単一の自己スケジュール型描画ループの世代。古い予約済みコールバックを無効化する。
+let tickGeneration = 0;
 // 1操作内で複数clickが起きても、次フレームの復旧は1回だけにまとめる。
 let interactionTickRecoveryFrame = 0;
 let resetCheckTimer = null;
@@ -1946,8 +1945,6 @@ function render(){
   renderSL();
   // すべて満タン・未開始なら、不要な毎秒描画を停止する。
   if (tickId && !needsTicking()) stopTicking();
-  // 全タイマーの差分描画が完了した時刻を記録し、停止検知の基準にする。
-  lastRenderAt = Date.now();
 }
 
 function renderG(){
@@ -2002,35 +1999,37 @@ function needsTicking(){
   return false;
 }
 
-function ensureTickWatchdog(){
-  if (tickWatchdogId || !needsTicking()) return;
-  tickWatchdogId = setInterval(() => {
-    // 非表示中の実行制御はブラウザに委ね、可視時に長時間描画されなければ復旧する。
-    if (document.hidden || !needsTicking()) return;
-    if (Date.now() - lastRenderAt < 3200) return;
-    render();
-    startTicking(true);
-  }, 2500);
+// 1回の描画完了後に次回だけを予約する。重複したループは世代番号で無効化する。
+function scheduleNextTick(generation){
+  if (generation !== tickGeneration || !needsTicking()) return;
+  const delay = Math.max(80, 1000 - (Date.now() % 1000));
+  tickId = setTimeout(() => {
+    tickId = null;
+    if (generation !== tickGeneration) return;
+    if (!needsTicking()) { stopTicking(); return; }
+    // 個別ゲームの描画例外が起きても、次回予約を失わないようにする。
+    try { render(); } catch (e) { console.warn(e); }
+    if (generation === tickGeneration && needsTicking()) scheduleNextTick(generation);
+  }, delay);
 }
 function startTicking(forceRestart = false){
   if (!needsTicking()) {
     stopTicking();
     return;
   }
-  // タスク復帰後にIDだけ残り実体が止まるケースでは、既存IDを破棄して確実に再生成する。
-  if (forceRestart && tickId) {
-    clearInterval(tickId);
+  // 復帰・ユーザー操作では古い予約を無効化し、新しい世代の単一ループへ即時接続する。
+  if (forceRestart) {
+    tickGeneration += 1;
+    if (tickId) clearTimeout(tickId);
     tickId = null;
   }
-  if (!tickId) tickId = setInterval(render, 1000);
-  ensureTickWatchdog();
+  if (!tickId) scheduleNextTick(tickGeneration);
 }
 function stopTicking(){
-  if (tickId) { clearInterval(tickId); tickId = null; }
-  if (tickWatchdogId) { clearInterval(tickWatchdogId); tickWatchdogId = null; }
+  tickGeneration += 1;
+  if (tickId) { clearTimeout(tickId); tickId = null; }
 }
-// 編集の開閉・タブ切替・確定待機への移行後に、停止した実体だけを安全に再生成する。
-// 常駐監視ではなく、ユーザー操作の次フレームに1回だけ実行する軽量な保険。
+// 編集の開閉・タブ切替・確定待機への移行後に、次フレームで単一ループを再接続する。
 function scheduleInteractionTickRecovery(){
   if (interactionTickRecoveryFrame) return;
   interactionTickRecoveryFrame = requestAnimationFrame(() => {
