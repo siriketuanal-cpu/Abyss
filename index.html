@@ -17,6 +17,11 @@
   --line:#262f45; --ink:#e9e7e0; --ink-dim:#8b93a7;
   --amber:#ffab5c; --violet:#9c86ff; --ok:#8fd6a8; --danger:#ff6b6b;
   --stam-full-c:#ff3b3b;
+  /* 到達表示は共通の語法で、ゲームごとに一目で見分けられる色を使う。 */
+  --reach-abyss:#ff3b3b;
+  --reach-g:#6fe8ff;
+  --reach-sl:#b9aaff;
+  --reach-orb:#f2a4b7;
   --g0:#7c5fd6; --g1:#5b9dff; --g2:#8fa3c4;
   --stam-cur-c:#6fe8ff; --idle-c:#ffd166;
 }
@@ -239,6 +244,7 @@ input,textarea{
 .tval.stam{color:var(--ok);}
 .tval.idle{color:var(--idle-c);}
 .tval.full{color:var(--stam-full-c)!important;}
+.tval.reached{color:var(--reach-abyss)!important;}
 .tval.urgent{color:var(--stam-full-c)!important;}
 .tsub{font-size:10px;color:var(--ink);height:13px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-variant-numeric:tabular-nums;}
 .tsub{position:relative;}
@@ -394,7 +400,8 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;
   color:var(--ok);line-height:1.1;
 }
-.gval.full{color:var(--stam-full-c)!important;}
+.gval.full{color:var(--reach-g)!important;}
+.gval.reached{color:var(--reach-g)!important;}
 .gsub{position:relative;font-size:10px;color:var(--ink);margin-top:1px;}
 .gsub .gsub-cur{display:inline-block;width:3ch;font-weight:700;color:#ffb35e;font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;}
 .gsub .gsub-sep{font-weight:600;color:var(--ink-dim);margin:0 1px;}
@@ -409,7 +416,7 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 .g-inline-max .g-inline-max-field{display:block;left:4.4ch;color:var(--stam-cur-c);}
 .gbar{height:3px;background:var(--line);border-radius:2px;overflow:hidden;margin-top:5px;}
 .gbar-fill{height:100%;border-radius:2px;background:var(--ok);transition:width .3s linear;}
-.gbar-fill.full{background:var(--stam-full-c)!important;}
+.gbar-fill.full{background:var(--reach-g)!important;}
 .gmark{
   width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;
   font-size:12px;font-weight:900;color:transparent;cursor:pointer;
@@ -433,9 +440,10 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   .sltag{font-size:9px;font-weight:700;color:#8fd6a8;letter-spacing:.04em;}
   .sltag.orb{color:#b9a7ff;}
   .slmain{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--ok);line-height:1.1;white-space:nowrap;overflow:hidden;}
-  .slmain.full{color:var(--stam-full-c);}
-  .slorbs{letter-spacing:2px;color:#f2a4b7;font-size:16px;}
-  .slorbs.full{color:#f2a4b7;}
+  .slmain.full,.slmain.reached{color:var(--reach-sl);}
+  .slorbs{letter-spacing:2px;color:var(--reach-orb);font-size:16px;}
+  .slorbs.full{color:var(--reach-orb);}
+  .orb-sub-left.reached{color:var(--reach-orb);font-weight:800;}
   .slsub{height:13px;margin-top:1px;font-size:9.5px;color:#c9b8ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums;}
   .slsub.sl-stamina-sub{position:relative;overflow:visible;text-overflow:clip;}
   .slsub.orb-sub{display:flex;align-items:center;gap:4px;overflow:visible;text-overflow:clip;}
@@ -450,9 +458,9 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   .slcard.sl-inline-orb .sl-orb-full-input{display:inline-block;width:42px;}
   .slbar{height:3px;background:var(--line);border-radius:2px;overflow:hidden;margin-top:5px;}
   .slbar-fill{height:100%;border-radius:2px;background:var(--ok);transition:width .3s linear;}
-  .slbar-fill.orb{background:#f2a4b7;}
-  .slbar-fill.orb.full{background:#f2a4b7;}
-  .slbar-fill.full{background:var(--stam-full-c);}
+  .slbar-fill.orb{background:var(--reach-orb);}
+  .slbar-fill.orb.full{background:var(--reach-orb);}
+  .slbar-fill.full{background:var(--reach-sl);}
 
   /*
    * 任意の数値表示用フォント（外部通信・追加ファイルなし）。
@@ -1282,18 +1290,19 @@ function renderSL(){
   const stamina = getSLTimerInfo(stamCfg.timer, stamCfg.max, stamCfg.interval, now);
   const orb = getSLTimerInfo(orbCfg.timer, orbCfg.max, orbCfg.interval, now);
 
-  setText(slRefs.stamina.main, stamina.isFull ? 'MAX' : (stamCfg.timer.running ? formatGameMinute(stamina.fullIn) : '—:—'));
-  setClass(slRefs.stamina.main, 'slmain' + (stamina.isFull ? ' full' : ''));
+  setText(slRefs.stamina.main, stamina.isFull ? (stamina.fullAt ? (formatClock(stamina.fullAt) + ' 到達') : '到達') : (stamCfg.timer.running ? formatGameMinute(stamina.fullIn) : '—:—'));
+  setClass(slRefs.stamina.main, 'slmain' + (stamina.isFull ? ' reached' : ''));
   setText(slRefs.stamina.current, String(stamina.current));
   setText(slRefs.stamina.max, String(SL_STAM_MAX));
-  setText(slRefs.stamina.clock, stamina.fullAt ? '　' + formatClock(stamina.fullAt) + (stamina.isFull ? ' 到達' : '') : '');
+  setText(slRefs.stamina.clock, stamina.isFull ? '' : (stamina.fullAt ? '　' + formatClock(stamina.fullAt) : ''));
   setWidth(slRefs.stamina.bar, stamina.pct);
   setClass(slRefs.stamina.bar, 'slbar-fill' + (stamina.isFull ? ' full' : ''));
 
   const filled = '●'.repeat(orb.current) + '○'.repeat(SL_ORB_MAX - orb.current);
   setText(slRefs.orb.main, filled);
   setClass(slRefs.orb.main, 'slmain slorbs' + (orb.isFull ? ' full' : ''));
-  setText(slRefs.orb.next, orb.isFull ? '4/4　満タン' : (orbCfg.timer.running ? '次 ' + formatGameMinute(orb.nextIn) : orb.current + '/4　未開始'));
+  setText(slRefs.orb.next, orb.isFull ? (orb.fullAt ? (formatClock(orb.fullAt) + ' 到達') : '到達') : (orbCfg.timer.running ? '次 ' + formatGameMinute(orb.nextIn) : orb.current + '/4　未開始'));
+  setClass(slRefs.orb.next, 'orb-sub-left' + (orb.isFull ? ' reached' : ''));
   setText(slRefs.orb.full, (!orb.isFull && orbCfg.timer.running) ? '全 ' + formatGameMinute(orb.fullIn) : '');
   setText(slRefs.orb.fullAt, (!orb.isFull && orbCfg.timer.running && orb.fullAt) ? formatClock(orb.fullAt) : '');
   setWidth(slRefs.orb.bar, orb.pct);
@@ -1942,9 +1951,9 @@ function render(){
       let stamMain, stamCls, stamCurTxt, stamMaxTxt, stamClockTxt, stamClockSuffix, stamBarCls;
       if (s.stamRunning) {
         if (stam.isFull) {
-          stamMain = 'MAX'; stamCls = 'tval stam full';
+          stamMain = stam.fullAt ? (formatClock(stam.fullAt) + ' 到達') : '到達'; stamCls = 'tval stam reached';
           stamCurTxt = String(stam.current); stamMaxTxt = String(s.stamMax);
-          stamClockTxt = stam.fullAt ? formatClock(stam.fullAt) : ''; stamClockSuffix = stam.fullAt ? ' 到達' : '';
+          stamClockTxt = ''; stamClockSuffix = '';
           stamBarCls = 'pbar-fill stam full';
         } else {
           stamMain = formatTime(stam.fullIn);
@@ -1974,16 +1983,19 @@ function render(){
         setClockParts(r.stamSubClockTime, r.stamSubClockSuffix, stamClockTxt, stamClockSuffix);
         setWidth(r.stamBar, stam.pct); setClass(r.stamBar, stamBarCls);
         let idleCls = 'tval idle';
-        if (idle.isFull) idleCls += ' full';
+        if (idle.isFull) idleCls += ' reached';
         else if (idleAlertClass) idleCls += ' ' + idleAlertClass;
         const idleArmed = Object.prototype.hasOwnProperty.call(armedIdle, i);
+        const idleMain = idle.isFull ? (idle.clockTxt ? (idle.clockTxt + ' 到達') : '到達') : idle.display;
         if (idleArmed) {
           // 受取待機中も残りタイマーを維持し、色と操作案内だけで受取待機を示す。
-          setText(r.idleVal, idle.display);
+          setText(r.idleVal, idleMain);
           setClockParts(r.idleSubClockTime, r.idleSubClockSuffix, '', 'もう一度タップで受取');
         } else {
-          setText(r.idleVal, idle.display);
-          if (idle.clockTxt) {
+          setText(r.idleVal, idleMain);
+          if (idle.isFull) {
+            setClockParts(r.idleSubClockTime, r.idleSubClockSuffix, '', '');
+          } else if (idle.clockTxt) {
             setClockParts(r.idleSubClockTime, r.idleSubClockSuffix, idle.clockTxt, idle.suffix);
           } else {
             setClockParts(r.idleSubClockTime, r.idleSubClockSuffix, '', idle.meta);
@@ -2027,9 +2039,9 @@ function renderG(){
       let main, cls, curTxt, maxTxt, clockTxt, barCls;
       if (s.stamRunning) {
         if (stam.isFull) {
-          main = 'MAX'; cls = 'gval full';
+          main = stam.fullAt ? (formatClock(stam.fullAt) + ' 到達') : '到達'; cls = 'gval reached';
           curTxt = String(stam.current); maxTxt = String(s.stamMax);
-          clockTxt = stam.fullAt ? (formatClock(stam.fullAt) + ' 到達') : '';
+          clockTxt = '';
           barCls = 'gbar-fill full';
         } else {
           main = formatGameMinute(stam.fullIn);
