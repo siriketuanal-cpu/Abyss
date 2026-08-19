@@ -1248,7 +1248,7 @@ function build(){
               '<div class="tsub" id="stam-sub-' + i + '"><span class="tsub-cur" id="stam-subcur-' + i + '"></span><input class="tsub-cur-input" type="text" id="stam-direct-cur-' + i + '" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" aria-label="スロット' + (i + 1) + 'の現在スタミナ"><span class="tsub-sep" id="stam-subsep-' + i + '">/</span><span class="tsub-max" id="stam-submax-' + i + '"></span><span class="tsub-clock" id="stam-subclock-' + i + '"><span class="idle-clock" id="stam-subclock-time-' + i + '"></span><span id="stam-subclock-suffix-' + i + '"></span></span></div>' +
             '</div>' +
           '</div>' +
-          '<div class="card abyss-idle-card ' + group + ' tblock-idle" id="idle-block-' + i + '" style="' + cardVars + '" data-idle-receive="true" data-idx="' + i + '" role="button" aria-label="放置報酬。1回タップで確認、長押しで受取">' +
+          '<div class="card abyss-idle-card ' + group + ' tblock-idle" id="idle-block-' + i + '" style="' + cardVars + '" data-idle-receive="true" data-idx="' + i + '" role="button" aria-label="放置報酬。1回タップで確認、受取">' +
             '<span class="idle-mark daily-mark ' + group + (s.missionDone ? ' show' : '') + '" id="daily-mark-' + i + '" aria-hidden="true">✔</span>' +
             '<div class="ttag idle">放置報酬</div>' +
             '<div class="tval idle" id="idle-val-' + i + '">—:—</div>' +
@@ -1952,7 +1952,7 @@ function updateIdleReceiveVisual(i, armed){
     setText(val, idle.display);
     const time = document.getElementById('idle-subclock-time-' + i);
     const suffix = document.getElementById('idle-subclock-suffix-' + i);
-    setClockParts(time, suffix, '', '長押しで受取');
+    setClockParts(time, suffix, '', '受取');
   }
   syncIdleConfirmBackdrop();
 }
@@ -2039,7 +2039,7 @@ function render(){
       if (stamEdit && stamEdit.index === i) {
         stamCurTxt = String(stamEdit.value);
         if (stamEdit.phase === DOT_EDIT_PHASE.REFERENCE) {
-          stamClockTxt = '長押しで確定';
+          stamClockTxt = '確定';
           stamClockSuffix = '';
         }
       }
@@ -2057,7 +2057,7 @@ function render(){
         if (idleArmed) {
           // 受取待機中も残りタイマーを維持し、色と操作案内だけで受取待機を示す。
           setText(r.idleVal, idleMain);
-          setClockParts(r.idleSubClockTime, r.idleSubClockSuffix, '', '長押しで受取');
+          setClockParts(r.idleSubClockTime, r.idleSubClockSuffix, '', '受取');
         } else {
           setText(r.idleVal, idleMain);
           if (idle.isFull) {
@@ -2295,7 +2295,7 @@ function setupDelegatedEvents(){
     } else if (stamCard && !(el.closest && el.closest('input'))) {
       const stamIndex = stamCard ? Number(stamCard.dataset.idx) : NaN;
       const isReference = stamEdit && stamEdit.index === stamIndex && stamEdit.phase === DOT_EDIT_PHASE.REFERENCE;
-      // 確認待ちは長押しで確定、通常時は従来どおり現在値の手入力を開く。
+      // 確認待ちは確定、通常時は従来どおり現在値の手入力を開く。
       mode = isReference ? 'stam-confirm' : 'stam-manual';
     } else return;
     const idEl = idleBlock || nameHit || rankHit || stamCard;
@@ -2317,7 +2317,7 @@ function setupDelegatedEvents(){
       } else if (mode === 'name') beginNameEdit(i);
       else if (mode === 'rank') beginRankEdit(i);
       else if (mode === 'stam-confirm') {
-        // 40基準の確認待ちは長押しで確定し、直後のclickを抑止する。
+        // 40基準の確認待ちは確定し、直後のclickを抑止する。
         commitStamEdit();
         pendingLongPressClick = { kind: 'stam-confirm', index: i };
       } else beginStamManualInput(i);
