@@ -225,7 +225,7 @@ input,textarea{
 .tval.urgent{color:var(--stam-full-c)!important;}
 .tsub{font-size:10px;color:var(--ink);height:13px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-variant-numeric:tabular-nums;}
 .tsub{position:relative;}
-.tsub-cur{display:inline-block;width:calc(3ch + 2px);font-weight:700;text-align:right;color:#ffb35e;font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;}
+.tsub-cur{display:inline-block;width:calc(3ch + 2px);font-weight:800;text-align:right;color:#ffb35e;font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;}
 /* 現在値だけを元の3文字幅の領域で置き換える。後続の/上限値と時刻は動かさない。 */
 .tsub-cur-input{
   display:none;position:absolute;left:0;top:0;width:3ch;height:13px;box-sizing:border-box;margin:0;padding:0;
@@ -239,7 +239,7 @@ input,textarea{
 /* 1回目のタップで表示する40消費後の参考値。対象カードは暗転より前面に保つ。 */
 .card.stam-preview{z-index:28;}
 .tsub-sep{font-weight:600;color:var(--ink-dim);margin:0 1px;}
-.tsub-max{font-weight:700;color:var(--stam-cur-c);font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;}
+.tsub-max{font-weight:800;color:var(--stam-cur-c);font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;}
 .tsub-clock{margin-left:4px;font-weight:700;color:var(--reach-plan);}
 .idle-clock{color:var(--reach-plan);font-weight:700;}
 .idle-meta{color:var(--reach-plan);font-weight:700;}
@@ -363,14 +363,17 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 #grid .rank-lp-hit{min-width:auto;}
 #grid .ttag{font-size:8px;line-height:1.05;letter-spacing:0;}
 #grid .tval{font-size:clamp(13px,3.6vw,16px);line-height:1.05;}
-#grid .tsub{height:10px;margin-top:1px;font-size:7.5px;line-height:10px;}
-#grid .tsub-cur,#grid .tsub-max,#grid .tsub-clock{font-size:7.5px;}
+#grid .tsub{height:11px;margin-top:1px;font-size:8.5px;line-height:11px;font-weight:700;}
+#grid .tsub-cur,#grid .tsub-max,#grid .tsub-clock{font-size:8.5px;font-weight:800;}
 #grid .daily-mark{top:6px;right:7px;font-size:16px;}
 #grid .card.stam-preview{background:rgba(0,0,0,.46)!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)!important;}
 /* コンパクト時も手入力欄を現在値表示と同じ幅・基準線・数字フォントへ完全に重ねる。 */
 #grid .tsub-cur-input{
-  left:0;top:0;width:calc(3ch + 2px);height:10px;margin:0;padding:0;
-  font-family:var(--timer-pop-system-font);font-size:7.5px;line-height:10px;font-weight:700;text-align:right;
+  left:0;top:0;width:calc(3ch + 2px);height:11px;margin:0;padding:0;
+  border:0;background:transparent;outline:none;
+  font-family:var(--timer-pop-system-font);font-size:8.5px;line-height:11px;font-weight:800;text-align:right;
+  color:#ffb35e;letter-spacing:inherit;
+  -webkit-appearance:none;appearance:none;
 }
 #gamesAll{
   display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;
@@ -385,8 +388,10 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 #gamesAll .grow-top{min-height:10px;margin-bottom:2px;gap:2px;}
 #gamesAll .gname-disp,#gamesAll .gname-input{font-size:7.5px;line-height:1;max-width:64%;}
 #gamesAll .gval,#gamesAll .slmain{font-size:clamp(13px,3.6vw,16px);line-height:1.05;}
-#gamesAll .gsub,#gamesAll .slsub{font-size:7.5px;line-height:10px;min-height:10px;margin-top:1px;}
-#gamesAll .slcard{padding:18px 6px 6px;}
+#gamesAll .gsub,#gamesAll .slsub{font-size:8.5px;line-height:11px;min-height:11px;margin-top:1px;font-weight:700;}
+#gamesAll .gsub-cur,#gamesAll .gsub-max,
+#gamesAll .sl-stamina-current-display,#gamesAll .sl-stamina-max-display{font-size:8.5px;font-weight:800;}
+#gamesAll .slcard{padding:6px;}
 #gamesAll .slcard::before{
   position:absolute;top:6px;left:6px;font:700 8px/1 var(--timer-pop-system-font);letter-spacing:.04em;color:var(--ink-dim);
 }
@@ -396,24 +401,79 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 /* v149: ゲーム側の数値入力をドットアビスの現在値表示と同じ基準線へ重ねる。 */
 #gamesAll .g-inline-current-field,
 #gamesAll .sl-stamina-current-input{
-  width:calc(3ch + 2px);height:10px;top:0;
-  font-family:var(--timer-pop-system-font);font-size:7.5px;line-height:10px;
-  text-align:right;
+  left:0;top:0;width:calc(3ch + 2px);height:11px;
+  border:0;background:transparent;outline:none;padding:0;margin:0;
+  font-family:var(--timer-pop-system-font);font-size:8.5px;line-height:11px;font-weight:800;
+  text-align:right;color:#ffb35e;letter-spacing:inherit;
+  -webkit-appearance:none;appearance:none;
 }
 /* Gジェネ上限値も、通常の上限表示の開始位置・高さ・文字基準へ合わせる。 */
 #gamesAll .g-inline-max-field{
-  left:calc(3ch + 7px);width:3ch;height:10px;top:0;
-  font-family:var(--timer-pop-system-font);font-size:7.5px;line-height:10px;
-  text-align:left;
+  left:calc(3ch + 7px);top:0;width:3ch;height:11px;
+  border:0;background:transparent;outline:none;padding:0;margin:0;
+  font-family:var(--timer-pop-system-font);font-size:8.5px;line-height:11px;font-weight:800;
+  text-align:left;color:var(--stam-cur-c);letter-spacing:inherit;
+  -webkit-appearance:none;appearance:none;
 }
 /* v150: 横4枠で上寄りに見えるGジェネの名前・タイマー・補助表示を一体で下げる。 */
-#gamesAll .gcard{padding:13px 6px 6px;}
+#gamesAll .gcard{padding:6px;}
 /* v153: ドットアビスの入力文字を通常表示と同じブラウザ外観へ揃える。 */
 #grid .tsub-cur-input{-webkit-appearance:none;appearance:none;}
 /* 到達ラベルは時刻より十分小さく、数値の下端へ寄せる。 */
-#grid .tval.stam.reached,#grid .tval.idle.reached{display:inline-flex;align-items:flex-end;gap:1px;}
-#grid .tval.stam.reached::after,#grid .tval.idle.reached::after{
-  content:"到達";font:800 6px/6px var(--timer-pop-system-font);letter-spacing:0;margin-bottom:1px;
+/* 到達は常に幅を確保し、表示時だけ見えるようにしてレイアウトずれを防ぐ */
+#grid .tval.stam,
+#grid .tval.idle{
+  display:inline-flex;align-items:flex-end;gap:1px;white-space:nowrap;
+}
+#grid .tval.stam::after,
+#grid .tval.idle::after{
+  content:"到達";
+  font:800 6px/6px var(--timer-pop-system-font);
+  letter-spacing:0;margin-bottom:1px;
+  opacity:0; /* 非到達時も同じ幅を確保 */
+  flex-shrink:0;
+}
+#grid .tval.stam.reached::after,
+#grid .tval.idle.reached::after{
+  opacity:1;
+}
+#gamesAll .gval,
+#gamesAll .slmain{
+  display:inline-flex;align-items:flex-end;gap:1px;white-space:nowrap;
+}
+#gamesAll .gval::after,
+#gamesAll .slmain::after{
+  content:"到達";
+  font:800 6px/6px var(--timer-pop-system-font);
+  letter-spacing:0;margin-bottom:1px;
+  opacity:0;
+  flex-shrink:0;
+}
+#gamesAll .gval.reached::after,
+#gamesAll .slmain.reached::after{
+  opacity:1;
+}
+/* オーブ「次」行：切れないようにし、到達は満タン時のみ表示 */
+.orb-sub-left{
+  display:inline-flex;
+  align-items:flex-end;
+  gap:1px;
+  overflow:visible !important;
+  text-overflow:clip !important;
+  white-space:nowrap !important;
+  min-width:auto !important;
+  flex:1 1 auto;
+  color:var(--orb-next);
+  font-weight:700;
+}
+.orb-sub-left::after{content:none;}
+.orb-sub-left.reached::after{
+  content:"到達";
+  font:800 6px/6px var(--timer-pop-system-font);
+  letter-spacing:0;
+  margin-bottom:1px;
+  flex-shrink:0;
+  opacity:1;
 }
 /* 縮小後も完了状態を見逃さないよう、ドットアビス右上のデイリー記号を拡大する。 */
 #grid .daily-mark{top:4px;right:5px;font-size:20px;line-height:20px;font-weight:900;}
@@ -422,12 +482,53 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 /* 背景グラデーションの切れ目が隙間に見えないよう、放置報酬を1pxだけ連結側へ重ねる。 */
 #grid .abyss-idle-card{width:calc(100% + 5px);margin-left:-5px;}
 /* スターリープの識別ラベルを撤去し、主タイマーとスタミナ行をカード下側へ揃える。 */
-#gamesAll .slcard{padding:6px;display:flex;flex-direction:column;}
-#gamesAll .slcard::before{display:none;}
-#gamesAll .slcard .slname{display:none;}
-#gamesAll .slcard .slmain{margin-top:auto;}
-/* Gジェネの数値列をスターリープと同じY座標へ揃える。 */
-#gamesAll .gcard{padding-top:18px;}
+/* スターリープ名称を表示し、Gジェネとヘッダー高さを揃える */
+#gamesAll .gcard,
+#gamesAll .slcard{
+  padding:6px;
+  display:flex;
+  flex-direction:column;
+  justify-content:flex-start;
+  box-sizing:border-box;
+}
+#gamesAll .slcard::before{display:none !important;content:none !important;}
+#gamesAll .slcard .slname,
+#gamesAll .slname{
+  display:block !important;
+  font-size:7.5px;
+  line-height:1;
+  font-weight:700;
+  color:var(--ink);
+  max-width:90%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+#gamesAll .slhead,
+#gamesAll .grow-top{
+  display:flex;
+  align-items:center;
+  min-height:16px;
+  height:16px;
+  margin:0 0 2px;
+  gap:2px;
+  flex-shrink:0;
+}
+#gamesAll .gmark{
+  width:14px;
+  height:14px;
+  font-size:9px;
+  flex-shrink:0;
+}
+#gamesAll .gval,
+#gamesAll .slmain{
+  display:inline-flex;
+  align-items:flex-end;
+  gap:1px;
+  margin:0;
+  line-height:1.05;
+  white-space:nowrap;
+}
 	
 	.gsection{margin-top:14px;}
 .gsection-title{
@@ -503,9 +604,10 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   .slorbs.full{color:var(--reach-orb);}
   .orb-sub-left.reached{color:var(--reach-orb);font-weight:800;}
   .slsub{height:var(--timer-card-sub-height);margin-top:1px;font-size:9.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums;}
+  .slsub.orb-sub{overflow:visible;text-overflow:clip;height:auto;min-height:var(--timer-card-sub-height);}
   .slsub.sl-stamina-sub{position:relative;overflow:visible;text-overflow:clip;}
   .slsub.orb-sub{display:flex;align-items:center;gap:4px;overflow:visible;text-overflow:clip;}
-  .orb-sub-left{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--orb-next);font-weight:700;}
+  .orb-sub-left{min-width:0;overflow:visible;text-overflow:clip;white-space:nowrap;color:var(--orb-next);font-weight:700;}
   .sl-orb-full-wrap{display:inline-flex;align-items:center;gap:1px;white-space:nowrap;}
   .orb-full-at{margin-left:auto;color:var(--orb-full);font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums;}
   #sl-stamina-clock{color:var(--reach-plan);font-weight:700;margin-left:3px;}
@@ -517,8 +619,53 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   /* 手入力中も同じ3桁領域を使い、入力欄と後続の/上限値を安定させる。 */
   .slcard.sl-inline-current .sl-stamina-current-display{visibility:hidden;width:calc(3ch + 2px);}
   .slcard.sl-inline-current .sl-stamina-current-input{display:block;left:0;color:#ffb35e;}
+  .slsub.orb-sub{
+    display:flex !important;
+    align-items:center;
+    gap:4px;
+    overflow:visible !important;
+    text-overflow:clip !important;
+    height:auto !important;
+    min-height:11px;
+    white-space:nowrap;
+  }
+  #gamesAll .slcard .slsub.orb-sub{
+    overflow:visible !important;
+    text-overflow:clip !important;
+  }
+  .sl-orb-full-wrap{
+    flex:0 0 auto;
+    position:relative;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-width:0;
+  }
+  .orb-full-at{
+    flex:0 0 auto;
+    margin-left:auto;
+    white-space:nowrap;
+  }
   .slcard.sl-inline-orb .sl-orb-full-display{display:none;}
-  .slcard.sl-inline-orb .sl-orb-full-input{display:inline-block;width:42px;}
+  .slcard.sl-inline-orb .orb-full-at{display:none;} /* 入力中は右側を空けて「次」を優先 */
+  .slcard.sl-inline-orb .sl-orb-full-input{
+    display:inline-block;
+    position:relative;
+    width:40px;
+    min-width:40px;
+    height:12px;
+    margin:0;
+    padding:0 2px;
+    box-sizing:border-box;
+    border:1px solid #4a5a78;
+    border-radius:3px;
+    background:var(--bg-inset,#111);
+    color:var(--ink);
+    font-size:8.5px;
+    line-height:12px;
+    font-weight:700;
+    text-align:center;
+  }
 
   /*
    * 任意の数値表示用フォント（外部通信・追加ファイルなし）。
@@ -1333,7 +1480,17 @@ function renderSL(){
   const stamina = getSLTimerInfo(stamCfg.timer, stamCfg.max, stamCfg.interval, now);
   const orb = getSLTimerInfo(orbCfg.timer, orbCfg.max, orbCfg.interval, now);
 
-  setText(slRefs.stamina.main, stamina.isFull ? (stamina.fullAt ? (formatClock(stamina.fullAt) + ' 到達') : '到達') : (stamCfg.timer.running ? formatGameMinute(stamina.fullIn) : '—:—'));
+  // 満タン時は Gジェネ／ドットアビスと同じ「時刻 + 到達」
+  let slStamMain;
+  if (stamina.isFull) {
+    const at = stamina.fullAt || stamCfg.timer.start || now;
+    slStamMain = formatClock(at);
+  } else if (stamCfg.timer.running) {
+    slStamMain = formatGameMinute(stamina.fullIn);
+  } else {
+    slStamMain = '—:—';
+  }
+  setText(slRefs.stamina.main, slStamMain);
   setClass(slRefs.stamina.main, 'slmain' + (stamina.isFull ? ' reached' : ''));
   setText(slRefs.stamina.current, String(stamina.current));
   setText(slRefs.stamina.max, String(SL_STAM_MAX));
@@ -1342,7 +1499,7 @@ function renderSL(){
   const filled = '●'.repeat(orb.current) + '○'.repeat(SL_ORB_MAX - orb.current);
   setText(slRefs.orb.main, filled);
   setClass(slRefs.orb.main, 'slmain slorbs' + (orb.isFull ? ' full' : ''));
-  setText(slRefs.orb.next, orb.isFull ? (orb.fullAt ? (formatClock(orb.fullAt) + ' 到達') : '到達') : (orbCfg.timer.running ? '次 ' + formatGameMinute(orb.nextIn) : orb.current + '/4　未開始'));
+  setText(slRefs.orb.next, orb.isFull ? (orb.fullAt ? formatClock(orb.fullAt) : 'MAX') : (orbCfg.timer.running ? '次 ' + formatGameMinute(orb.nextIn) : orb.current + '/4　未開始'));
   setClass(slRefs.orb.next, 'orb-sub-left' + (orb.isFull ? ' reached' : ''));
   setText(slRefs.orb.full, '');
   setText(slRefs.orb.fullAt, (!orb.isFull && orbCfg.timer.running && orb.fullAt) ? ('全 ' + formatPlanClock(orb.fullAt)) : '');
@@ -1943,7 +2100,7 @@ function renderG(){
       let main, cls, curTxt, maxTxt, clockTxt;
       if (s.stamRunning) {
         if (stam.isFull) {
-          main = stam.fullAt ? (formatClock(stam.fullAt) + ' 到達') : '到達'; cls = 'gval reached';
+          main = stam.fullAt ? formatClock(stam.fullAt) : 'MAX'; cls = 'gval reached';
           curTxt = String(stam.current); maxTxt = String(s.stamMax);
           clockTxt = '';
         } else {
