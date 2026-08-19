@@ -217,8 +217,8 @@ input,textarea{
 }
 .tblock{min-width:0;}
 .ttag{font-size:9px;font-weight:700;letter-spacing:.04em;}
-/* スタミナ行のラベル枠は回復予定時刻用。サイズは旧「スタミナ」と同じ、色だけ予定色。 */
-.ttag.stam{color:var(--reach-plan);font-weight:700;font-variant-numeric:tabular-nums;min-height:1em;}
+/* スタミナ行ラベル枠は回復予定時刻用。サイズは旧「スタミナ」相当、極太。 */
+.ttag.stam{color:var(--reach-plan);font-weight:900;font-variant-numeric:tabular-nums;min-height:1em;letter-spacing:.02em;}
 .ttag.idle{color:var(--idle-c);}
 .tval{
   font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;
@@ -367,10 +367,13 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 #grid .name-disp,#grid .name-input,#grid .rank-disp,#grid .rank-input{
   font-size:7.5px;line-height:1;min-width:0;
 }
-#grid .name-disp,#grid .name-input{max-width:66%;}
+/* 名前はサイズ据え置き・極太（900）。空表示は少し控えめ。 */
+#grid .name-disp,#grid .name-input{max-width:66%;font-weight:900;}
+#grid .name-disp.empty{font-weight:700;}
 #grid .rank-lp-hit{min-width:auto;}
 #grid .ttag{font-size:8px;line-height:1.05;letter-spacing:0;}
-#grid .ttag.stam{font-size:8px;font-weight:700;letter-spacing:0;color:var(--reach-plan);}
+/* 予定時刻は旧「スタミナ」と同じ8px、極太900（中央寄せはしない） */
+#grid .ttag.stam{font-size:8px;font-weight:900;line-height:1.05;letter-spacing:.02em;color:var(--reach-plan);}
 #grid .tval{font-size:var(--timer-main-size);line-height:1.05;}
 #grid .tsub{height:var(--timer-card-sub-height);margin-top:1px;font-size:var(--timer-sub-font);line-height:var(--timer-card-sub-height);font-weight:700;}
 #grid .tsub-cur,#grid .tsub-max{font-size:var(--timer-sub-font);font-weight:800;}
@@ -457,7 +460,7 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 #gamesAll .slmain.reached::after{
   opacity:1;
 }
-/* オーブ「次」行：狭い4枠でも収まるよう縮小可能にし、到達は満タン時のみ表示 */
+/* オーブ「次」行：左右に寄せ、漢字ラベルは数字より一段小さく。 */
 .orb-sub-left{
   display:inline-flex;
   align-items:flex-end;
@@ -470,6 +473,15 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   color:var(--orb-next);
   font-weight:700;
   font-size:9px;
+}
+.orb-label{
+  font-size:7px;
+  font-weight:700;
+  letter-spacing:0;
+  line-height:1;
+  margin-right:1px;
+  flex-shrink:0;
+  opacity:.9;
 }
 .orb-sub-left::after{content:none;}
 .orb-sub-left.reached::after{
@@ -615,10 +627,10 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   .slsub{height:var(--timer-card-sub-height);margin-top:1px;font-size:9.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums;}
   .slsub.orb-sub{overflow:hidden;text-overflow:clip;height:auto;min-height:var(--timer-card-sub-height);}
   .slsub.sl-stamina-sub{position:relative;overflow:visible;text-overflow:clip;}
-  .slsub.orb-sub{display:flex;align-items:center;gap:2px;overflow:hidden;text-overflow:clip;}
+  .slsub.orb-sub{display:flex;align-items:center;justify-content:space-between;gap:2px;overflow:hidden;text-overflow:clip;}
   .orb-sub-left{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--orb-next);font-weight:700;font-size:9px;}
   .sl-orb-full-wrap{display:inline-flex;align-items:center;gap:1px;white-space:nowrap;flex:0 0 auto;}
-  .orb-full-at{margin-left:auto;color:var(--orb-full);font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums;font-size:9px;flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;}
+  .orb-full-at{margin-left:0;color:var(--orb-full);font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums;font-size:9px;flex:0 0 auto;}
   #sl-stamina-clock{color:var(--reach-plan);font-weight:700;margin-left:3px;}
   .sl-stamina-sep{font-weight:600;color:var(--ink-dim);margin:0 1px;}
   .sl-stamina-max-display{display:inline;font-weight:700;color:var(--stam-cur-c);font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;}
@@ -631,6 +643,7 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   .slsub.orb-sub{
     display:flex !important;
     align-items:center;
+    justify-content:space-between;
     gap:2px;
     overflow:hidden !important;
     text-overflow:clip !important;
@@ -643,8 +656,15 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
     overflow:hidden !important;
     text-overflow:clip !important;
     gap:2px;
+    /* Gジェネの gsub よりわずかに下げ、左右端へ寄せる */
+    margin-top:3px;
+    padding:0 1px;
+    justify-content:space-between;
   }
-  #gamesAll .slcard.orb-card{padding:5px 5px 4px;min-width:0;}
+  #gamesAll .slcard.orb-card{padding:5px 5px 3px;min-width:0;}
+  #gamesAll .slcard .orb-sub-left{font-size:9px;line-height:var(--timer-card-sub-height);justify-self:start;}
+  #gamesAll .slcard .orb-label{font-size:7px;line-height:var(--timer-card-sub-height);}
+  #gamesAll .slcard .orb-full-at{font-size:9px;line-height:var(--timer-card-sub-height);margin-left:0;}
   .sl-orb-full-wrap{
     flex:0 0 auto;
     position:relative;
@@ -652,14 +672,12 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
     align-items:center;
     justify-content:center;
     min-width:0;
+    margin-left:auto;
   }
   .orb-full-at{
-    flex:0 1 auto;
-    margin-left:auto;
+    flex:0 0 auto;
+    margin-left:0;
     white-space:nowrap;
-    min-width:0;
-    overflow:hidden;
-    text-overflow:ellipsis;
     font-size:9px;
   }
   .slcard.sl-inline-orb .sl-orb-full-display{display:none;}
@@ -1517,10 +1535,22 @@ function renderSL(){
   const filled = '●'.repeat(orb.current) + '○'.repeat(SL_ORB_MAX - orb.current);
   setText(slRefs.orb.main, filled);
   setClass(slRefs.orb.main, 'slmain slorbs' + (orb.isFull ? ' full' : ''));
-  setText(slRefs.orb.next, orb.isFull ? (orb.fullAt ? formatClock(orb.fullAt) : 'MAX') : (orbCfg.timer.running ? '次 ' + formatGameMinute(orb.nextIn) : orb.current + '/4　未開始'));
+  if (orb.isFull) {
+    setText(slRefs.orb.next, orb.fullAt ? formatClock(orb.fullAt) : 'MAX');
+  } else if (orbCfg.timer.running) {
+    if (slRefs.orb.next) {
+      const nextTxt = formatGameMinute(orb.nextIn);
+      const html = '<span class="orb-label">次</span>' + nextTxt;
+      if (slRefs.orb.next.dataset._h !== html) {
+        slRefs.orb.next.dataset._h = html;
+        slRefs.orb.next.innerHTML = html;
+      }
+    }
+  } else {
+    setText(slRefs.orb.next, orb.current + '/4　未開始');
+  }
   setClass(slRefs.orb.next, 'orb-sub-left' + (orb.isFull ? ' reached' : ''));
   setText(slRefs.orb.full, '');
-  // 「全」を省いて時刻だけにし、狭い4枠でも全回復予定が切れにくくする。
   setText(slRefs.orb.fullAt, (!orb.isFull && orbCfg.timer.running && orb.fullAt) ? formatPlanClock(orb.fullAt) : '');
 }
 function setupSLDelegatedEvents(){
@@ -2052,21 +2082,18 @@ function render(){
           stamMain = formatGameMinute(stam.fullIn);
           stamCls = 'tval stam' + (stamUrgent ? ' urgent' : '');
           stamCurTxt = String(stam.current); stamMaxTxt = String(s.stamMax);
-          // 回復予定は旧「スタミナ」ラベル位置へ。補助行は現在値/上限だけにする。
           stamPlanTxt = formatPlanClock(stam.fullAt);
         }
       } else {
         stamMain = '—:—'; stamCls = 'tval stam';
         stamCurTxt = String(s.stamCurrent); stamMaxTxt = String(s.stamMax); stamPlanTxt = '';
       }
-      // 40消費後の仮値を表示中は、状態を確定せずに現在値の表示だけ差し替える。
       if (stamEdit && stamEdit.index === i) {
         stamCurTxt = String(stamEdit.value);
         if (stamEdit.phase === DOT_EDIT_PHASE.REFERENCE) {
           stamPlanTxt = '確定';
         }
       }
-      // DOM更新は表示中の2枚だけに集中する。非表示カードはタブ切替時に即時追従する。
       if (renderVisibleCard) {
         setText(r.stamVal, stamMain); setClass(r.stamVal, stamCls);
         setText(r.stamPlan, stamPlanTxt);
