@@ -92,29 +92,6 @@ input,textarea{
   border:1px solid #e0a82e;
 }
 /* テスト用: ドットアビスをグループカラーごとに切り替える。 */
-.abyss-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:6px;}
-.abyss-tab{
-  min-height:32px;border:1px solid #3d4a62;border-radius:8px;background:#0c111c;color:var(--ink-dim);
-  display:flex;align-items:center;justify-content:center;gap:5px;
-  font:700 10.5px/1 inherit;letter-spacing:.02em;cursor:pointer;-webkit-tap-highlight-color:transparent;
-}
-.abyss-tab-name{font-size:12px;font-weight:800;white-space:nowrap;}
-/* 時間はグループ色と分け、どのタブでも同じ淡いアンバーで読ませる。 */
-.abyss-tab-idle{color:#ffd98f;font-size:10.5px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:0;white-space:nowrap;opacity:1;text-shadow:0 0 4px rgba(255,217,143,.16);}
-.abyss-tab.g0{color:#b9aaff;}.abyss-tab.g1{color:#a6ccff;}.abyss-tab.g2{color:#c2ccdf;}
-.abyss-tab.active.g0{border-color:var(--g0);background:#1a1530;box-shadow:0 0 0 1px rgba(124,95,214,.25);}
-.abyss-tab.active.g1{border-color:var(--g1);background:#10233c;box-shadow:0 0 0 1px rgba(91,157,255,.25);}
-.abyss-tab.active.g2{border-color:var(--g2);background:#1c2330;box-shadow:0 0 0 1px rgba(143,163,196,.25);}
-/* スタミナが2時間未満のグループは、該当タブの識別文字だけを太い赤で知らせる。 */
-.abyss-tab.urgent .abyss-tab-name{color:#ff5656;font-weight:900;text-shadow:0 0 5px rgba(255,86,86,.28);}
-/* 放置報酬の実タイマーと同じ緊急条件では、タブ内の放置タイマーだけを赤字にする。 */
-.abyss-tab.idle-urgent .abyss-tab-idle{color:var(--stam-full-c);font-weight:900;text-shadow:0 0 5px rgba(255,86,86,.28);}
-.grid{display:grid;grid-template-columns:1fr;gap:6px;margin-top:6px;}
-@media (min-width:620px){.grid{grid-template-columns:1fr 1fr;}}
-.grid[data-group] .card-row{display:none;margin-top:0!important;padding-top:0!important;border-top:none!important;}
-.grid[data-group="g0"] .card-row[data-group="g0"],
-.grid[data-group="g1"] .card-row[data-group="g1"],
-.grid[data-group="g2"] .card-row[data-group="g2"]{display:flex;}
 .card-row{display:flex;align-items:center;gap:11px;}
 /* ドットアビスはスタミナと放置報酬を独立カードとして横並びにする。 */
 .abyss-timers{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;flex:1 1 auto;min-width:0;}
@@ -154,18 +131,6 @@ input,textarea{
   padding-left:12px;
 }
 /* 選択タブは内側を中立な濃色に保ち、下線・外枠・文字の強調だけで状態を伝える。 */
-.abyss-tab{position:relative;overflow:hidden;}
-.abyss-tab:not(.active){background:#090e17;border-color:#2d3a51;}
-.abyss-tab.active{border-width:1.5px;background:#101824;box-shadow:0 0 0 1px rgba(210,224,255,.18);}
-.abyss-tab.active::before{
-  content:'';position:absolute;z-index:0;left:0;right:0;bottom:0;height:2px;
-  border-radius:0;background:currentColor;opacity:.95;
-}
-.abyss-tab > *{position:relative;z-index:1;}
-.abyss-tab.active .abyss-tab-name{font-weight:900;}
-.abyss-tab.active.g0{border-color:#9f86ff;background:#101824;box-shadow:0 0 0 1px rgba(159,134,255,.34);}
-.abyss-tab.active.g1{border-color:#77b7ff;background:#101824;box-shadow:0 0 0 1px rgba(119,183,255,.34);}
-.abyss-tab.active.g2{border-color:#b5c5e0;background:#101824;box-shadow:0 0 0 1px rgba(181,197,224,.34);}
 .row-top{display:flex;align-items:center;gap:7px;margin-bottom:3px;}
 /* 放置報酬は一枚の受取カードとして扱い、デイリー✔だけを右上へ重ねる。 */
 .abyss-idle-card .daily-mark{
@@ -360,11 +325,64 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 	/* テスト用ゲームタブ */
 	.game-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px;}
 /* ドットアビスの75%タイマー領域と、ゲームタブ・ゲームパネルの基準幅を揃える。 */
-#abyssTabs,#gameTabs,.game-tab-panel{width:calc(37.5% - 2.25px);max-width:calc(37.5% - 2.25px);}
-@media (max-width:619px){#abyssTabs,#gameTabs,.game-tab-panel{width:75%;max-width:75%;}}
+#gameTabs,.game-tab-panel{width:calc(37.5% - 2.25px);max-width:calc(37.5% - 2.25px);}
+@media (max-width:619px){#gameTabs,.game-tab-panel{width:75%;max-width:75%;}}
 /* 共通75%幅のタイマー領域を、それぞれの所属領域の中央へ揃える。 */
 #grid .card-row{justify-content:center;}
-#abyssTabs,#gameTabs,.game-tab-panel{margin-left:auto;margin-right:auto;}
+#gameTabs,.game-tab-panel{margin-left:auto;margin-right:auto;}
+
+/* v141: 2段のドットアビスを、4要素すべて一行のコンパクトレールへ再構成する。 */
+#grid{
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr) 6px minmax(0,1fr) minmax(0,1fr);
+  column-gap:4px;row-gap:0;
+  width:min(calc(100% - 12px),440px);margin:10px auto 0;padding:0;
+  border:0;border-radius:0;background:transparent;
+}
+#grid .card-row{display:contents!important;}
+#grid .abyss-timers{display:contents;}
+#grid{display:grid;}
+#grid .abyss-group-label{
+  grid-column:1/-1;grid-row:var(--abyss-label-row);height:12px;align-self:end;margin-top:3px;padding-left:2px;
+  font:700 8px/12px var(--timer-pop-system-font);letter-spacing:.12em;color:var(--abyss-group-color);
+}
+#grid .abyss-group-label:first-child{margin-top:0;}
+#grid .abyss-timers{display:contents;}
+#grid .card{
+  min-width:0;min-height:68px;border-width:1px;box-shadow:none;
+  background:#090e16;transition:none;
+}
+#grid .abyss-stam-card{
+  border-radius:9px 0 0 9px;border-right:0!important;
+  padding:6px 6px 6px 8px;background:linear-gradient(155deg,#0d2027,#080d14);
+}
+#grid .abyss-idle-card{
+  width:calc(100% + 4px);margin-left:-4px;
+  border-radius:0 9px 9px 0;border-left:0!important;
+  padding:20px 7px 6px 6px;background:linear-gradient(155deg,#211a0c,#0d0d10);
+}
+#grid .card.g0{border-color:var(--g0)!important;}
+#grid .card.g1{border-color:var(--g1)!important;}
+#grid .card.g2{border-color:var(--g2)!important;}
+/* 行・列はカードごとのCSS変数で与え、全スロットを同じグリッド規則へ統一する。 */
+#grid .abyss-stam-card{grid-row:var(--abyss-row);grid-column:var(--abyss-stam-column);}
+#grid .abyss-idle-card{grid-row:var(--abyss-row);grid-column:var(--abyss-idle-column);}
+#grid .row-top{min-height:10px;gap:2px;margin-bottom:2px;}
+#grid .name-disp,#grid .name-input,#grid .rank-disp,#grid .rank-input{
+  font-size:7.5px;line-height:1;min-width:0;
+}
+#grid .name-disp,#grid .name-input{max-width:66%;}
+#grid .rank-lp-hit{min-width:auto;}
+#grid .ttag{font-size:8px;line-height:1.05;letter-spacing:0;}
+#grid .tval{font-size:clamp(13px,3.6vw,16px);line-height:1.05;}
+#grid .tsub{height:10px;margin-top:1px;font-size:7.5px;line-height:10px;}
+#grid .tsub-cur,#grid .tsub-max,#grid .tsub-clock{font-size:7.5px;}
+#grid .daily-mark{top:6px;right:7px;font-size:16px;}
+#grid .card.stam-preview{background:rgba(0,0,0,.46)!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)!important;}
+/* コンパクト時も手入力欄を現在値表示と同じ幅・基準線・数字フォントへ完全に重ねる。 */
+#grid .tsub-cur-input{
+  left:0;top:0;width:calc(3ch + 2px);height:10px;margin:0;padding:0;
+  font-family:var(--timer-pop-system-font);font-size:7.5px;line-height:10px;font-weight:700;text-align:right;
+}
 	.game-tab{
 	  min-height:34px;border:1px solid #3d4a62;border-radius:9px;background:#0c111c;color:var(--ink-dim);
 	  font:700 11.5px/1 inherit;letter-spacing:.03em;cursor:pointer;
@@ -473,7 +491,7 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
    * 日本語ラベル・名前・補助文には適用しない。
    */
   :root{--timer-pop-system-font:ui-rounded,"Arial Rounded MT Bold","Trebuchet MS",Roboto,system-ui,sans-serif;}
-  .tval,.gval,.slmain,.abyss-tab-name,.abyss-tab-idle-time,
+  .tval,.gval,.slmain,
   .tsub-cur,.tsub-max,.gsub .gsub-cur,.gsub .gsub-max,.sl-stamina-current-display,
   .tsub-cur-input,.g-inline-field,.sl-stamina-current-input,
   .sl-orb-full-display,.sl-inline-field.sl-orb-full-input,.orb-full-at{
@@ -511,12 +529,7 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
     <span class="daily-val" id="dailyDateDisplay">—</span>
     <span class="daily-progress" id="dailyProgress"></span>
   </div>
-  <div class="abyss-tabs" id="abyssTabs" role="tablist" aria-label="ドットアビスのグループ">
-    <button type="button" class="abyss-tab g0 active" data-abyss-group="g0" role="tab" aria-selected="true" aria-label="グループA"><span class="abyss-tab-name">A</span><span class="abyss-tab-idle"><span class="abyss-tab-idle-time" id="abyss-idle-time-g0"></span><span id="abyss-idle-status-g0">未開始</span></span></button>
-    <button type="button" class="abyss-tab g1" data-abyss-group="g1" role="tab" aria-selected="false" aria-label="グループB"><span class="abyss-tab-name">B</span><span class="abyss-tab-idle"><span class="abyss-tab-idle-time" id="abyss-idle-time-g1"></span><span id="abyss-idle-status-g1">未開始</span></span></button>
-    <button type="button" class="abyss-tab g2" data-abyss-group="g2" role="tab" aria-selected="false" aria-label="グループC"><span class="abyss-tab-name">C</span><span class="abyss-tab-idle"><span class="abyss-tab-idle-time" id="abyss-idle-time-g2"></span><span id="abyss-idle-status-g2">未開始</span></span></button>
-  </div>
-  <div class="grid" id="grid" data-group="g0"></div>
+  <div class="grid" id="grid" aria-label="ドットアビス全グループ"></div>
   <div class="game-tabs" id="gameTabs" role="tablist" aria-label="ゲームタイマー">
     <button type="button" class="game-tab active" id="game-tab-g" data-game-tab="g" role="tab" aria-selected="true" aria-controls="game-panel-g">Gジェネ</button>
     <button type="button" class="game-tab" id="game-tab-sl" data-game-tab="sl" role="tab" aria-selected="false" aria-controls="game-panel-sl">スターリープ</button>
@@ -591,7 +604,6 @@ let state = { slots: Array.from({ length: N }, defaultSlot), dailyDate: '', g: {
 let storageOk = true;
 let textEditIdx = -1;
 let refs = [];
-let abyssTabRefs = {};
 let tickId = null;
 // 単一の自己スケジュール型描画ループの世代。古い予約済みコールバックを無効化する。
 let tickGeneration = 0;
@@ -613,7 +625,6 @@ let labelSaveTimer = null;
 let lastProgressSig = '';
 let lastDailyLabel = '';
 
-function groupClass(i){ return 'g' + (Math.floor(i / 2) % 3); }
 function dayStrAt(resetHour){
   const d = new Date();
   if (d.getHours() < resetHour) d.setDate(d.getDate() - 1);
@@ -627,27 +638,12 @@ function formatDateJP(iso){
   return p[0] + '年' + Number(p[1]) + '月' + Number(p[2]) + '日';
 }
 function safeNum(v, fb){ if (v === null || v === undefined || v === '') return fb; const n = Number(v); return Number.isFinite(n) ? n : fb; }
-function formatTime(ms){
-  ms = Math.max(0, safeNum(ms, 0));
-  const t = Math.floor(ms / 1000);
-  const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60;
-  if (h > 0) return h + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
-  return m + ':' + String(s).padStart(2, '0');
-}
 function formatClock(ts){
   const d = new Date(ts);
   return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
 }
 // 小さい予定表示は時刻だけにし、到達後の主表示だけに「到達」を付ける。
 function formatPlanClock(ts){ return ts ? formatClock(ts) : ''; }
-function formatFixedDuration(ms){
-  ms = Math.max(0, safeNum(ms, 0));
-  const totalSeconds = Math.floor(ms / 1000);
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  return String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
-}
 // Gジェネ・スターリープの分単位表示用。残り時間を過小に見せないよう切り上げる。
 function formatGameMinute(ms){
   ms = Math.max(0, safeNum(ms, 0));
@@ -933,7 +929,7 @@ function getIdleInfo(s, now){
   const isFull = remaining <= 0;
   const fullAt = s.idleStart + cap;
   return {
-    display: isFull ? 'MAX' : formatTime(remaining),
+    display: isFull ? 'MAX' : formatGameMinute(remaining),
     meta: isFull ? formatClock(fullAt) + ' 到達' : formatClock(fullAt) + ' 満タン',
     clockTxt: formatClock(fullAt),
     suffix: isFull ? ' 到達' : ' 満タン',
@@ -1059,10 +1055,20 @@ function build(){
   let html = '';
   for (let i = 0; i < N; i++) {
     const s = state.slots[i];
+    const groupIndex = Math.floor(i / 2);
+    const group = 'g' + groupIndex;
+    const row = groupIndex * 2 + 2;
+    const stamColumn = i % 2 ? 4 : 1;
+    const idleColumn = i % 2 ? 5 : 2;
+    const cardVars = '--abyss-row:' + row + ';--abyss-stam-column:' + stamColumn + ';--abyss-idle-column:' + idleColumn + ';';
+    if (i % 2 === 0) {
+      const labelRow = groupIndex * 2 + 1;
+      html += '<div class="abyss-group-label" style="--abyss-label-row:' + labelRow + ';--abyss-group-color:var(--g' + groupIndex + ')" aria-label="グループ' + ['A', 'B', 'C'][groupIndex] + '">' + ['A', 'B', 'C'][groupIndex] + '</div>';
+    }
     html +=
-      '<div class="card-row" data-group="' + groupClass(i) + '">' +
+      '<div class="card-row">' +
         '<div class="abyss-timers">' +
-          '<div class="card abyss-stam-card ' + groupClass(i) + '" id="card-' + i + '" data-action="card" data-idx="' + i + '" aria-expanded="false">' +
+          '<div class="card abyss-stam-card ' + group + '" id="card-' + i + '" style="' + cardVars + '" data-action="card" data-idx="' + i + '" aria-expanded="false">' +
             '<div class="row-top">' +
               '<span class="name-disp' + (s.label ? '' : ' empty') + '" id="name-disp-' + i + '"><span class="name-lp-hit">' +
               (s.label ? escapeHtml(s.label) : ('スロット ' + (i + 1))) + '</span></span>' +
@@ -1076,8 +1082,8 @@ function build(){
               '<div class="tsub" id="stam-sub-' + i + '"><span class="tsub-cur" id="stam-subcur-' + i + '"></span><input class="tsub-cur-input" type="text" id="stam-direct-cur-' + i + '" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" aria-label="スロット' + (i + 1) + 'の現在スタミナ"><span class="tsub-sep" id="stam-subsep-' + i + '">/</span><span class="tsub-max" id="stam-submax-' + i + '"></span><span class="tsub-clock" id="stam-subclock-' + i + '"><span class="idle-clock" id="stam-subclock-time-' + i + '"></span><span id="stam-subclock-suffix-' + i + '"></span></span></div>' +
             '</div>' +
           '</div>' +
-          '<div class="card abyss-idle-card ' + groupClass(i) + ' tblock-idle" id="idle-block-' + i + '" data-idle-receive="true" data-idx="' + i + '" role="button" aria-label="放置報酬。1回タップで確認、長押しで受取">' +
-            '<span class="idle-mark daily-mark ' + groupClass(i) + (s.missionDone ? ' show' : '') + '" id="daily-mark-' + i + '" aria-hidden="true">✔</span>' +
+          '<div class="card abyss-idle-card ' + group + ' tblock-idle" id="idle-block-' + i + '" style="' + cardVars + '" data-idle-receive="true" data-idx="' + i + '" role="button" aria-label="放置報酬。1回タップで確認、長押しで受取">' +
+            '<span class="idle-mark daily-mark ' + group + (s.missionDone ? ' show' : '') + '" id="daily-mark-' + i + '" aria-hidden="true">✔</span>' +
             '<div class="ttag idle">放置報酬</div>' +
             '<div class="tval idle" id="idle-val-' + i + '">—:—</div>' +
             '<div class="tsub idle-meta" id="idle-sub-' + i + '"><span class="idle-clock" id="idle-subclock-time-' + i + '"></span><span id="idle-subclock-suffix-' + i + '"></span></div>' +
@@ -1088,7 +1094,6 @@ function build(){
   grid.innerHTML = html;
 
   cacheRefs();
-  cacheAbyssTabRefs();
   buildG();
   buildSL();
 }
@@ -1368,16 +1373,6 @@ function setupSLDelegatedEvents(){
     slCommitOutside();
   });
 }
-function cacheAbyssTabRefs(){
-  abyssTabRefs = {};
-  ['g0', 'g1', 'g2'].forEach((group) => {
-    abyssTabRefs[group] = {
-      tab: document.querySelector('[data-abyss-group="' + group + '"]'),
-      idleTime: document.getElementById('abyss-idle-time-' + group),
-      idleStatus: document.getElementById('abyss-idle-status-' + group)
-    };
-  });
-}
 function cacheRefs(){
   refs = [];
   for (let i = 0; i < N; i++) {
@@ -1495,71 +1490,6 @@ function closeAllPanels(){
 }
 
 // ---- テスト用: ドットアビスのグループタブ ----
-let activeAbyssGroup = 'g0';
-// 非表示タブの目安は分単位で同期し、タブ切替時だけ即時同期する。
-let abyssTabMinuteKey = '';
-let forceAbyssTabRefresh = true;
-
-function switchAbyssGroup(group){
-  if (!['g0', 'g1', 'g2'].includes(group) || group === activeAbyssGroup) return;
-	
-  // 非表示になるカードのフォーカスを残さない。
-  softBlur();
-
-  activeAbyssGroup = group;
-  const grid = document.getElementById('grid');
-  if (grid) grid.dataset.group = group;
-  document.querySelectorAll('[data-abyss-group]').forEach((tab) => {
-    const selected = tab.dataset.abyssGroup === group;
-    tab.classList.toggle('active', selected);
-    setAttr(tab, 'aria-selected', selected);
-  });
-  // 新たに非表示となるタブの目安も含め、切替直後は実時刻から即時同期する。
-  forceAbyssTabRefresh = true;
-  render();
-}
-
-function setupAbyssTabs(){
-  const tabs = document.getElementById('abyssTabs');
-  if (!tabs || tabs.dataset.ready) return;
-  tabs.dataset.ready = '1';
-  tabs.addEventListener('click', (ev) => {
-    const tab = ev.target.closest('[data-abyss-group]');
-    if (tab) switchAbyssGroup(tab.dataset.abyssGroup);
-  });
-}
-
-function formatAbyssTabMinute(remainingMs){
-  if (remainingMs == null) return '';
-  if (remainingMs <= 0) return 'MAX';
-  const totalMinutes = Math.max(1, Math.ceil(remainingMs / 60000));
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  return hours + ':' + String(minutes).padStart(2, '0');
-}
-function renderAbyssTabIdle(shortestByGroup, stamUrgentByGroup, idleUrgentByGroup, updateInactiveTabs){
-  ['g0', 'g1', 'g2'].forEach((group) => {
-    const ref = abyssTabRefs[group];
-    if (!ref) return;
-    const isActive = group === activeAbyssGroup;
-    const shortest = shortestByGroup[group];
-    const hasTimer = shortest !== undefined;
-    if (isActive) {
-      // 表示中のグループはカード本体が正確な秒表示を担うため、タブの重複目安は消す。
-      setText(ref.idleTime, '');
-      setText(ref.idleStatus, '');
-    } else if (updateInactiveTabs) {
-      // 非表示タブは分単位の目安に抑え、切替時には即時同期する。
-      setText(ref.idleTime, hasTimer ? formatAbyssTabMinute(shortest) : '');
-      setText(ref.idleStatus, hasTimer ? '' : '未開始');
-    }
-    if (ref.tab && (isActive || updateInactiveTabs)) {
-      ref.tab.classList.toggle('urgent', !!stamUrgentByGroup[group]);
-      ref.tab.classList.toggle('idle-urgent', !!idleUrgentByGroup[group]);
-    }
-  });
-}
-
 // ---- テスト用ゲームタブ ----
 let activeGameTab = 'g';
 // ゲームタブは分単位で描画し、非表示側はタブ切替時だけ即時同期する。
@@ -1938,28 +1868,16 @@ function render(){
     ensureDailyDate();
     const now = Date.now();
     if (!refs.length) return;
-    // カード描画で求めた放置報酬情報を再利用し、タブ用の二重計算を避ける。
-    const abyssTabShortest = Object.create(null);
-    const abyssTabStamUrgent = Object.create(null);
-    const abyssTabIdleUrgent = Object.create(null);
     for (let i = 0; i < N; i++) {
       const s = state.slots[i];
       const r = refs[i];
       if (!r || !r.stamVal) continue;
       const stam = getStamInfo(s, now);
       const idle = getIdleInfo(s, now);
-      const group = groupClass(i);
-      // 2時間未満に入った後は、MAX到達後も同じ計測サイクル中はタブの注意表示を維持する。
       const stamUrgent = s.stamRunning && stam.fullAt != null && stam.fullAt <= now + URGENT_MS;
-      if (stamUrgent) abyssTabStamUrgent[group] = true;
       const idleAlertClass = getIdleAlertClass(s, idle);
-      if (idleAlertClass) abyssTabIdleUrgent[group] = true;
-      if (idle.remainingMs != null) {
-        if (abyssTabShortest[group] === undefined || idle.remainingMs < abyssTabShortest[group]) {
-          abyssTabShortest[group] = idle.remainingMs;
-        }
-      }
-      const renderVisibleCard = group === activeAbyssGroup;
+      // A/B/Cは全て常時表示するため、全カードを同一の描画条件で更新する。
+      const renderVisibleCard = true;
       let stamMain, stamCls, stamCurTxt, stamMaxTxt, stamClockTxt, stamClockSuffix;
       if (s.stamRunning) {
         if (stam.isFull) {
@@ -1967,7 +1885,7 @@ function render(){
           stamCurTxt = String(stam.current); stamMaxTxt = String(s.stamMax);
           stamClockTxt = ''; stamClockSuffix = '';
         } else {
-          stamMain = formatTime(stam.fullIn);
+          stamMain = formatGameMinute(stam.fullIn);
           stamCls = 'tval stam' + (stamUrgent ? ' urgent' : '');
           stamCurTxt = String(stam.current); stamMaxTxt = String(s.stamMax);
           stamClockTxt = formatPlanClock(stam.fullAt); stamClockSuffix = '';
@@ -2011,13 +1929,6 @@ function render(){
         }
         setClass(r.idleVal, idleCls);
       }
-    }
-    const minuteKey = String(Math.floor(now / 60000));
-    const updateInactiveTabs = forceAbyssTabRefresh || minuteKey !== abyssTabMinuteKey;
-    renderAbyssTabIdle(abyssTabShortest, abyssTabStamUrgent, abyssTabIdleUrgent, updateInactiveTabs);
-    if (updateInactiveTabs) {
-      abyssTabMinuteKey = minuteKey;
-      forceAbyssTabRefresh = false;
     }
   } catch (e) { console.warn(e); }
   const gameMinuteKeyNow = String(Math.floor(Date.now() / 60000));
@@ -2081,19 +1992,9 @@ function needsTicking(){
 }
 
 // 1回の描画完了後に次回だけを予約する。重複したループは世代番号で無効化する。
-function needsSecondPrecision(){
-  const now = Date.now();
-  for (let i = 0; i < N; i++) {
-    if (groupClass(i) !== activeAbyssGroup) continue;
-    const s = state.slots[i];
-    if (s.stamRunning && !getStamInfo(s, now).isFull) return true;
-    if (s.idleRunning && !getIdleInfo(s, now).isFull) return true;
-  }
-  return false;
-}
 function scheduleNextTick(generation){
   if (generation !== tickGeneration || !needsTicking()) return;
-  const unitMs = needsSecondPrecision() ? 1000 : 60000;
+  const unitMs = 60000;
   const delay = Math.max(80, unitMs - (Date.now() % unitMs));
   tickId = setTimeout(() => {
     tickId = null;
@@ -2337,7 +2238,6 @@ setupDelegatedEvents();
 setupGDelegatedEvents();
 setupSLDelegatedEvents();
 setupGameTabs();
-setupAbyssTabs();
 const appRootForTickRecovery = document.querySelector('.wrap');
 if (appRootForTickRecovery) appRootForTickRecovery.addEventListener('click', scheduleInteractionTickRecovery);
 scheduleStartupStabilization();
