@@ -406,6 +406,17 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   font-family:var(--timer-pop-system-font);font-size:7.5px;line-height:10px;
   text-align:left;
 }
+/* v150: 横4枠で上寄りに見えるGジェネの名前・タイマー・補助表示を一体で下げる。 */
+#gamesAll .gcard{padding:13px 6px 6px;}
+/* v151: ドットアビスの現在値入力は表示値と同じ文字描画へ揃える。 */
+#grid .tsub-cur-input{-webkit-appearance:none;appearance:none;}
+/* 到達ラベルだけを半分程度へ縮小し、時刻の下側基準へ寄せる。 */
+#grid .tval.stam.reached,#grid .tval.idle.reached{display:inline-flex;align-items:flex-end;gap:1px;}
+#grid .tval.stam.reached::after,#grid .tval.idle.reached::after{
+  content:"到達";font:800 8px/8px var(--timer-pop-system-font);letter-spacing:0;margin-bottom:1px;
+}
+/* 縮小カードでも完了状態を認識しやすいよう、右上のデイリー記号を拡大する。 */
+#grid .daily-mark{top:4px;right:5px;font-size:20px;line-height:20px;font-weight:900;}
 	
 	.gsection{margin-top:14px;}
 .gsection-title{
@@ -1848,7 +1859,7 @@ function render(){
       let stamMain, stamCls, stamCurTxt, stamMaxTxt, stamClockTxt, stamClockSuffix;
       if (s.stamRunning) {
         if (stam.isFull) {
-          stamMain = stam.fullAt ? (formatClock(stam.fullAt) + ' 到達') : '到達'; stamCls = 'tval stam reached';
+          stamMain = stam.fullAt ? formatClock(stam.fullAt) : ''; stamCls = 'tval stam reached';
           stamCurTxt = String(stam.current); stamMaxTxt = String(s.stamMax);
           stamClockTxt = ''; stamClockSuffix = '';
         } else {
@@ -1879,7 +1890,7 @@ function render(){
         if (idle.isFull) idleCls += ' reached';
         else if (idleAlertClass) idleCls += ' ' + idleAlertClass;
         const idleArmed = Object.prototype.hasOwnProperty.call(armedIdle, i);
-        const idleMain = idle.isFull ? (idle.clockTxt ? (idle.clockTxt + ' 到達') : '到達') : idle.display;
+        const idleMain = idle.isFull ? (idle.clockTxt || '') : idle.display;
         if (idleArmed) {
           // 受取待機中も残りタイマーを維持し、色と操作案内だけで受取待機を示す。
           setText(r.idleVal, idleMain);
