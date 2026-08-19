@@ -393,6 +393,19 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 #gamesAll .slcard[data-sltype="stamina"]::before{content:"討伐";}
 #gamesAll .slcard[data-sltype="orb"]::before{content:"オーブ";color:var(--reach-orb);}
 #gamesAll .daily-mark{top:6px;right:6px;font-size:14px;}
+/* v149: ゲーム側の数値入力をドットアビスの現在値表示と同じ基準線へ重ねる。 */
+#gamesAll .g-inline-current-field,
+#gamesAll .sl-stamina-current-input{
+  width:calc(3ch + 2px);height:10px;top:0;
+  font-family:var(--timer-pop-system-font);font-size:7.5px;line-height:10px;
+  text-align:right;
+}
+/* Gジェネ上限値も、通常の上限表示の開始位置・高さ・文字基準へ合わせる。 */
+#gamesAll .g-inline-max-field{
+  left:calc(3ch + 7px);width:3ch;height:10px;top:0;
+  font-family:var(--timer-pop-system-font);font-size:7.5px;line-height:10px;
+  text-align:left;
+}
 	
 	.gsection{margin-top:14px;}
 .gsection-title{
