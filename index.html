@@ -228,9 +228,9 @@ input,textarea{
 .tval.full{color:var(--stam-full-c)!important;}
 .tval.reached{color:var(--reach-abyss)!important;}
 .tval.urgent{color:var(--stam-full-c)!important;}
-.tsub{font-size:10px;color:var(--ink);height:13px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-variant-numeric:tabular-nums;}
+.tsub{font-size:10px;color:var(--ink);height:13px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-variant-numeric:tabular-nums;display:flex;align-items:center;min-width:0;}
 .tsub{position:relative;}
-.tsub-cur{display:inline-block;width:calc(3ch + 2px);font-weight:800;text-align:right;color:#ffb35e;font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;}
+.tsub-cur{display:inline-block;width:calc(3ch + 2px);flex:0 0 auto;font-weight:800;text-align:right;color:#ffb35e;font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;}
 /* 現在値だけを元の3文字幅の領域で置き換える。後続の/上限値と時刻は動かさない。 */
 .tsub-cur-input{
   display:none;position:absolute;left:0;top:0;width:3ch;height:13px;box-sizing:border-box;margin:0;padding:0;
@@ -243,9 +243,10 @@ input,textarea{
 .tsub.stam-manual-editing .tsub-cur-input{display:block;}
 /* 1回目のタップで表示する40消費後の参考値。対象カードは暗転より前面に保つ。 */
 .card.stam-preview{z-index:28;}
-.tsub-sep{font-weight:600;color:var(--ink-dim);margin:0 1px;}
-.tsub-max{font-weight:800;color:var(--stam-cur-c);font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;}
-.tsub-clock{margin-left:4px;font-weight:700;color:var(--reach-plan);}
+.tsub-sep{font-weight:600;color:var(--ink-dim);margin:0 1px;flex:0 0 auto;}
+.tsub-max{font-weight:800;color:var(--stam-cur-c);font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;flex:0 0 auto;}
+/* 予定時刻は現在値より一段小さくし、狭い端末でも枠内に収める。 */
+.tsub-clock{margin-left:2px;font-weight:700;color:var(--reach-plan);flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;letter-spacing:-0.02em;font-size:9px;line-height:13px;}
 .idle-clock{color:var(--reach-plan);font-weight:700;}
 .idle-meta{color:var(--reach-plan);font-weight:700;}
 /* 放置報酬の受取待機は色と文字だけで示し、点滅・アニメーションは使わない。 */
@@ -369,7 +370,9 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 #grid .ttag{font-size:8px;line-height:1.05;letter-spacing:0;}
 #grid .tval{font-size:var(--timer-main-size);line-height:1.05;}
 #grid .tsub{height:var(--timer-card-sub-height);margin-top:1px;font-size:var(--timer-sub-font);line-height:var(--timer-card-sub-height);font-weight:700;}
-#grid .tsub-cur,#grid .tsub-max,#grid .tsub-clock{font-size:var(--timer-sub-font);font-weight:800;}
+#grid .tsub-cur,#grid .tsub-max{font-size:var(--timer-sub-font);font-weight:800;}
+/* 全回復予定だけ9pxに抑え、主表示を大きくしても時刻が切れないようにする。 */
+#grid .tsub-clock{font-size:9px;font-weight:700;line-height:var(--timer-card-sub-height);}
 #grid .daily-mark{top:4px;right:5px;font-size:26px;line-height:1;font-weight:900;}
 #grid .card.stam-preview{background:rgba(0,0,0,.46)!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)!important;}
 /* コンパクト時も手入力欄を現在値表示と同じ幅・基準線・数字フォントへ完全に重ねる。 */
@@ -680,7 +683,9 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   .tval,.gval,.slmain,
   .tsub-cur,.tsub-max,.gsub .gsub-cur,.gsub .gsub-max,.sl-stamina-current-display,
   .tsub-cur-input,.g-inline-field,.sl-stamina-current-input,
-  .sl-orb-full-display,.sl-inline-field.sl-orb-full-input,.orb-full-at{
+  .sl-orb-full-display,.sl-inline-field.sl-orb-full-input,.orb-full-at,
+  /* 予定時刻・補助クロックも同じ丸み数字へ揃える（日本語接尾辞のspanには当てない） */
+  .tsub-clock,.idle-clock,.gsub-clock,#sl-stamina-clock,.orb-sub-left{
     font-family:var(--timer-pop-system-font);
     font-variant-numeric:tabular-nums;
   }
