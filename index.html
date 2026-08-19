@@ -135,7 +135,7 @@ input,textarea{
 .card.g2.open{border-color:var(--g2);box-shadow:0 0 0 1.5px var(--g2);}
 
 /* ドットアビスは内部操作を分離したまま、外枠だけを連結して1枚の管理カード風に見せる。 */
-.abyss-timers{position:relative;gap:0;}
+.abyss-timers{position:relative;gap:0;flex:0 0 75%;max-width:75%;}
 .abyss-timers > .abyss-stam-card{
   border-radius:12px 0 0 12px;
   border-right:0!important;
@@ -271,13 +271,6 @@ input,textarea{
 .tsub-clock{margin-left:4px;font-weight:700;color:var(--reach-plan);}
 .idle-clock{color:var(--reach-plan);font-weight:700;}
 .idle-meta{color:var(--reach-plan);font-weight:700;}
-.pbar{height:3px;background:var(--line);border-radius:2px;overflow:hidden;margin-top:3px;}
-.pbar-fill{height:100%;border-radius:2px;transition:width .3s linear;}
-.pbar-fill.stam{background:var(--ok);}
-.pbar-fill.idle{background:var(--idle-c);}
-.pbar-fill.stam.full{background:var(--stam-full-c)!important;}
-.pbar-fill.idle.full{background:var(--stam-full-c)!important;}
-.pbar-fill.idle.urgent{background:var(--stam-full-c)!important;}
 /* 放置報酬の受取待機は色と文字だけで示し、点滅・アニメーションは使わない。 */
 .tblock-idle{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
 .tblock-idle.receive-armed .tval.idle{color:#bfe8ff!important;}
@@ -359,6 +352,12 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 
 	/* テスト用ゲームタブ */
 	.game-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px;}
+/* ドットアビスの75%タイマー領域と、ゲームタブ・ゲームパネルの基準幅を揃える。 */
+#abyssTabs,#gameTabs,.game-tab-panel{width:calc(37.5% - 2.25px);max-width:calc(37.5% - 2.25px);}
+@media (max-width:619px){#abyssTabs,#gameTabs,.game-tab-panel{width:75%;max-width:75%;}}
+/* 共通75%幅のタイマー領域を、それぞれの所属領域の中央へ揃える。 */
+#grid .card-row{justify-content:center;}
+#abyssTabs,#gameTabs,.game-tab-panel{margin-left:auto;margin-right:auto;}
 	.game-tab{
 	  min-height:34px;border:1px solid #3d4a62;border-radius:9px;background:#0c111c;color:var(--ink-dim);
 	  font:700 11.5px/1 inherit;letter-spacing:.03em;cursor:pointer;
@@ -419,9 +418,6 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 .g-inline-current .g-inline-current-field{display:block;left:0;color:#ffb35e;}
 .g-inline-max .gsub-max{visibility:hidden;}
 .g-inline-max .g-inline-max-field{display:block;left:calc(4.4ch + 2px);color:var(--stam-cur-c);}
-.gbar{height:3px;background:var(--line);border-radius:2px;overflow:hidden;margin-top:5px;}
-.gbar-fill{height:100%;border-radius:2px;background:var(--ok);transition:width .3s linear;}
-.gbar-fill.full{background:var(--reach-g)!important;}
 .gmark{
   width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;
   font-size:12px;font-weight:900;color:transparent;cursor:pointer;
@@ -441,8 +437,7 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   .slcard.sl-inline-active{border-color:#6fe8ff;z-index:30;}
   .slhead{display:flex;align-items:center;justify-content:space-between;gap:5px;min-height:22px;margin-bottom:2px;}
   .slname{font-size:10.5px;font-weight:800;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .slbadge{font-size:8.5px;font-weight:700;color:#c8eef8;background:#1a2a33;border:1px solid #3d6a7a;border-radius:4px;padding:1px 5px;white-space:nowrap;}
-  .slmain{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--ok);line-height:1.1;white-space:nowrap;overflow:hidden;}
+    .slmain{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--ok);line-height:1.1;white-space:nowrap;overflow:hidden;}
   .slmain.full,.slmain.reached{color:var(--reach-sl);}
   .slorbs{letter-spacing:2px;color:var(--reach-orb);font-size:16px;}
   .slorbs.full{color:var(--reach-orb);}
@@ -464,11 +459,6 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   .slcard.sl-inline-current .sl-stamina-current-input{display:block;left:0;color:#ffb35e;}
   .slcard.sl-inline-orb .sl-orb-full-display{display:none;}
   .slcard.sl-inline-orb .sl-orb-full-input{display:inline-block;width:42px;}
-  .slbar{height:3px;background:var(--line);border-radius:2px;overflow:hidden;margin-top:5px;}
-  .slbar-fill{height:100%;border-radius:2px;background:var(--ok);transition:width .3s linear;}
-  .slbar-fill.orb{background:var(--reach-orb);}
-  .slbar-fill.orb.full{background:var(--reach-orb);}
-  .slbar-fill.full{background:var(--reach-sl);}
 
   /*
    * 任意の数値表示用フォント（外部通信・追加ファイルなし）。
@@ -594,6 +584,7 @@ let state = { slots: Array.from({ length: N }, defaultSlot), dailyDate: '', g: {
 let storageOk = true;
 let textEditIdx = -1;
 let refs = [];
+let abyssTabRefs = {};
 let tickId = null;
 // 単一の自己スケジュール型描画ループの世代。古い予約済みコールバックを無効化する。
 let tickGeneration = 0;
@@ -668,12 +659,6 @@ function setClockParts(timeEl, suffixEl, timeText, suffixText){
   setText(suffixEl, suffixText || '');
 }
 function setClass(el, cls){ if (el && el.className !== cls) el.className = cls; }
-function setWidth(el, pct){
-  if (!el) return;
-  const rounded = Math.round((pct || 0) * 10) / 10;
-  const w = rounded + '%';
-  if (el.style.width !== w) el.style.width = w;
-}
 function setAttr(el, name, value){
   if (!el) return;
   const next = String(value);
@@ -879,7 +864,7 @@ function saveState(){
 function getStamInfo(s, now){
   if (!s.stamRunning || !s.stamStart) {
     const cur = s.stamCurrent;
-    return { current: cur, fullIn: null, fullAt: null, isFull: cur >= s.stamMax, pct: s.stamMax ? (cur / s.stamMax) * 100 : 0 };
+    return { current: cur, fullIn: null, fullAt: null, isFull: cur >= s.stamMax };
   }
   const elapsed = Math.max(0, now - s.stamStart);
   const recovered = Math.floor(elapsed / STAM_INTERVAL);
@@ -887,18 +872,18 @@ function getStamInfo(s, now){
   if (current >= s.stamMax) {
     const need = Math.max(0, s.stamMax - s.stamCurrent);
     const fullAt = s.stamStart + need * STAM_INTERVAL;
-    return { current: s.stamMax, fullIn: 0, fullAt: fullAt, isFull: true, pct: 100 };
+    return { current: s.stamMax, fullIn: 0, fullAt: fullAt, isFull: true };
   }
   const nextIn = STAM_INTERVAL - (elapsed % STAM_INTERVAL);
   const need = s.stamMax - current;
   const fullIn = (need - 1) * STAM_INTERVAL + nextIn;
-  return { current, fullIn, fullAt: now + fullIn, isFull: false, pct: s.stamMax ? Math.min(100, (current / s.stamMax) * 100) : 0 };
+  return { current, fullIn, fullAt: now + fullIn, isFull: false };
 }
 
 function getGStamInfo(s, now){
   if (!s.stamRunning || !s.stamStart) {
     const cur = s.stamCurrent;
-    return { current: cur, fullIn: null, fullAt: null, isFull: cur >= s.stamMax, pct: s.stamMax ? (cur / s.stamMax) * 100 : 0 };
+    return { current: cur, fullIn: null, fullAt: null, isFull: cur >= s.stamMax };
   }
   const elapsed = Math.max(0, now - s.stamStart);
   const recovered = Math.floor(elapsed / G_STAM_INTERVAL);
@@ -906,18 +891,18 @@ function getGStamInfo(s, now){
   if (current >= s.stamMax) {
     const need = Math.max(0, s.stamMax - s.stamCurrent);
     const fullAt = s.stamStart + need * G_STAM_INTERVAL;
-    return { current: s.stamMax, fullIn: 0, fullAt: fullAt, isFull: true, pct: 100 };
+    return { current: s.stamMax, fullIn: 0, fullAt: fullAt, isFull: true };
   }
   const nextIn = G_STAM_INTERVAL - (elapsed % G_STAM_INTERVAL);
   const need = s.stamMax - current;
   const fullIn = (need - 1) * G_STAM_INTERVAL + nextIn;
-  return { current, fullIn, fullAt: now + fullIn, isFull: false, pct: s.stamMax ? Math.min(100, (current / s.stamMax) * 100) : 0 };
+  return { current, fullIn, fullAt: now + fullIn, isFull: false };
 }
 
 function getSLTimerInfo(timer, max, interval, now){
   if (!timer.running || !timer.start) {
     const current = timer.current;
-    return { current, nextIn: null, fullIn: null, fullAt: null, isFull: current >= max, pct: max ? (current / max) * 100 : 0 };
+    return { current, nextIn: null, fullIn: null, fullAt: null, isFull: current >= max };
   }
   const elapsed = Math.max(0, now - timer.start);
   const recovered = Math.floor(elapsed / interval);
@@ -925,16 +910,16 @@ function getSLTimerInfo(timer, max, interval, now){
   if (current >= max) {
     const need = Math.max(0, max - timer.current);
     const fullAt = timer.start + need * interval;
-    return { current: max, nextIn: 0, fullIn: 0, fullAt, isFull: true, pct: 100 };
+    return { current: max, nextIn: 0, fullIn: 0, fullAt, isFull: true };
   }
   const nextIn = interval - (elapsed % interval);
   const need = max - current;
   const fullIn = (need - 1) * interval + nextIn;
-  return { current, nextIn, fullIn, fullAt: now + fullIn, isFull: false, pct: Math.min(100, (current / max) * 100) };
+  return { current, nextIn, fullIn, fullAt: now + fullIn, isFull: false };
 }
 
 function getIdleInfo(s, now){
-  if (!s.idleRunning || !s.idleStart) return { display: '—:—', meta: '未開始', pct: 0, isFull: false, remainingMs: null };
+  if (!s.idleRunning || !s.idleStart) return { display: '—:—', meta: '未開始', isFull: false, remainingMs: null };
   const cap = s.idleCapMs || IDLE_DEFAULT_CAP_MS;
   const elapsed = Math.max(0, now - s.idleStart);
   const remaining = Math.max(0, cap - elapsed);
@@ -945,7 +930,6 @@ function getIdleInfo(s, now){
     meta: isFull ? formatClock(fullAt) + ' 到達' : formatClock(fullAt) + ' 満タン',
     clockTxt: formatClock(fullAt),
     suffix: isFull ? ' 到達' : ' 満タン',
-    pct: Math.min(100, (elapsed / cap) * 100),
     isFull,
     remainingMs: remaining
   };
@@ -1071,15 +1055,13 @@ function build(){
               '<div class="ttag stam">スタミナ</div>' +
               '<div class="tval stam" id="stam-val-' + i + '">—:—</div>' +
               '<div class="tsub" id="stam-sub-' + i + '"><span class="tsub-cur" id="stam-subcur-' + i + '"></span><input class="tsub-cur-input" type="text" id="stam-direct-cur-' + i + '" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" aria-label="スロット' + (i + 1) + 'の現在スタミナ"><span class="tsub-sep" id="stam-subsep-' + i + '">/</span><span class="tsub-max" id="stam-submax-' + i + '"></span><span class="tsub-clock" id="stam-subclock-' + i + '"><span class="idle-clock" id="stam-subclock-time-' + i + '"></span><span id="stam-subclock-suffix-' + i + '"></span></span></div>' +
-              '<div class="pbar"><div class="pbar-fill stam" id="stam-bar-' + i + '" style="width:0%"></div></div>' +
             '</div>' +
           '</div>' +
-          '<div class="card abyss-idle-card ' + groupClass(i) + ' tblock-idle" id="idle-block-' + i + '" data-idle-receive="true" data-idx="' + i + '" role="button" aria-label="放置報酬。1回タップで確認、もう一度タップで受取">' +
+          '<div class="card abyss-idle-card ' + groupClass(i) + ' tblock-idle" id="idle-block-' + i + '" data-idle-receive="true" data-idx="' + i + '" role="button" aria-label="放置報酬。1回タップで確認、長押しで受取">' +
             '<span class="idle-mark daily-mark ' + groupClass(i) + (s.missionDone ? ' show' : '') + '" id="daily-mark-' + i + '" aria-hidden="true">✔</span>' +
             '<div class="ttag idle">放置報酬</div>' +
             '<div class="tval idle" id="idle-val-' + i + '">—:—</div>' +
             '<div class="tsub idle-meta" id="idle-sub-' + i + '"><span class="idle-clock" id="idle-subclock-time-' + i + '"></span><span id="idle-subclock-suffix-' + i + '"></span></div>' +
-            '<div class="pbar"><div class="pbar-fill idle" id="idle-bar-' + i + '" style="width:0%"></div></div>' +
           '</div>' +
         '</div>' +
       '</div>';
@@ -1087,6 +1069,7 @@ function build(){
   grid.innerHTML = html;
 
   cacheRefs();
+  cacheAbyssTabRefs();
   buildG();
   buildSL();
 }
@@ -1114,7 +1097,6 @@ function buildG(){
           '<span class="gsub-max" id="g-submax-' + i + '"></span>' +
           '<span class="gsub-clock" id="g-subclock-' + i + '"></span>' +
         '</div>' +
-        '<div class="gbar"><div class="gbar-fill" id="g-bar-' + i + '" style="width:0%"></div></div>' +
       '</div>';
   }
   wrap.innerHTML = html;
@@ -1130,7 +1112,6 @@ function cacheRefsG(){
       subCur: document.getElementById('g-subcur-' + i),
       subMax: document.getElementById('g-submax-' + i),
       subClock: document.getElementById('g-subclock-' + i),
-      bar: document.getElementById('g-bar-' + i),
       mark: document.getElementById('g-mark-' + i)
     });
   }
@@ -1141,20 +1122,18 @@ function buildSL(){
   if (!wrap) return;
   wrap.innerHTML =
     '<div class="slcard stam-card" id="sl-card-stamina" data-slaction="card" data-sltype="stamina">' +
-      '<div class="slhead"><span class="slname">討伐依頼</span><span class="slbadge">12分 / 1</span></div>' +
+      '<div class="slhead"><span class="slname">討伐依頼</span></div>' +
       '<div class="slmain" id="sl-stamina-main">—:—</div>' +
       '<div class="slsub sl-stamina-sub" id="sl-stamina-sub"><span class="sl-stamina-current-display" id="sl-stamina-current-display"></span><input class="sl-inline-field sl-stamina-current-input" id="sl-stamina-current-input" type="text" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" aria-label="現在のスタミナ"><span class="sl-stamina-sep">/</span><span class="sl-stamina-max-display" id="sl-stamina-max-display"></span><span id="sl-stamina-clock"></span></div>' +
-      '<div class="slbar"><div class="slbar-fill" id="sl-stamina-bar" style="width:0%"></div></div>' +
     '</div>' +
     '<div class="slcard orb-card" id="sl-card-orb" data-slaction="card" data-sltype="orb">' +
-      '<div class="slhead"><span class="slname">御大樹の恵み</span><span class="slbadge">6時間 / 1</span></div>' +
+      '<div class="slhead"><span class="slname">御大樹の恵み</span></div>' +
       '<div class="slmain slorbs" id="sl-orb-main">○○○○</div>' +
       '<div class="slsub orb-sub"><span class="orb-sub-left" id="sl-orb-next"></span><span class="sl-orb-full-wrap"><span class="sl-orb-full-display" id="sl-orb-full-display"></span><input class="sl-inline-field sl-orb-full-input" id="sl-orb-full-input" type="text" inputmode="numeric" pattern="[0-9:]*" enterkeyhint="done" aria-label="オーブ全回復までの残り時間。数字は4桁まで。342、1800、または18:00で入力"></span><span class="orb-full-at" id="sl-orb-full-at"></span></div>' +
-      '<div class="slbar"><div class="slbar-fill orb" id="sl-orb-bar" style="width:0%"></div></div>' +
     '</div>';
   slRefs = {
-    stamina: { card: document.getElementById('sl-card-stamina'), main: document.getElementById('sl-stamina-main'), current: document.getElementById('sl-stamina-current-display'), max: document.getElementById('sl-stamina-max-display'), clock: document.getElementById('sl-stamina-clock'), bar: document.getElementById('sl-stamina-bar'), input: document.getElementById('sl-stamina-current-input') },
-    orb: { card: document.getElementById('sl-card-orb'), main: document.getElementById('sl-orb-main'), next: document.getElementById('sl-orb-next'), full: document.getElementById('sl-orb-full-display'), fullAt: document.getElementById('sl-orb-full-at'), bar: document.getElementById('sl-orb-bar'), input: document.getElementById('sl-orb-full-input') }
+    stamina: { card: document.getElementById('sl-card-stamina'), main: document.getElementById('sl-stamina-main'), current: document.getElementById('sl-stamina-current-display'), max: document.getElementById('sl-stamina-max-display'), clock: document.getElementById('sl-stamina-clock'), input: document.getElementById('sl-stamina-current-input') },
+    orb: { card: document.getElementById('sl-card-orb'), main: document.getElementById('sl-orb-main'), next: document.getElementById('sl-orb-next'), full: document.getElementById('sl-orb-full-display'), fullAt: document.getElementById('sl-orb-full-at'), input: document.getElementById('sl-orb-full-input') }
   };
 }
 function getSLConfig(type){
@@ -1310,8 +1289,6 @@ function renderSL(){
   setText(slRefs.stamina.current, String(stamina.current));
   setText(slRefs.stamina.max, String(SL_STAM_MAX));
   setText(slRefs.stamina.clock, stamina.isFull ? '' : (stamina.fullAt ? '　' + formatPlanClock(stamina.fullAt) : ''));
-  setWidth(slRefs.stamina.bar, stamina.pct);
-  setClass(slRefs.stamina.bar, 'slbar-fill' + (stamina.isFull ? ' full' : ''));
 
   const filled = '●'.repeat(orb.current) + '○'.repeat(SL_ORB_MAX - orb.current);
   setText(slRefs.orb.main, filled);
@@ -1320,8 +1297,6 @@ function renderSL(){
   setClass(slRefs.orb.next, 'orb-sub-left' + (orb.isFull ? ' reached' : ''));
   setText(slRefs.orb.full, '');
   setText(slRefs.orb.fullAt, (!orb.isFull && orbCfg.timer.running && orb.fullAt) ? ('全 ' + formatPlanClock(orb.fullAt)) : '');
-  setWidth(slRefs.orb.bar, orb.pct);
-  setClass(slRefs.orb.bar, 'slbar-fill orb' + (orb.isFull ? ' full' : ''));
 }
 function setupSLDelegatedEvents(){
   const wrap = document.getElementById('slwrap');
@@ -1374,6 +1349,16 @@ function setupSLDelegatedEvents(){
     slCommitOutside();
   });
 }
+function cacheAbyssTabRefs(){
+  abyssTabRefs = {};
+  ['g0', 'g1', 'g2'].forEach((group) => {
+    abyssTabRefs[group] = {
+      tab: document.querySelector('[data-abyss-group="' + group + '"]'),
+      idleTime: document.getElementById('abyss-idle-time-' + group),
+      idleStatus: document.getElementById('abyss-idle-status-' + group)
+    };
+  });
+}
 function cacheRefs(){
   refs = [];
   for (let i = 0; i < N; i++) {
@@ -1386,12 +1371,10 @@ function cacheRefs(){
       stamSubClock: document.getElementById('stam-subclock-' + i),
       stamSubClockTime: document.getElementById('stam-subclock-time-' + i),
       stamSubClockSuffix: document.getElementById('stam-subclock-suffix-' + i),
-      stamBar: document.getElementById('stam-bar-' + i),
       idleVal: document.getElementById('idle-val-' + i),
       idleSub: document.getElementById('idle-sub-' + i),
       idleSubClockTime: document.getElementById('idle-subclock-time-' + i),
       idleSubClockSuffix: document.getElementById('idle-subclock-suffix-' + i),
-      idleBar: document.getElementById('idle-bar-' + i),
       mark: document.getElementById('daily-mark-' + i),
       stamSub: document.getElementById('stam-sub-' + i),
       directCurEl: document.getElementById('stam-direct-cur-' + i)
@@ -1430,11 +1413,9 @@ function onCardClick(i, ev){
     return;
   }
 
-  // 参考表示中の再タップは40基準値を確定し、手入力中は入力状態を保つ。
-  if (stamEdit && stamEdit.index === i) {
-    if (stamEdit.phase === DOT_EDIT_PHASE.REFERENCE) commitStamEdit();
-    return;
-  }
+  // 参考表示中の通常タップは状態を保ち、確定は長押しに限定する。
+  // 手入力中の通常タップは従来どおり入力状態を保つ。
+  if (stamEdit && stamEdit.index === i) return;
   // 別タイマーの仮値が残っている場合は、段階に応じて取消または確定だけを行う。
   if (stamEdit) {
     resolveStamEditFromOutside();
@@ -1539,22 +1520,23 @@ function formatAbyssTabMinute(remainingMs){
 }
 function renderAbyssTabIdle(shortestByGroup, stamUrgentByGroup, idleUrgentByGroup, updateInactiveTabs){
   ['g0', 'g1', 'g2'].forEach((group) => {
+    const ref = abyssTabRefs[group];
+    if (!ref) return;
     const isActive = group === activeAbyssGroup;
     const shortest = shortestByGroup[group];
     const hasTimer = shortest !== undefined;
-    const tab = document.querySelector('[data-abyss-group="' + group + '"]');
     if (isActive) {
       // 表示中のグループはカード本体が正確な秒表示を担うため、タブの重複目安は消す。
-      setText(document.getElementById('abyss-idle-time-' + group), '');
-      setText(document.getElementById('abyss-idle-status-' + group), '');
+      setText(ref.idleTime, '');
+      setText(ref.idleStatus, '');
     } else if (updateInactiveTabs) {
       // 非表示タブは分単位の目安に抑え、切替時には即時同期する。
-      setText(document.getElementById('abyss-idle-time-' + group), hasTimer ? formatAbyssTabMinute(shortest) : '');
-      setText(document.getElementById('abyss-idle-status-' + group), hasTimer ? '' : '未開始');
+      setText(ref.idleTime, hasTimer ? formatAbyssTabMinute(shortest) : '');
+      setText(ref.idleStatus, hasTimer ? '' : '未開始');
     }
-    if (tab && (isActive || updateInactiveTabs)) {
-      tab.classList.toggle('urgent', !!stamUrgentByGroup[group]);
-      tab.classList.toggle('idle-urgent', !!idleUrgentByGroup[group]);
+    if (ref.tab && (isActive || updateInactiveTabs)) {
+      ref.tab.classList.toggle('urgent', !!stamUrgentByGroup[group]);
+      ref.tab.classList.toggle('idle-urgent', !!idleUrgentByGroup[group]);
     }
   });
 }
@@ -1881,7 +1863,7 @@ function updateIdleReceiveVisual(i, armed){
     setText(val, idle.display);
     const time = document.getElementById('idle-subclock-time-' + i);
     const suffix = document.getElementById('idle-subclock-suffix-' + i);
-    setClockParts(time, suffix, '', 'もう一度タップで受取');
+    setClockParts(time, suffix, '', '長押しで受取');
   }
   syncIdleConfirmBackdrop();
 }
@@ -1916,11 +1898,8 @@ function commitIdleReceive(i){
   return true;
 }
 function onIdleTimerTap(i){
-  // 同じ放置報酬の再タップは受取確定。長押しは通常時のデイリー切替だけに使う。
-  if (Object.prototype.hasOwnProperty.call(armedIdle, i)) {
-    commitIdleReceive(i);
-    return;
-  }
+  // 確認待ち中の通常タップは受取にせず、長押しだけを確定操作にする。
+  if (Object.prototype.hasOwnProperty.call(armedIdle, i)) return;
   // 別スロットが受取確認中なら、最初のタップは確認を解除するだけにする。
   // 意図せず別の放置報酬をそのまま受取待機へ切り替えないための安全クッション。
   const hasOtherArmedIdle = Object.keys(armedIdle).some((key) => Number(key) !== i);
@@ -1963,30 +1942,27 @@ function render(){
         }
       }
       const renderVisibleCard = group === activeAbyssGroup;
-      let stamMain, stamCls, stamCurTxt, stamMaxTxt, stamClockTxt, stamClockSuffix, stamBarCls;
+      let stamMain, stamCls, stamCurTxt, stamMaxTxt, stamClockTxt, stamClockSuffix;
       if (s.stamRunning) {
         if (stam.isFull) {
           stamMain = stam.fullAt ? (formatClock(stam.fullAt) + ' 到達') : '到達'; stamCls = 'tval stam reached';
           stamCurTxt = String(stam.current); stamMaxTxt = String(s.stamMax);
           stamClockTxt = ''; stamClockSuffix = '';
-          stamBarCls = 'pbar-fill stam full';
         } else {
           stamMain = formatTime(stam.fullIn);
           stamCls = 'tval stam' + (stamUrgent ? ' urgent' : '');
           stamCurTxt = String(stam.current); stamMaxTxt = String(s.stamMax);
           stamClockTxt = formatPlanClock(stam.fullAt); stamClockSuffix = '';
-          stamBarCls = 'pbar-fill stam';
         }
       } else {
         stamMain = '—:—'; stamCls = 'tval stam';
         stamCurTxt = String(s.stamCurrent); stamMaxTxt = String(s.stamMax); stamClockTxt = ''; stamClockSuffix = '';
-        stamBarCls = 'pbar-fill stam';
       }
       // 40消費後の仮値を表示中は、状態を確定せずに現在値の表示だけ差し替える。
       if (stamEdit && stamEdit.index === i) {
         stamCurTxt = String(stamEdit.value);
         if (stamEdit.phase === DOT_EDIT_PHASE.REFERENCE) {
-          stamClockTxt = 'もう一度タップで確定';
+          stamClockTxt = '長押しで確定';
           stamClockSuffix = '';
         }
       }
@@ -1996,7 +1972,6 @@ function render(){
         setText(r.stamSubCur, stamCurTxt);
         setText(r.stamSubMax, stamMaxTxt);
         setClockParts(r.stamSubClockTime, r.stamSubClockSuffix, stamClockTxt, stamClockSuffix);
-        setWidth(r.stamBar, stam.pct); setClass(r.stamBar, stamBarCls);
         let idleCls = 'tval idle';
         if (idle.isFull) idleCls += ' reached';
         else if (idleAlertClass) idleCls += ' ' + idleAlertClass;
@@ -2005,7 +1980,7 @@ function render(){
         if (idleArmed) {
           // 受取待機中も残りタイマーを維持し、色と操作案内だけで受取待機を示す。
           setText(r.idleVal, idleMain);
-          setClockParts(r.idleSubClockTime, r.idleSubClockSuffix, '', 'もう一度タップで受取');
+          setClockParts(r.idleSubClockTime, r.idleSubClockSuffix, '', '長押しで受取');
         } else {
           setText(r.idleVal, idleMain);
           if (idle.isFull) {
@@ -2017,8 +1992,6 @@ function render(){
           }
         }
         setClass(r.idleVal, idleCls);
-        setWidth(r.idleBar, idle.pct);
-        setClass(r.idleBar, 'pbar-fill idle' + (idle.isFull ? ' full' : (idleCls.indexOf('urgent') >= 0 ? ' urgent' : '')));
       }
     }
     const minuteKey = String(Math.floor(now / 60000));
@@ -2051,28 +2024,24 @@ function renderG(){
       const r = gRefs[i];
       if (!r || !r.val) continue;
       const stam = getGStamInfo(s, now);
-      let main, cls, curTxt, maxTxt, clockTxt, barCls;
+      let main, cls, curTxt, maxTxt, clockTxt;
       if (s.stamRunning) {
         if (stam.isFull) {
           main = stam.fullAt ? (formatClock(stam.fullAt) + ' 到達') : '到達'; cls = 'gval reached';
           curTxt = String(stam.current); maxTxt = String(s.stamMax);
           clockTxt = '';
-          barCls = 'gbar-fill full';
         } else {
           main = formatGameMinute(stam.fullIn);
           cls = 'gval';
           curTxt = String(stam.current); maxTxt = String(s.stamMax);
           clockTxt = formatPlanClock(stam.fullAt);
-          barCls = 'gbar-fill';
         }
       } else {
         main = '—:—'; cls = 'gval';
         curTxt = String(s.stamCurrent); maxTxt = String(s.stamMax); clockTxt = '';
-        barCls = 'gbar-fill';
       }
       setText(r.val, main); setClass(r.val, cls);
       setText(r.subCur, curTxt); setText(r.subMax, maxTxt); setText(r.subClock, clockTxt);
-      setWidth(r.bar, stam.pct); setClass(r.bar, barCls);
     }
   } catch (e) { console.warn(e); }
 }
@@ -2265,8 +2234,9 @@ function setupDelegatedEvents(){
       mode = Object.prototype.hasOwnProperty.call(armedIdle, idleIndex) ? 'idle-armed' : 'idle-mark';
     } else if (stamCard && !(el.closest && el.closest('input'))) {
       const stamIndex = stamCard ? Number(stamCard.dataset.idx) : NaN;
-      // 40基準の確認待ちからは、長押しで現在値手入力へ切り替える。
-      mode = 'stam-manual';
+      const isReference = stamEdit && stamEdit.index === stamIndex && stamEdit.phase === DOT_EDIT_PHASE.REFERENCE;
+      // 確認待ちは長押しで確定、通常時は従来どおり現在値の手入力を開く。
+      mode = isReference ? 'stam-confirm' : 'stam-manual';
     } else return;
     const idEl = idleBlock || nameHit || rankHit || stamCard;
     const cardEl = idEl && idEl.closest ? idEl.closest('.card') : null;
@@ -2278,13 +2248,19 @@ function setupDelegatedEvents(){
     lpTimer = setTimeout(() => {
       lpTimer = null;
       if (mode === 'idle-armed') {
+        // 受取確認中の長押しは受取を確定し、直後のclickを抑止する。
+        commitIdleReceive(i);
         pendingLongPressClick = { kind: 'idle-armed', index: i };
       } else if (mode === 'idle-mark') {
         toggleMissionMark(i);
         pendingLongPressClick = { kind: 'idle-mark', index: i };
       } else if (mode === 'name') beginNameEdit(i);
       else if (mode === 'rank') beginRankEdit(i);
-      else beginStamManualInput(i);
+      else if (mode === 'stam-confirm') {
+        // 40基準の確認待ちは長押しで確定し、直後のclickを抑止する。
+        commitStamEdit();
+        pendingLongPressClick = { kind: 'stam-confirm', index: i };
+      } else beginStamManualInput(i);
     }, LP_MS);
   };
   const lpMove = (ev) => {
