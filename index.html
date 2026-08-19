@@ -392,11 +392,6 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 #gamesAll .gsub-cur,#gamesAll .gsub-max,
 #gamesAll .sl-stamina-current-display,#gamesAll .sl-stamina-max-display{font-size:8.5px;font-weight:800;}
 #gamesAll .slcard{padding:6px;}
-#gamesAll .slcard::before{
-  position:absolute;top:6px;left:6px;font:700 8px/1 var(--timer-pop-system-font);letter-spacing:.04em;color:var(--ink-dim);
-}
-#gamesAll .slcard[data-sltype="stamina"]::before{content:"討伐";}
-#gamesAll .slcard[data-sltype="orb"]::before{content:"オーブ";color:var(--reach-orb);}
 #gamesAll .daily-mark{top:6px;right:6px;font-size:14px;}
 /* v149: ゲーム側の数値入力をドットアビスの現在値表示と同じ基準線へ重ねる。 */
 #gamesAll .g-inline-current-field,
@@ -417,7 +412,6 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 }
 /* v150: 横4枠で上寄りに見えるGジェネの名前・タイマー・補助表示を一体で下げる。 */
 #gamesAll .gcard{padding:6px;}
-/* v153: ドットアビスの入力文字を通常表示と同じブラウザ外観へ揃える。 */
 #grid .tsub-cur-input{-webkit-appearance:none;appearance:none;}
 /* 到達ラベルは時刻より十分小さく、数値の下端へ寄せる。 */
 /* 到達は常に幅を確保し、表示時だけ見えるようにしてレイアウトずれを防ぐ */
@@ -1840,6 +1834,7 @@ function setupGDelegatedEvents(){
   let timer = null, sx = 0, sy = 0;
   const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } };
   const start = (ev) => {
+    if (ev.touches && ev.touches.length > 1) return;
     const target = ev.target;
     if (!target) return;
     const mark = target.closest && target.closest('.gmark');
@@ -2276,9 +2271,11 @@ function setupDelegatedEvents(){
   let lpTimer = null;
   let lpX = 0, lpY = 0;
   const LP_MS = 500;
-  const LP_MOVE2 = 12 * 12;
+  const LP_MOVE2 = 14 * 14; // 指の微ブレでキャンセルされにくくする
   const clearLp = () => { if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; } };
   const lpStart = (ev) => {
+    // 2本指などは無視（スクロール開始の誤判定を減らす）
+    if (ev.touches && ev.touches.length > 1) return;
     const el = ev.target;
     if (!el) return;
     // 直前の長押しにclickが続かなかった場合だけをここで失効させる。別操作は止めない。
@@ -2335,6 +2332,8 @@ function setupDelegatedEvents(){
   grid.addEventListener('touchstart', lpStart, { passive: true });
   grid.addEventListener('touchmove', lpMove, { passive: true });
   grid.addEventListener('touchend', clearLp, { passive: true });
+  grid.addEventListener('touchcancel', clearLp, { passive: true });
+  grid.addEventListener('contextmenu', (ev) => { ev.preventDefault(); }, { passive: false });
   grid.addEventListener('touchcancel', clearLp, { passive: true });
   grid.addEventListener('mouseleave', clearLp, { passive: true });
   grid.addEventListener('mousedown', (ev) => { if (ev.button === 0) lpStart(ev); });
