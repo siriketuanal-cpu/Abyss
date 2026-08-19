@@ -29,6 +29,13 @@
   --orb-full:#f2a4b7;
   --g0:#7c5fd6; --g1:#5b9dff; --g2:#8fa3c4;
   --stam-cur-c:#6fe8ff; --idle-c:#ffd166;
+  /* 全ゲームのカードで共有する縦方向・名称表示の基準。横幅と固有操作は各ゲームが保持する。 */
+  --timer-card-radius:12px;
+  --timer-card-pad-y:7px;
+  --timer-card-header-min:22px;
+  --timer-card-sub-height:15px;
+  --timer-card-name-size:10px;
+  --timer-card-name-weight:700;
 }
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;overscroll-behavior:none;background-color:#000;}
@@ -118,7 +125,7 @@ input,textarea{
   margin-top:2px;padding-top:8px;border-top:1px solid #5a6a88;
 }
 .card{
-  background:var(--bg-card);border:1px solid #2c2c2c;border-radius:12px;padding:7px 11px;
+  background:var(--bg-card);border:1px solid #2c2c2c;border-radius:var(--timer-card-radius);padding:var(--timer-card-pad-y) 11px;
   cursor:pointer;position:relative;-webkit-tap-highlight-color:transparent;
   touch-action:manipulation;
   flex:1 1 auto;min-width:0;
@@ -186,7 +193,7 @@ input,textarea{
 .idle-mark.disabled-by-edit{pointer-events:none;opacity:.25;}
 .rank-disp,.rank-input{
   margin-left:auto;flex-shrink:0;width:4.2em;max-width:38%;
-  color:#f0a07a;font-size:12px;font-weight:800;
+  color:#f0a07a;font-size:var(--timer-card-name-size);font-weight:var(--timer-card-name-weight);
   font-family:inherit;line-height:1.2;text-align:right;
   font-variant-numeric:tabular-nums;
   -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
@@ -213,7 +220,7 @@ input,textarea{
 
 .name-disp,.name-input{
   width:6em;max-width:38%;min-width:3.5em;
-  color:var(--ink);font-size:13px;font-weight:700;
+  color:var(--ink);font-size:var(--timer-card-name-size);font-weight:var(--timer-card-name-weight);
   font-family:inherit;line-height:1.2;
   -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
 }
@@ -377,13 +384,13 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 .gsection-note{font-size:9.5px;font-weight:400;color:#5c6785;display:none;}
 .gwrap{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
   .gcard{
-  background:var(--bg-card);border:1.5px solid #3a3a3a;border-radius:12px;padding:7px 9px;
+  background:var(--bg-card);border:1.5px solid #3a3a3a;border-radius:var(--timer-card-radius);padding:var(--timer-card-pad-y) 9px;
   cursor:pointer;position:relative;overflow:visible;-webkit-tap-highlight-color:transparent;
 }
 .gcard.g-inline-active{z-index:30;}
-.grow-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;}
+.grow-top{display:flex;align-items:center;justify-content:space-between;min-height:var(--timer-card-header-min);margin-bottom:2px;}
 .gname-disp,.gname-input{
-  font-size:10.5px;font-weight:700;color:var(--ink);
+  font-size:var(--timer-card-name-size);font-weight:var(--timer-card-name-weight);color:var(--ink);
   font-family:inherit;line-height:1.2;max-width:70%;min-width:2.5em;
   -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
 }
@@ -406,7 +413,7 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 }
 .gval.full{color:var(--reach-g)!important;}
 .gval.reached{color:var(--reach-g)!important;}
-.gsub{position:relative;font-size:10px;color:var(--ink);margin-top:1px;}
+.gsub{position:relative;height:var(--timer-card-sub-height);font-size:10px;color:var(--ink);margin-top:1px;}
 .gsub .gsub-cur{display:inline-block;width:calc(3ch + 2px);font-weight:700;text-align:right;color:#ffb35e;font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;}
 .gsub .gsub-sep{font-weight:600;color:var(--ink-dim);margin:0 1px;}
 .gsub .gsub-max{display:inline-block;width:3ch;font-weight:700;color:var(--stam-cur-c);font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;}
@@ -431,18 +438,18 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   .slsection{margin-top:14px;}
   .slwrap{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
   .slcard{
-    background:var(--bg-card);border:1.5px solid #3a3a3a;border-radius:12px;padding:7px 9px;
+    background:var(--bg-card);border:1.5px solid #3a3a3a;border-radius:var(--timer-card-radius);padding:var(--timer-card-pad-y) 9px;
     cursor:pointer;position:relative;min-width:0;overflow:visible;-webkit-tap-highlight-color:transparent;
   }
   .slcard.sl-inline-active{border-color:#6fe8ff;z-index:30;}
-  .slhead{display:flex;align-items:center;justify-content:space-between;gap:5px;min-height:22px;margin-bottom:2px;}
-  .slname{font-size:10.5px;font-weight:800;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .slhead{display:flex;align-items:center;justify-content:space-between;gap:5px;min-height:var(--timer-card-header-min);margin-bottom:2px;}
+  .slname{font-size:var(--timer-card-name-size);font-weight:var(--timer-card-name-weight);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
     .slmain{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--ok);line-height:1.1;white-space:nowrap;overflow:hidden;}
   .slmain.full,.slmain.reached{color:var(--reach-sl);}
   .slorbs{letter-spacing:2px;color:var(--reach-orb);font-size:16px;}
   .slorbs.full{color:var(--reach-orb);}
   .orb-sub-left.reached{color:var(--reach-orb);font-weight:800;}
-  .slsub{height:15px;margin-top:1px;font-size:9.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums;}
+  .slsub{height:var(--timer-card-sub-height);margin-top:1px;font-size:9.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums;}
   .slsub.sl-stamina-sub{position:relative;overflow:visible;text-overflow:clip;}
   .slsub.orb-sub{display:flex;align-items:center;gap:4px;overflow:visible;text-overflow:clip;}
   .orb-sub-left{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--orb-next);font-weight:700;}
@@ -950,6 +957,20 @@ function getLiveStamCurrent(i){
   const s = state.slots[i];
   return s.stamRunning ? getStamInfo(s, Date.now()).current : s.stamCurrent;
 }
+// 進行中の3分サイクルだけ、更新後にも次回回復までの残り時間を保つ。
+function getStamCycleStartAfterUpdate(s, now){
+  if (!s.stamRunning || !s.stamStart) return now;
+  const info = getStamInfo(s, now);
+  if (info.isFull) return now;
+  const elapsed = Math.max(0, now - s.stamStart);
+  return now - (elapsed % STAM_INTERVAL);
+}
+function applyStamCurrentPreservingCycle(s, current, now){
+  const start = getStamCycleStartAfterUpdate(s, now);
+  s.stamCurrent = clampInt(current, 0, s.stamMax, 0);
+  s.stamStart = start;
+  s.stamRunning = true;
+}
 
 function clearStamEdit(){
   if (!stamEdit) return;
@@ -1013,9 +1034,7 @@ function commitStamEdit(rawValue){
   }
   let next = value;
   if (raw !== '') next = clampInt(raw, 0, s.stamMax, next);
-  s.stamCurrent = clampInt(next, 0, s.stamMax, 0);
-  s.stamStart = Date.now();
-  s.stamRunning = true;
+  applyStamCurrentPreservingCycle(s, next, Date.now());
   clearStamEdit();
   saveState();
   syncIdleConfirmBackdrop();
@@ -1824,8 +1843,7 @@ function onRankBlur(i){
   const s = state.slots[i];
   if (s.stamRunning && s.stamStart) {
     const info = getStamInfo(s, now);
-    s.stamCurrent = info.current;
-    s.stamStart = now;
+    applyStamCurrentPreservingCycle(s, info.current, now);
   }
   s.rank = r;
   s.stamMax = stamMaxFromRank(r);
