@@ -408,15 +408,26 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 }
 /* v150: 横4枠で上寄りに見えるGジェネの名前・タイマー・補助表示を一体で下げる。 */
 #gamesAll .gcard{padding:13px 6px 6px;}
-/* v151: ドットアビスの現在値入力は表示値と同じ文字描画へ揃える。 */
+/* v153: ドットアビスの入力文字を通常表示と同じブラウザ外観へ揃える。 */
 #grid .tsub-cur-input{-webkit-appearance:none;appearance:none;}
-/* 到達ラベルだけを半分程度へ縮小し、時刻の下側基準へ寄せる。 */
+/* 到達ラベルは時刻より十分小さく、数値の下端へ寄せる。 */
 #grid .tval.stam.reached,#grid .tval.idle.reached{display:inline-flex;align-items:flex-end;gap:1px;}
 #grid .tval.stam.reached::after,#grid .tval.idle.reached::after{
-  content:"到達";font:800 8px/8px var(--timer-pop-system-font);letter-spacing:0;margin-bottom:1px;
+  content:"到達";font:800 6px/6px var(--timer-pop-system-font);letter-spacing:0;margin-bottom:1px;
 }
-/* 縮小カードでも完了状態を認識しやすいよう、右上のデイリー記号を拡大する。 */
+/* 縮小後も完了状態を見逃さないよう、ドットアビス右上のデイリー記号を拡大する。 */
 #grid .daily-mark{top:4px;right:5px;font-size:20px;line-height:20px;font-weight:900;}
+/* 放置報酬を2px上げ、スタミナのラベル・タイマー・補助行と同じY座標へ揃える。 */
+#grid .abyss-idle-card{padding-top:18px;}
+/* 背景グラデーションの切れ目が隙間に見えないよう、放置報酬を1pxだけ連結側へ重ねる。 */
+#grid .abyss-idle-card{width:calc(100% + 5px);margin-left:-5px;}
+/* スターリープの識別ラベルを撤去し、主タイマーとスタミナ行をカード下側へ揃える。 */
+#gamesAll .slcard{padding:6px;display:flex;flex-direction:column;}
+#gamesAll .slcard::before{display:none;}
+#gamesAll .slcard .slname{display:none;}
+#gamesAll .slcard .slmain{margin-top:auto;}
+/* Gジェネの数値列をスターリープと同じY座標へ揃える。 */
+#gamesAll .gcard{padding-top:18px;}
 	
 	.gsection{margin-top:14px;}
 .gsection-title{
