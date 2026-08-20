@@ -332,12 +332,11 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 /* 共通75%幅のタイマー領域を、それぞれの所属領域の中央へ揃える。 */
 #grid .card-row{justify-content:center;}
 
-/* ドットアビスを横2組・3段のコンパクトグリッドとして並べる。 */
-/* 中央スペーサを3pxに絞り、全体幅を広げて外側の余白感とカード内の余裕を両立する。 */
-/* 日付バーと同じ横幅（親 .wrap いっぱいに揃える）。中央スペーサは最小。 */
+/* ドットアビス：左右2組。中央スペーサ列を廃止し、組間は column-gap のみ（狭く・カードを広く）。 */
+/* 横幅は日付バーと同じく 100%。 */
 #grid{
-  grid-template-columns:minmax(0,1fr) minmax(0,1fr) 2px minmax(0,1fr) minmax(0,1fr);
-  column-gap:4px;row-gap:6px;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);
+  column-gap:3px;row-gap:6px;
   width:100%;max-width:none;margin:10px auto 0;padding:0;
   border:0;border-radius:0;background:transparent;
   box-sizing:border-box;
@@ -415,7 +414,6 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   color:#ffb35e;letter-spacing:inherit;
   -webkit-appearance:none;appearance:none;
 }
-/* Gジェネ2枚目〜討伐依頼の間もアビス中央並みに詰め、左右端は日付バーと揃える */
 #gamesAll{
   display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px;
   width:100%;max-width:none;margin:10px auto 0;
@@ -1292,8 +1290,8 @@ function build(){
     const groupIndex = Math.floor(i / 2);
     const group = 'g' + groupIndex;
     const row = groupIndex + 1;
-    const stamColumn = i % 2 ? 4 : 1;
-    const idleColumn = i % 2 ? 5 : 2;
+    const stamColumn = i % 2 ? 3 : 1;
+    const idleColumn = i % 2 ? 4 : 2;
     const cardVars = '--abyss-row:' + row + ';--abyss-stam-column:' + stamColumn + ';--abyss-idle-column:' + idleColumn + ';';
     html +=
       '<div class="card-row">' +
