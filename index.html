@@ -218,7 +218,7 @@ input,textarea{
 .tblock{min-width:0;}
 .ttag{font-size:9px;font-weight:700;letter-spacing:.04em;}
 /* スタミナ行ラベル枠は回復予定時刻用。サイズは旧「スタミナ」相当、極太。 */
-.ttag.stam{color:var(--reach-plan);font-weight:900;font-variant-numeric:tabular-nums;min-height:1em;letter-spacing:.02em;}
+.ttag.stam{color:var(--reach-plan);font-weight:800;font-variant-numeric:tabular-nums;min-height:1em;letter-spacing:.02em;}
 .ttag.idle{color:var(--idle-c);}
 .tval{
   font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;
@@ -344,38 +344,60 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 #grid .abyss-timers{display:contents;}
 #grid{display:grid;}
 #grid .card{
-  min-width:0;min-height:var(--timer-card-min-height);border-width:1px;box-shadow:none;
+  min-width:0;min-height:82px;border-width:1px;box-shadow:none;
   background:#090e16;transition:none;
 }
 #grid .abyss-stam-card{
   border-radius:9px 0 0 9px;border-right:0!important;
-  padding:6px 6px 6px 8px;background:#090e16;
+  padding:6px 6px 4px 8px;background:#090e16;
+  display:flex;flex-direction:column;
+}
+#grid .abyss-stam-card .tblock-stam{
+  display:flex;flex-direction:column;flex:0 0 auto;margin-top:auto;
 }
 #grid .abyss-idle-card{
   width:calc(100% + 4px);margin-left:-4px;
   border-radius:0 9px 9px 0;border-left:0!important;
-  padding:20px 7px 6px 6px;background:#090e16;
+  padding:6px 7px 4px 6px;background:#090e16;
+  display:flex;flex-direction:column;
 }
+#grid .abyss-idle-card .ttag.idle{margin-top:auto;}
 #grid .card.g0{border-color:var(--g0)!important;}
 #grid .card.g1{border-color:var(--g1)!important;}
 #grid .card.g2{border-color:var(--g2)!important;}
 /* 行・列はカードごとのCSS変数で与え、全スロットを同じグリッド規則へ統一する。 */
 #grid .abyss-stam-card{grid-row:var(--abyss-row);grid-column:var(--abyss-stam-column);}
 #grid .abyss-idle-card{grid-row:var(--abyss-row);grid-column:var(--abyss-idle-column);}
-#grid .row-top{min-height:10px;gap:2px;margin-bottom:2px;}
+#grid .row-top{min-height:17px;gap:3px;margin-bottom:4px;align-items:center;}
 #grid .name-disp,#grid .name-input,#grid .rank-disp,#grid .rank-input{
-  font-size:7.5px;line-height:1;min-width:0;
+  font-size:10.5px;line-height:1.15;min-width:0;
 }
-/* 名前はサイズ据え置き・極太（900）。空表示は少し控えめ。 */
-#grid .name-disp,#grid .name-input{max-width:66%;font-weight:900;}
-#grid .name-disp.empty{font-weight:700;}
+#grid .name-disp,#grid .name-input{max-width:66%;font-weight:800;}
+#grid .name-disp.empty{font-weight:600;}
+#grid .rank-disp,#grid .rank-input{font-weight:800;}
 #grid .rank-lp-hit{min-width:auto;}
 #grid .ttag{font-size:8px;line-height:1.05;letter-spacing:0;}
-/* 予定時刻は旧「スタミナ」と同じ8px、極太900（中央寄せはしない） */
-#grid .ttag.stam{font-size:8px;font-weight:900;line-height:1.05;letter-spacing:.02em;color:var(--reach-plan);}
+/*
+ * 予定時刻は丸み数字フォントを外し、和文UIフォントでサイズを上げる。
+ * （ui-rounded は極小数字向けで、拡大時に窮屈に見えやすい）
+ */
+#grid .ttag.stam{
+  font-size:10px;font-weight:800;line-height:1.15;letter-spacing:.02em;color:var(--reach-plan);
+  font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic UI","Yu Gothic",Meiryo,system-ui,sans-serif;
+  font-variant-numeric:tabular-nums;
+}
+#grid .abyss-stam-card .ttag.stam,
+#grid .abyss-idle-card .ttag.idle{margin-bottom:3px;}
 #grid .tval{font-size:var(--timer-main-size);line-height:1.05;}
 #grid .tsub{height:var(--timer-card-sub-height);margin-top:1px;font-size:var(--timer-sub-font);line-height:var(--timer-card-sub-height);font-weight:700;}
+#grid .abyss-stam-card .tsub,
+#grid .abyss-idle-card .tsub{
+  margin-top:3px;height:15px;line-height:15px;font-size:11px;
+}
 #grid .tsub-cur,#grid .tsub-max{font-size:var(--timer-sub-font);font-weight:800;}
+#grid .abyss-stam-card .tsub-cur,
+#grid .abyss-stam-card .tsub-max{font-size:11px;font-weight:800;}
+#grid .abyss-stam-card .tsub-cur-input{height:15px;line-height:15px;font-size:11px;}
 #grid .daily-mark{top:4px;right:5px;font-size:26px;line-height:1;font-weight:900;}
 #grid .card.stam-preview{background:rgba(0,0,0,.46)!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)!important;}
 /* コンパクト時も手入力欄を現在値表示と同じ幅・基準線・数字フォントへ完全に重ねる。 */
@@ -460,9 +482,7 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 }
 /* 縮小後も完了状態を見逃さないよう、ドットアビス右上のデイリー記号を拡大する。 */
 #grid .daily-mark{top:4px;right:5px;font-size:26px;line-height:26px;font-weight:900;}
-/* 放置報酬を2px上げ、スタミナのラベル・タイマー・補助行と同じY座標へ揃える。 */
-#grid .abyss-idle-card{padding-top:18px;}
-/* 背景グラデーションの切れ目が隙間に見えないよう、放置報酬を1pxだけ連結側へ重ねる。 */
+/* タイマー一式は margin-top:auto で下寄せ。連結の重ねだけ維持。 */
 #grid .abyss-idle-card{width:calc(100% + 5px);margin-left:-5px;}
 /* スターリープの識別ラベルを撤去し、主タイマーとスタミナ行をカード下側へ揃える。 */
 /* スターリープ名称を表示し、Gジェネとヘッダー高さを揃える */
@@ -610,10 +630,11 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   .tsub-cur,.tsub-max,.gsub .gsub-cur,.gsub .gsub-max,.sl-stamina-current-display,
   .tsub-cur-input,.g-inline-field,.sl-stamina-current-input,
   .sl-orb-full-display,.sl-inline-field.sl-orb-full-input,.orb-full-at,
-  .ttag.stam,.idle-clock,.gsub-clock,#sl-stamina-clock,.orb-sub-left{
+  .idle-clock,.gsub-clock,#sl-stamina-clock,.orb-sub-left{
     font-family:var(--timer-pop-system-font);
     font-variant-numeric:tabular-nums;
   }
+  /* .ttag.stam（予定時刻）は丸みフォント対象外。#grid 側で和文UIフォント＋大きめサイズを指定。 */
 
   /* 数値インライン入力の共通基準。キャレットの高さ・太さは文字サイズと行高に従うため、全タイマーで同じ値へ揃える。 */
   .tsub-cur-input,.g-inline-field,.sl-stamina-current-input,.sl-inline-field.sl-orb-full-input{
