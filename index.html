@@ -332,7 +332,7 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 /* 共通75%幅のタイマー領域を、それぞれの所属領域の中央へ揃える。 */
 #grid .card-row{justify-content:center;}
 
-/* v141: 2段のドットアビスを、4要素すべて一行のコンパクトレールへ再構成する。 */
+/* ドットアビスを横2組・3段のコンパクトグリッドとして並べる。 */
 /* 中央スペーサを3pxに絞り、全体幅を広げて外側の余白感とカード内の余裕を両立する。 */
 #grid{
   grid-template-columns:minmax(0,1fr) minmax(0,1fr) 3px minmax(0,1fr) minmax(0,1fr);
@@ -343,7 +343,6 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 #grid .card-row{display:contents!important;}
 #grid .abyss-timers{display:contents;}
 #grid{display:grid;}
-#grid .abyss-timers{display:contents;}
 #grid .card{
   min-width:0;min-height:var(--timer-card-min-height);border-width:1px;box-shadow:none;
   background:#090e16;transition:none;
@@ -406,7 +405,7 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 #gamesAll .sl-stamina-current-display,#gamesAll .sl-stamina-max-display{font-size:var(--timer-sub-font);font-weight:800;}
 #gamesAll .slcard{padding:6px;}
 #gamesAll .daily-mark{top:6px;right:6px;font-size:14px;}
-/* v149: ゲーム側の数値入力をドットアビスの現在値表示と同じ基準線へ重ねる。 */
+/* ゲーム側の数値入力を、通常の現在値表示と同じ基準線へ重ねる。 */
 #gamesAll .g-inline-current-field,
 #gamesAll .sl-stamina-current-input{
   left:0;top:0;width:calc(3ch + 2px);height:var(--timer-card-sub-height);
@@ -423,9 +422,8 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   text-align:left;color:var(--stam-cur-c);letter-spacing:inherit;
   -webkit-appearance:none;appearance:none;
 }
-/* v150: 横4枠で上寄りに見えるGジェネの名前・タイマー・補助表示を一体で下げる。 */
+/* 横4枠のGジェネで、名前・タイマー・補助表示の縦位置を揃える。 */
 #gamesAll .gcard{padding:6px;}
-#grid .tsub-cur-input{-webkit-appearance:none;appearance:none;}
 /* 到達ラベルは時刻より十分小さく、数値の下端へ寄せる。 */
 /* 到達は常に幅を確保し、表示時だけ見えるようにしてレイアウトずれを防ぐ */
 #grid .tval.stam,
@@ -458,38 +456,6 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 }
 #gamesAll .gval.reached::after,
 #gamesAll .slmain.reached::after{
-  opacity:1;
-}
-/* オーブ「次」行：左右に寄せ、漢字ラベルは数字より一段小さく。 */
-.orb-sub-left{
-  display:inline-flex;
-  align-items:flex-end;
-  gap:1px;
-  overflow:hidden !important;
-  text-overflow:ellipsis !important;
-  white-space:nowrap !important;
-  min-width:0 !important;
-  flex:1 1 auto;
-  color:var(--orb-next);
-  font-weight:700;
-  font-size:9px;
-}
-.orb-label{
-  font-size:7px;
-  font-weight:700;
-  letter-spacing:0;
-  line-height:1;
-  margin-right:1px;
-  flex-shrink:0;
-  opacity:.9;
-}
-.orb-sub-left::after{content:none;}
-.orb-sub-left.reached::after{
-  content:"到達";
-  font:800 6px/6px var(--timer-pop-system-font);
-  letter-spacing:0;
-  margin-bottom:1px;
-  flex-shrink:0;
   opacity:1;
 }
 /* 縮小後も完了状態を見逃さないよう、ドットアビス右上のデイリー記号を拡大する。 */
@@ -623,14 +589,8 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   .slmain.full,.slmain.reached{color:var(--reach-sl);}
   .slorbs{letter-spacing:var(--timer-orb-tracking);color:var(--reach-orb);font-size:var(--timer-orb-size);}
   .slorbs.full{color:var(--reach-orb);}
-  .orb-sub-left.reached{color:var(--reach-orb);font-weight:800;}
   .slsub{height:var(--timer-card-sub-height);margin-top:1px;font-size:9.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums;}
-  .slsub.orb-sub{overflow:hidden;text-overflow:clip;height:auto;min-height:var(--timer-card-sub-height);}
   .slsub.sl-stamina-sub{position:relative;overflow:visible;text-overflow:clip;}
-  .slsub.orb-sub{display:flex;align-items:center;justify-content:space-between;gap:2px;overflow:hidden;text-overflow:clip;}
-  .orb-sub-left{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--orb-next);font-weight:700;font-size:9px;}
-  .sl-orb-full-wrap{display:inline-flex;align-items:center;gap:1px;white-space:nowrap;flex:0 0 auto;}
-  .orb-full-at{margin-left:0;color:var(--orb-full);font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums;font-size:9px;flex:0 0 auto;}
   #sl-stamina-clock{color:var(--reach-plan);font-weight:700;margin-left:3px;}
   .sl-stamina-sep{font-weight:600;color:var(--ink-dim);margin:0 1px;}
   .sl-stamina-max-display{display:inline;font-weight:700;color:var(--stam-cur-c);font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;}
@@ -640,68 +600,6 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   /* 手入力中も同じ3桁領域を使い、入力欄と後続の/上限値を安定させる。 */
   .slcard.sl-inline-current .sl-stamina-current-display{visibility:hidden;width:calc(3ch + 2px);}
   .slcard.sl-inline-current .sl-stamina-current-input{display:block;left:0;color:#ffb35e;}
-  .slsub.orb-sub{
-    display:flex !important;
-    align-items:center;
-    justify-content:space-between;
-    gap:2px;
-    overflow:hidden !important;
-    text-overflow:clip !important;
-    height:auto !important;
-    min-height:11px;
-    white-space:nowrap;
-    min-width:0;
-  }
-  #gamesAll .slcard .slsub.orb-sub{
-    overflow:hidden !important;
-    text-overflow:clip !important;
-    gap:2px;
-    /* Gジェネの gsub よりわずかに下げ、左右端へ寄せる */
-    margin-top:3px;
-    padding:0 1px;
-    justify-content:space-between;
-  }
-  #gamesAll .slcard.orb-card{padding:5px 5px 3px;min-width:0;}
-  #gamesAll .slcard .orb-sub-left{font-size:9px;line-height:var(--timer-card-sub-height);justify-self:start;}
-  #gamesAll .slcard .orb-label{font-size:7px;line-height:var(--timer-card-sub-height);}
-  #gamesAll .slcard .orb-full-at{font-size:9px;line-height:var(--timer-card-sub-height);margin-left:0;}
-  .sl-orb-full-wrap{
-    flex:0 0 auto;
-    position:relative;
-    display:inline-flex;
-    align-items:center;
-    justify-content:center;
-    min-width:0;
-    margin-left:auto;
-  }
-  .orb-full-at{
-    flex:0 0 auto;
-    margin-left:0;
-    white-space:nowrap;
-    font-size:9px;
-  }
-  .slcard.sl-inline-orb .sl-orb-full-display{display:none;}
-  .slcard.sl-inline-orb .orb-full-at{display:none;} /* 入力中は右側を空けて「次」を優先 */
-  .slcard.sl-inline-orb .sl-orb-full-input{
-    display:inline-block;
-    position:relative;
-    width:34px;
-    min-width:34px;
-    max-width:36px;
-    height:12px;
-    margin:0;
-    padding:0 1px;
-    box-sizing:border-box;
-    border:1px solid #4a5a78;
-    border-radius:3px;
-    background:var(--bg-inset,#111);
-    color:var(--ink);
-    font-size:8px;
-    line-height:12px;
-    font-weight:700;
-    text-align:center;
-  }
-
   /*
    * 任意の数値表示用フォント（外部通信・追加ファイルなし）。
    * 不要なら、このブロック全体だけを削除すれば従来の表示へ戻る。
@@ -737,6 +635,101 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   }
   .sl-stamina-current-input{
     width:calc(3ch + 1.5px);height:13px;top:1px;font-size:9.5px;line-height:13px;text-align:right;
+  }
+
+  /* STAR LEAP オーブ補助行: 共通レイアウト */
+  .slsub.orb-sub{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    gap:2px;
+    min-width:0;
+    min-height:var(--timer-card-sub-height);
+    height:auto;
+    overflow:hidden;
+    text-overflow:clip;
+    white-space:nowrap;
+  }
+  .orb-sub-left{
+    display:inline-flex;
+    align-items:baseline;
+    gap:1px;
+    min-width:0;
+    flex:1 1 auto;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    color:var(--orb-next);
+    font-size:9px;
+    font-weight:700;
+    line-height:var(--timer-card-sub-height);
+  }
+  .orb-label{
+    flex:0 0 auto;
+    margin-right:1px;
+    font-size:7px;
+    font-weight:700;
+    line-height:var(--timer-card-sub-height);
+    letter-spacing:0;
+    opacity:.9;
+  }
+  .orb-sub-left::after{
+    content:"到達";
+    flex:0 0 2.5em;
+    font:800 7px/var(--timer-card-sub-height) var(--timer-pop-system-font);
+    letter-spacing:0;
+    text-align:left;
+    visibility:hidden;
+  }
+  .sl-orb-full-wrap{
+    display:inline-flex;
+    align-items:baseline;
+    justify-content:flex-end;
+    min-width:0;
+    margin-left:auto;
+    white-space:nowrap;
+    flex:0 0 auto;
+  }
+  .orb-full-at{
+    flex:0 0 auto;
+    margin-left:0;
+    color:var(--orb-full);
+    font-size:9px;
+    font-weight:700;
+    line-height:var(--timer-card-sub-height);
+    white-space:nowrap;
+  }
+
+  /* STAR LEAP オーブ補助行: 横4枠レイアウト */
+  #gamesAll .slcard.orb-card{padding:5px 5px 3px;min-width:0;}
+  #gamesAll .slcard .slsub.orb-sub{margin-top:3px;padding:0 1px;}
+  #gamesAll .slcard .orb-sub-left{font-size:9px;}
+  #gamesAll .slcard .orb-label{font-size:7px;}
+  #gamesAll .slcard .orb-full-at{font-size:9px;}
+
+  /* STAR LEAP オーブ補助行: 満タン・編集の特殊状態 */
+  .orb-sub-left.reached{color:var(--reach-orb);font-weight:800;}
+  .orb-sub-left.reached::after{visibility:visible;}
+  .slcard.sl-inline-orb .sl-orb-full-display,
+  .slcard.sl-inline-orb .orb-full-at{display:none;}
+  .slcard.sl-inline-orb .sl-orb-full-input{
+    display:inline-block;
+    position:relative;
+    width:34px;
+    min-width:34px;
+    max-width:36px;
+    height:12px;
+    margin:0;
+    padding:0 1px;
+    box-sizing:border-box;
+    border:1px solid #4a5a78;
+    border-radius:3px;
+    background:var(--bg-inset,#111);
+    color:var(--ink);
+    font-size:8px;
+    line-height:12px;
+    font-weight:700;
+    text-align:center;
   }
   </style>
 </head>
