@@ -1911,14 +1911,17 @@ function setupGDelegatedEvents(){
   const wrap = document.getElementById('gwrap');
   if (!wrap || wrap.dataset.gInlineReady) return;
   wrap.dataset.gInlineReady = '1';
+  let gNameLongPressClickUntil = 0;
 
   wrap.addEventListener('click', (ev) => {
     const target = ev.target;
     if (target.closest && target.closest('input')) return;
     const mark = target.closest && target.closest('.gmark');
     const name = target.closest && target.closest('.gname-lp-hit');
-    // チェックと名前はそれぞれ長押し専用。通常タップをカード操作へ流さない。
-    if (mark || name) return;
+    // チェックは長押し専用。名前は通常タップをカード操作へ通す。
+    if (mark) return;
+    // 名前の長押し後にブラウザが発火する自動クリックだけは、編集を閉じないよう短時間無視する。
+    if (name && performance.now() < gNameLongPressClickUntil) return;
     const card = target.closest && target.closest('.gcard');
     if (!card) return;
     const i = Number(card.dataset.idx);
@@ -1957,7 +1960,11 @@ function setupGDelegatedEvents(){
     timer = setTimeout(() => {
       timer = null;
       if (mark) { toggleGMark(Number(mark.dataset.idx)); return; }
-      if (name) { beginGNameEdit(Number(card.dataset.idx)); return; }
+      if (name) {
+        gNameLongPressClickUntil = performance.now() + 360;
+        beginGNameEdit(Number(card.dataset.idx));
+        return;
+      }
       gBeginEdit(Number(card.dataset.idx), G_EDIT_MODE.MAX);
     }, 500);
   };
