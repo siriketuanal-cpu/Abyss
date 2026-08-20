@@ -334,17 +334,19 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 
 /* ドットアビスを横2組・3段のコンパクトグリッドとして並べる。 */
 /* 中央スペーサを3pxに絞り、全体幅を広げて外側の余白感とカード内の余裕を両立する。 */
+/* 日付バーと同じ横幅（親 .wrap いっぱいに揃える）。中央スペーサは最小。 */
 #grid{
-  grid-template-columns:minmax(0,1fr) minmax(0,1fr) 3px minmax(0,1fr) minmax(0,1fr);
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr) 2px minmax(0,1fr) minmax(0,1fr);
   column-gap:4px;row-gap:6px;
-  width:min(calc(100% - 8px),460px);margin:10px auto 0;padding:0;
+  width:100%;max-width:none;margin:10px auto 0;padding:0;
   border:0;border-radius:0;background:transparent;
+  box-sizing:border-box;
 }
 #grid .card-row{display:contents!important;}
 #grid .abyss-timers{display:contents;}
 #grid{display:grid;}
 #grid .card{
-  min-width:0;min-height:82px;border-width:1px;box-shadow:none;
+  min-width:0;min-height:86px;border-width:1px;box-shadow:none;
   background:#090e16;transition:none;
 }
 #grid .abyss-stam-card{
@@ -377,36 +379,32 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 #grid .rank-disp,#grid .rank-input{font-weight:800;}
 #grid .rank-lp-hit{min-width:auto;}
 #grid .ttag{font-size:8px;line-height:1.05;letter-spacing:0;}
-/*
- * 予定時刻は丸みフォント外し・11px。
- * 放置ラベルと行ボックス高さを揃えて、横並びで同じYに見えるようにする。
- */
 #grid .ttag.stam{
   font-size:11px;font-weight:800;line-height:13px;letter-spacing:.02em;color:var(--reach-plan);
   font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic UI","Yu Gothic",Meiryo,system-ui,sans-serif;
   font-variant-numeric:tabular-nums;
   min-height:13px;height:13px;box-sizing:border-box;
+  display:flex;align-items:flex-end;
 }
 #grid .abyss-idle-card .ttag.idle{
   font-size:8px;font-weight:700;line-height:13px;letter-spacing:0;
   min-height:13px;height:13px;box-sizing:border-box;
   display:flex;align-items:flex-end;
 }
-#grid .abyss-stam-card .ttag.stam{
-  display:flex;align-items:flex-end;
-}
 #grid .abyss-stam-card .ttag.stam,
 #grid .abyss-idle-card .ttag.idle{margin-bottom:3px;}
-#grid .tval{font-size:var(--timer-main-size);line-height:1.05;}
+#grid .tval{font-size:clamp(16px,4.6vw,19px);line-height:1.05;}
 #grid .tsub{height:var(--timer-card-sub-height);margin-top:1px;font-size:var(--timer-sub-font);line-height:var(--timer-card-sub-height);font-weight:700;}
 #grid .abyss-stam-card .tsub,
 #grid .abyss-idle-card .tsub{
-  margin-top:3px;height:15px;line-height:15px;font-size:11px;
+  margin-top:3px;height:17px;line-height:17px;font-size:13px;
 }
 #grid .tsub-cur,#grid .tsub-max{font-size:var(--timer-sub-font);font-weight:800;}
 #grid .abyss-stam-card .tsub-cur,
-#grid .abyss-stam-card .tsub-max{font-size:11px;font-weight:800;}
-#grid .abyss-stam-card .tsub-cur-input{height:15px;line-height:15px;font-size:11px;}
+#grid .abyss-stam-card .tsub-max,
+#grid .abyss-idle-card .tsub-cur,
+#grid .abyss-idle-card .tsub-max{font-size:13px;font-weight:800;}
+#grid .abyss-stam-card .tsub-cur-input{height:17px;line-height:17px;font-size:13px;}
 #grid .daily-mark{top:4px;right:5px;font-size:26px;line-height:1;font-weight:900;}
 #grid .card.stam-preview{background:rgba(0,0,0,.46)!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)!important;}
 /* コンパクト時も手入力欄を現在値表示と同じ幅・基準線・数字フォントへ完全に重ねる。 */
@@ -417,9 +415,11 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   color:#ffb35e;letter-spacing:inherit;
   -webkit-appearance:none;appearance:none;
 }
+/* Gジェネ2枚目〜討伐依頼の間もアビス中央並みに詰め、左右端は日付バーと揃える */
 #gamesAll{
-  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;
-  width:min(calc(100% - 8px),460px);margin:10px auto 0;
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px;
+  width:100%;max-width:none;margin:10px auto 0;
+  box-sizing:border-box;
 }
 #gamesAll .game-tab-panel,#gamesAll .gsection,#gamesAll .slsection,#gamesAll .gwrap,#gamesAll .slwrap{display:contents!important;}
 #gamesAll .gsection-title{display:none;}
@@ -464,7 +464,7 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 #grid .tval.stam::after,
 #grid .tval.idle::after{
   content:"到達";
-  font:800 6px/6px var(--timer-pop-system-font);
+  font:800 10px/10px var(--timer-pop-system-font);
   letter-spacing:0;margin-bottom:1px;
   opacity:0; /* 非到達時も同じ幅を確保 */
   flex-shrink:0;
@@ -480,7 +480,7 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 #gamesAll .gval::after,
 #gamesAll .slmain::after{
   content:"到達";
-  font:800 6px/6px var(--timer-pop-system-font);
+  font:800 10px/10px var(--timer-pop-system-font);
   letter-spacing:0;margin-bottom:1px;
   opacity:0;
   flex-shrink:0;
@@ -705,7 +705,7 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   .orb-sub-left::after{
     content:"到達";
     flex:0 0 2.5em;
-    font:800 7px/var(--timer-card-sub-height) var(--timer-pop-system-font);
+    font:800 10px/var(--timer-card-sub-height) var(--timer-pop-system-font);
     letter-spacing:0;
     text-align:left;
     visibility:hidden;
