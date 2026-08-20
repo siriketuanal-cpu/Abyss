@@ -160,6 +160,16 @@ input,textarea{
   color:#d0d8e8;background:transparent;border:none;box-shadow:none;
   text-shadow:0 0 7px rgba(208,216,232,.55);
 }
+.abyss-idle-card .weekly-mark{
+  position:absolute;z-index:2;right:10px;bottom:25px;
+  color:transparent;font-size:18px;line-height:1;font-weight:900;
+  text-shadow:none;pointer-events:none;cursor:inherit;
+  -webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;user-select:none;
+}
+.abyss-idle-card .weekly-mark.show{
+  color:#4f9b70;
+  text-shadow:0 1px 0 rgba(0,0,0,.78),0 -1px 0 rgba(174,255,203,.18);
+}
 .idle-mark.disabled-by-edit{pointer-events:none;opacity:.25;}
 .rank-disp,.rank-input{
   margin-left:auto;flex-shrink:0;width:4.2em;max-width:38%;
@@ -784,7 +794,8 @@ const N = 6;
 const STAM_INTERVAL = 3 * 60 * 1000;
 const IDLE_DEFAULT_CAP_MS = 12 * 3600 * 1000;
 // ドットアビスの確認待ちは、画面外を押すまで維持し、再タップで確定する。
-const IDLE_LEAD_MS = 2 * 60 * 1000;
+// 秒表示を使わないため、開始時の見た目にも差が出る5分補正を使う。
+const IDLE_LEAD_MS = 5 * 60 * 1000;
 const URGENT_MS = 2 * 60 * 60 * 1000;
 const STAM_MAX_BASE = 240;
 const STAM_MAX_PER_LEVEL = 5;
@@ -798,7 +809,7 @@ const defaultSlot = () => ({
   rank: 1,
   stamCurrent: 0, stamMax: 240, stamStart: null, stamRunning: false,
   idleStart: null, idleCapMs: IDLE_DEFAULT_CAP_MS, idleRunning: false,
-  missionDone: false
+  missionDone: false, weeklyDone: false
 });
 
 function stamMaxFromRank(rank){
@@ -831,7 +842,7 @@ const defaultSLState = () => ({ stamina: defaultSLTimer(), orb: defaultSLTimer()
 let slEdit = null;
 let slRefs = {};
 
-let state = { slots: Array.from({ length: N }, defaultSlot), dailyDate: '', g: { slots: Array.from({ length: GN }, defaultGSlot), dailyDate: '' }, sl: defaultSLState() };
+let state = { slots: Array.from({ length: N }, defaultSlot), dailyDate: '', weeklyDate: '', g: { slots: Array.from({ length: GN }, defaultGSlot), dailyDate: '' }, sl: defaultSLState() };
 
 let storageOk = true;
 let textEditIdx = -1;
@@ -848,7 +859,8 @@ let armedIdle = {};
 let stamEdit = null;
 // 手入力中に同じタイマーをタップした際、そのタップは確定操作として一度だけ消費する。
 let pendingManualStamTap = -1;
-// 長押し確定・長押しチェックの直後に発生する同一カードのclickだけを消費する。時間ベースの全体ガードにはしない。
+// 長押しの終了直後にブラウザが発火する同一カードのclickだけを短時間で消費する。
+// 新しいタップ開始時には必ず解除するため、次の意図的な操作は止めない。
 let pendingLongPressClick = null;
 // 数値インライン編集の状態定数。入口操作はゲーム別のまま、状態遷移だけを明文化する。
 const DOT_EDIT_PHASE = Object.freeze({ REFERENCE: 'reference', MANUAL: 'manual' });
@@ -856,6 +868,7 @@ const G_EDIT_MODE = Object.freeze({ ARMED: 'armed', CURRENT: 'current', MAX: 'ma
 let labelSaveTimer = null;
 let lastProgressSig = '';
 let lastDailyLabel = '';
+let lastIdleQuickTap = { index: -1, at: 0 };
 
 function dayStrAt(resetHour){
   const d = new Date();
@@ -863,6 +876,13 @@ function dayStrAt(resetHour){
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 function gameDayStr(){ return dayStrAt(5); }
+function weekStrAt(resetHour){
+  const d = new Date();
+  if (d.getHours() < resetHour) d.setDate(d.getDate() - 1);
+  const mondayOffset = (d.getDay() + 6) % 7;
+  d.setDate(d.getDate() - mondayOffset);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
 function formatDateJP(iso){
   if (!iso) return '—';
   const p = iso.split('-');
@@ -953,6 +973,18 @@ function ensureDailyDate(){
   renderDailyProgress();
 }
 
+function ensureWeeklyDate(){
+  const week = weekStrAt(5);
+  if (state.weeklyDate !== week) {
+    state.weeklyDate = week;
+    state.slots.forEach(s => { s.weeklyDone = false; });
+    for (let i = 0; i < refs.length; i++) {
+      if (refs[i] && refs[i].weeklyMark) refs[i].weeklyMark.classList.remove('show');
+    }
+    saveState();
+  }
+}
+
 function renderDailyProgress(){
   const el = document.getElementById('dailyProgress');
   if (!el) return;
@@ -979,7 +1011,7 @@ function renderDailyProgress(){
 function parseStoredState(){
   if (typeof localStorage === 'undefined') throw new Error('no localStorage');
   const raw = localStorage.getItem(STORAGE_KEY);
-  const result = { slots: null, dailyDate: gameDayStr(), g: { slots: null, dailyDate: dayStrAt(G_RESET_HOUR) }, sl: defaultSLState() };
+  const result = { slots: null, dailyDate: gameDayStr(), weeklyDate: weekStrAt(5), g: { slots: null, dailyDate: dayStrAt(G_RESET_HOUR) }, sl: defaultSLState() };
   if (raw) {
     const parsed = JSON.parse(raw);
     if (parsed.slots && Array.isArray(parsed.slots) && parsed.slots.length === N) {
@@ -1016,10 +1048,12 @@ function parseStoredState(){
           o.idleRunning = true;
         }
         o.missionDone = !!s.missionDone;
+        o.weeklyDone = !!s.weeklyDone;
         return o;
       });
     }
     result.dailyDate = typeof parsed.dailyDate === 'string' ? parsed.dailyDate : gameDayStr();
+    result.weeklyDate = typeof parsed.weeklyDate === 'string' ? parsed.weeklyDate : weekStrAt(5);
     result.g = result.g || { slots: null, dailyDate: dayStrAt(G_RESET_HOUR) };
     if (parsed.g && Array.isArray(parsed.g.slots) && parsed.g.slots.length === GN) {
       const now2 = Date.now();
@@ -1068,6 +1102,7 @@ function loadState(){
     const parsed = parseStoredState();
     if (parsed.slots) state.slots = parsed.slots;
     state.dailyDate = parsed.dailyDate;
+    state.weeklyDate = parsed.weeklyDate;
     if (parsed.g && parsed.g.slots) state.g.slots = parsed.g.slots;
     if (parsed.g) state.g.dailyDate = parsed.g.dailyDate;
     if (parsed.sl) state.sl = parsed.sl;
@@ -1312,6 +1347,7 @@ function build(){
           '</div>' +
           '<div class="card abyss-idle-card ' + group + ' tblock-idle" id="idle-block-' + i + '" style="' + cardVars + '" data-idle-receive="true" data-idx="' + i + '" role="button" aria-label="放置報酬。1回タップで確認、受取">' +
             '<span class="idle-mark daily-mark ' + group + (s.missionDone ? ' show' : '') + '" id="daily-mark-' + i + '" aria-hidden="true">✔</span>' +
+            '<span class="weekly-mark' + (s.weeklyDone ? ' show' : '') + '" id="weekly-mark-' + i + '" aria-hidden="true">✦</span>' +
             '<div class="ttag idle">放置報酬</div>' +
             '<div class="tval idle" id="idle-val-' + i + '">—:—</div>' +
             '<div class="tsub idle-meta" id="idle-sub-' + i + '"><span class="idle-clock" id="idle-subclock-time-' + i + '"></span><span id="idle-subclock-suffix-' + i + '"></span></div>' +
@@ -1639,6 +1675,7 @@ function cacheRefs(){
       idleSubClockTime: document.getElementById('idle-subclock-time-' + i),
       idleSubClockSuffix: document.getElementById('idle-subclock-suffix-' + i),
       mark: document.getElementById('daily-mark-' + i),
+      weeklyMark: document.getElementById('weekly-mark-' + i),
       stamSub: document.getElementById('stam-sub-' + i),
       directCurEl: document.getElementById('stam-direct-cur-' + i)
     });
@@ -1653,8 +1690,8 @@ function softBlur(){
 
 function onCardClick(i, ev){
   const t = ev.target;
-  // スタミナカード全体（上部空白・タイマー部を含む）を単一の通常タップ入口として扱う。
-  // 名前・ランクの実際の文字部分だけは、上位の長押し専用判定で静かに除外される。
+  // スタミナカード全体（名前・ランク・上部空白・タイマー部を含む）を単一の通常タップ入口として扱う。
+  // 名前・ランクの長押しだけは、委譲された長押し判定が先に編集へ切り替える。
   if (!t || !t.closest) return;
   if (t.closest('input') || t.closest('button') || t.closest('.name-input') || t.closest('.rank-input')) return;
 
@@ -1966,6 +2003,13 @@ function toggleMissionMark(i){
   }
   renderDailyProgress();
 }
+function toggleWeeklyMark(i){
+  const s = state.slots[i];
+  const mark = refs[i] && refs[i].weeklyMark;
+  s.weeklyDone = !s.weeklyDone;
+  saveState();
+  if (mark) mark.classList.toggle('show', s.weeklyDone);
+}
 
 function beginRankEdit(i){
   for (let j = 0; j < N; j++) endNameEditVisual(j);
@@ -2080,6 +2124,7 @@ function onIdleTimerTap(i){
 function render(){
   try {
     ensureDailyDate();
+    ensureWeeklyDate();
     const now = Date.now();
     if (!refs.length) return;
     for (let i = 0; i < N; i++) {
@@ -2266,14 +2311,26 @@ function setupDelegatedEvents(){
     const actionIndex = actionCard ? Number(actionCard.dataset.idx) : NaN;
     if (pendingLongPressClick) {
       const sameCard = Number.isFinite(actionIndex) && actionIndex === pendingLongPressClick.index;
+      const withinWindow = performance.now() <= pendingLongPressClick.expiresAt;
       pendingLongPressClick = null;
-      if (sameCard) return;
+      if (sameCard && withinWindow) return;
     }
     const idleBlock = t.closest && t.closest('[data-idle-receive]');
     if (idleBlock) {
       const cardEl = idleBlock.closest('.card');
       const idx = cardEl ? Number(cardEl.dataset.idx) : NaN;
       if (Number.isFinite(idx)) {
+        const now = performance.now();
+        if (Object.prototype.hasOwnProperty.call(armedIdle, idx)) {
+          if (lastIdleQuickTap.index === idx && now - lastIdleQuickTap.at <= 240) {
+            lastIdleQuickTap = { index: -1, at: 0 };
+            toggleWeeklyMark(idx);
+            return;
+          }
+          lastIdleQuickTap = { index: idx, at: now };
+          return;
+        }
+        lastIdleQuickTap = { index: -1, at: 0 };
         // 放置報酬を押したら、開いているスタミナ編集を静かに閉じて受取操作へ移る。
         closeAbyssEditForIdle();
         onIdleTimerTap(idx);
@@ -2283,7 +2340,10 @@ function setupDelegatedEvents(){
     const nameHit = t.closest && t.closest('.name-lp-hit');
     const rankHit = t.closest && t.closest('.rank-lp-hit');
     if (nameHit || rankHit) {
-      // 名前・ランクは長押し専用。通常タップはカード操作へ流さない。
+      // コンパクトな見出し領域もカードの通常タップへ通し、長押しだけを編集に残す。
+      const stamCard = (nameHit || rankHit).closest('.abyss-stam-card');
+      const idx = stamCard ? Number(stamCard.dataset.idx) : NaN;
+      if (Number.isFinite(idx)) onCardClick(idx, ev);
       return;
     }
     const el = t.closest('[data-action]');
@@ -2348,7 +2408,7 @@ function setupDelegatedEvents(){
     if (ev.touches && ev.touches.length > 1) return;
     const el = ev.target;
     if (!el) return;
-    // 直前の長押しにclickが続かなかった場合だけをここで失効させる。別操作は止めない。
+    // 新しい指操作が始まった場合は、前回の長押し終了後clickの保護を解除する。
     if (pendingLongPressClick) pendingLongPressClick = null;
     const idleBlock = el.closest && el.closest('[data-idle-receive]');
     const nameHit = el.closest && el.closest('.name-lp-hit');
@@ -2360,7 +2420,7 @@ function setupDelegatedEvents(){
     else if (rankHit) mode = 'rank';
     else if (idleBlock) {
       const idleIndex = Number(idleBlock.dataset.idx);
-      // 確認待ちの放置報酬は再タップ確定。長押し後のclickだけを抑止して何もしない。
+      // 確認待ちの放置報酬は長押しで受取を確定する。
       mode = Object.prototype.hasOwnProperty.call(armedIdle, idleIndex) ? 'idle-armed' : 'idle-mark';
     } else if (stamCard && !(el.closest && el.closest('input'))) {
       const stamIndex = stamCard ? Number(stamCard.dataset.idx) : NaN;
@@ -2378,18 +2438,21 @@ function setupDelegatedEvents(){
     lpTimer = setTimeout(() => {
       lpTimer = null;
       if (mode === 'idle-armed') {
-        // 受取確認中の長押しは受取を確定し、直後のclickを抑止する。
         commitIdleReceive(i);
-        pendingLongPressClick = { kind: 'idle-armed', index: i };
+        pendingLongPressClick = { index: i, expiresAt: performance.now() + 240 };
       } else if (mode === 'idle-mark') {
         toggleMissionMark(i);
-        pendingLongPressClick = { kind: 'idle-mark', index: i };
-      } else if (mode === 'name') beginNameEdit(i);
-      else if (mode === 'rank') beginRankEdit(i);
+        pendingLongPressClick = { index: i, expiresAt: performance.now() + 240 };
+      } else if (mode === 'name') {
+        beginNameEdit(i);
+        pendingLongPressClick = { index: i, expiresAt: performance.now() + 240 };
+      } else if (mode === 'rank') {
+        beginRankEdit(i);
+        pendingLongPressClick = { index: i, expiresAt: performance.now() + 240 };
+      }
       else if (mode === 'stam-confirm') {
-        // 40基準の確認待ちは確定し、直後のclickを抑止する。
         commitStamEdit();
-        pendingLongPressClick = { kind: 'stam-confirm', index: i };
+        pendingLongPressClick = { index: i, expiresAt: performance.now() + 240 };
       } else beginStamManualInput(i);
     }, LP_MS);
   };
@@ -2404,7 +2467,6 @@ function setupDelegatedEvents(){
   grid.addEventListener('touchend', clearLp, { passive: true });
   grid.addEventListener('touchcancel', clearLp, { passive: true });
   grid.addEventListener('contextmenu', (ev) => { ev.preventDefault(); }, { passive: false });
-  grid.addEventListener('touchcancel', clearLp, { passive: true });
   grid.addEventListener('mouseleave', clearLp, { passive: true });
   grid.addEventListener('mousedown', (ev) => { if (ev.button === 0) lpStart(ev); });
   grid.addEventListener('mousemove', lpMove);
@@ -2423,21 +2485,14 @@ document.addEventListener('selectstart', (ev) => {
 }, { capture: true });
 
 
-// 初期表示は同期的に完了させ、起動安定化は描画後に1回だけ実行する。
-// これにより、初期画面を遅らせずに復帰直後の表示・タイマー・PWA登録を整える。
+// 初期描画・更新予約・日付リセット予約はloadState()で完了している。
+// 起動後のアイドル処理ではPWA登録だけを遅延実行し、二重描画は行わない。
 let startupStabilized = false;
 function scheduleStartupStabilization(){
   const stabilize = () => {
     if (startupStabilized || document.hidden) return;
     startupStabilized = true;
-    requestAnimationFrame(() => {
-      if (document.hidden) return;
-      // setText/setWidthの差分更新だけなので、不要な点滅を起こさず時刻表示を再同期する。
-      render();
-      startTicking();
-      scheduleResetCheck();
-      scheduleServiceWorkerRegistration();
-    });
+    scheduleServiceWorkerRegistration();
   };
   if ('requestIdleCallback' in window) requestIdleCallback(stabilize, { timeout: 600 });
   else setTimeout(stabilize, 50);
@@ -2460,7 +2515,8 @@ const startupGraceUntil = Date.now() + 3000;
 // 連続復帰イベントは短い debounce で1回にまとめる。
 let resumeDebounceTimer = null;
 let lastResumeAt = 0;
-const RESUME_FORCE_COALESCE_MS = 180;
+// Androidのvisibilitychange・resume・pageshow・focusの連続通知をまとめる。
+const RESUME_FORCE_COALESCE_MS = 800;
 const RESUME_NORMAL_DEBOUNCE_MS = 320;
 
 function resumeTicking(force){
@@ -2542,14 +2598,43 @@ window.addEventListener('pageshow', () => resumeTicking(true));
 // visibilitychangeが届かないPWAシェルでも、フォーカス復帰を保険として同期入口にする。
 window.addEventListener('focus', () => resumeTicking(true));
 
+const SW_UPDATE_CHECK_KEY = 'dotabyss:sw-update-check:v1';
+const SW_UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
+
+function isServiceWorkerUpdateDue(now){
+  try {
+    const last = Number(localStorage.getItem(SW_UPDATE_CHECK_KEY));
+    return !Number.isFinite(last) || last <= 0 || now < last || now - last >= SW_UPDATE_CHECK_INTERVAL_MS;
+  } catch (_) {
+    // 保存不可の環境では、従来どおり起動時に確認する。
+    return true;
+  }
+}
+
+function markServiceWorkerUpdateChecked(now){
+  try { localStorage.setItem(SW_UPDATE_CHECK_KEY, String(now)); } catch (_) {}
+}
+
 function scheduleServiceWorkerRegistration(){
   if (swRegistrationScheduled) return;
   if (!('serviceWorker' in navigator)) return;
   if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
 
   swRegistrationScheduled = true;
-  const register = () => {
-    navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).catch(() => {});
+  const register = async () => {
+    try {
+      const existing = await navigator.serviceWorker.getRegistration('./');
+      // 未登録時は必ず登録する。登録済みなら更新確認を6時間に1回へ抑える。
+      if (!existing) {
+        await navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
+        markServiceWorkerUpdateChecked(Date.now());
+        return;
+      }
+      const now = Date.now();
+      if (!isServiceWorkerUpdateDue(now)) return;
+      await existing.update();
+      markServiceWorkerUpdateChecked(now);
+    } catch (_) {}
   };
 
   // Service Workerの取得・インストールを初期描画と競合させない。
