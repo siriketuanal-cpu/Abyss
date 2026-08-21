@@ -2641,13 +2641,19 @@ scheduleStartupStabilization();
 const startupGraceUntil = Date.now() + 3000;
 
 // ---- 画面復帰時のタイマー同期処理 ----
-// focus/pageshow は visibilitychange と二重発火しやすいので使わない。
-// 連続復帰イベントは短い debounce で1回にまとめる。
+// 起動直後の初回pageshow/focus/resumeはloadState()直後の二重描画になるため除外する。
+// 起動後の連続復帰イベントは短い debounce で1回にまとめる。
 let resumeDebounceTimer = null;
 let lastResumeAt = 0;
 // Androidのvisibilitychange・resume・pageshow・focusの連続通知をまとめる。
 const RESUME_FORCE_COALESCE_MS = 800;
 const RESUME_NORMAL_DEBOUNCE_MS = 320;
+
+function shouldSkipInitialResume(event){
+  if (Date.now() >= startupGraceUntil) return false;
+  // BFCacheからの復帰は、起動直後に見えても必ず同期する。
+  return !(event && event.type === 'pageshow' && event.persisted);
+}
 
 function resumeTicking(force){
   if (document.hidden) return;
@@ -2717,16 +2723,26 @@ document.addEventListener('visibilitychange', () => {
     }
   } else {
     // Androidのタスク復帰では最初の可視化を必ず同期する。
+    if (shouldSkipInitialResume()) return;
     resumeTicking(true);
   }
 });
 
 // 一部のWebView・PWAシェルが送る復帰通知も同じ経路で扱う。
-document.addEventListener('resume', () => resumeTicking(true));
+document.addEventListener('resume', (event) => {
+  if (shouldSkipInitialResume(event)) return;
+  resumeTicking(true);
+});
 
-window.addEventListener('pageshow', () => resumeTicking(true));
+window.addEventListener('pageshow', (event) => {
+  if (shouldSkipInitialResume(event)) return;
+  resumeTicking(true);
+});
 // visibilitychangeが届かないPWAシェルでも、フォーカス復帰を保険として同期入口にする。
-window.addEventListener('focus', () => resumeTicking(true));
+window.addEventListener('focus', (event) => {
+  if (shouldSkipInitialResume(event)) return;
+  resumeTicking(true);
+});
 
 const SW_UPDATE_CHECK_KEY = 'dotabyss:sw-update-check:v1';
 const SW_UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
