@@ -466,6 +466,7 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   -webkit-appearance:none;appearance:none;
   caret-color:transparent;
   pointer-events:none;
+  transform:none!important;
 }
 #grid .abyss-stam-card .stam-curmax.stam-manual-editing .stam-cur-field{
   pointer-events:auto;
@@ -740,13 +741,13 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   }
 
   /* 数値表示inputは通常時にカード操作を奪わず、編集時だけ有効にする。 */
-  #gamesAll .g-always-current-field,#gamesAll .g-always-max-field,
-  #gamesAll .sl-always-current-field,#gamesAll .sl-always-max-field{
+#gamesAll .g-always-current-field,#gamesAll .g-always-max-field,
+#gamesAll .sl-always-current-field,#gamesAll .sl-always-max-field{
     display:inline-block!important;position:static!important;
     height:var(--timer-card-sub-height)!important;margin:0;padding:0;border:0;background:transparent;outline:none;
     box-sizing:border-box;font-family:var(--timer-pop-system-font);font-size:var(--timer-sub-font);line-height:var(--timer-card-sub-height);font-weight:800;
-    font-variant-numeric:tabular-nums;caret-color:transparent!important;pointer-events:none;vertical-align:baseline;transform:translateY(.5px);
-    -webkit-appearance:none;appearance:none;
+  font-variant-numeric:tabular-nums;caret-color:transparent!important;pointer-events:none;vertical-align:baseline;
+  -webkit-appearance:none;appearance:none;
   }
   #gamesAll .g-always-current-field,#gamesAll .sl-always-current-field{width:calc(3ch + 1.5px);text-align:right;color:#ffb35e;}
   #gamesAll .g-always-max-field,#gamesAll .sl-always-max-field{width:3ch;text-align:left;color:var(--stam-cur-c);}
