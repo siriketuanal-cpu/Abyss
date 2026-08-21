@@ -22,7 +22,6 @@
   --reach-g:#6fe8ff;
   --reach-sl:#b9aaff;
   --reach-orb:#f2a4b7;
-  /* スタミナ予定時刻（ラベンダー）と、放置予定時刻・受取（水色）を分ける。 */
   --reach-plan:#c9b8ff;
   --idle-plan:#bfe8ff;
   /* オーブは次回（ラベンダー）と全回復予定（桜色）を役割別に区別する。 */
@@ -161,7 +160,6 @@ input,textarea{
   color:#d0d8e8;background:transparent;border:none;box-shadow:none;
   text-shadow:0 0 7px rgba(208,216,232,.55);
 }
-/* ウィークリー✔：右下。到達と被らない。枠から少し内側。 */
 .abyss-idle-card .weekly-mark{
   position:absolute;z-index:2;right:8px;bottom:6px;
   color:transparent;font-size:16px;line-height:1;font-weight:900;
@@ -252,27 +250,22 @@ input,textarea{
   font-size:10px;line-height:13px;font-weight:700;text-align:left;outline:none;appearance:textfield;-moz-appearance:textfield;
 }
 .tsub-cur-input::-webkit-outer-spin-button,.tsub-cur-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
-.tsub.stam-manual-editing .tsub-cur,
-.ttag.stam-manual-editing .tsub-cur{visibility:hidden;}
-.tsub.stam-manual-editing .tsub-cur-input,
-.ttag.stam-manual-editing .tsub-cur-input{display:block;}
+.tsub.stam-manual-editing .tsub-cur{visibility:hidden;}
+.tsub.stam-manual-editing .tsub-cur-input{display:block;}
 /* 1回目のタップで表示する40消費後の参考値。対象カードは暗転より前面に保つ。 */
 .card.stam-preview{z-index:28;}
 .tsub-sep{font-weight:600;color:var(--ink-dim);margin:0 1px;}
 .tsub-max{font-weight:800;color:var(--stam-cur-c);font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;}
 /* スタミナ補助行の予定時刻はラベル位置へ移したため、ここは通常非表示。 */
 .tsub-clock{display:none;margin-left:0;}
-/* 放置の予定時刻・受取は水色。スタミナ予定時刻と差別化。 */
+/* 放置予定・受取は水色。確認待ちタイマーは通常色。 */
 .idle-clock{color:var(--idle-plan);font-weight:700;}
 .idle-meta{color:var(--idle-plan);font-weight:700;}
-/* 確認待ち：タイマーは通常色。「受取」だけ水色。 */
 .tblock-idle{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
 .tblock-idle.receive-armed .idle-meta,
 .tblock-idle.receive-armed .idle-clock,
 .abyss-idle-card.receive-armed .idle-meta,
-.abyss-idle-card.receive-armed .idle-clock{
-  color:var(--idle-plan)!important;
-}
+.abyss-idle-card.receive-armed .idle-clock{color:var(--idle-plan)!important;}
 .edit-panel{
   display:none;position:absolute;top:calc(100% + 6px);background:#000;
   border:1px solid var(--violet);border-radius:12px;padding:10px 12px;
@@ -378,10 +371,12 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 #grid .abyss-idle-card{
   width:calc(100% + 5px);margin-left:-5px;
   border-radius:0 9px 9px 0;border-left:0!important;
-  padding:6px 7px 4px 6px;background:#090e16;
+  padding:6px 7px 4px 6px!important;
+  background:#090e16;
   display:flex;flex-direction:column;
+  justify-content:flex-end;
 }
-#grid .abyss-idle-card .ttag.idle{margin-top:auto;}
+#grid .abyss-idle-card .ttag.idle{margin-top:0;}
 #grid .card.g0{border-color:var(--g0)!important;}
 #grid .card.g1{border-color:var(--g1)!important;}
 #grid .card.g2{border-color:var(--g2)!important;}
@@ -397,53 +392,84 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 #grid .rank-disp,#grid .rank-input{font-weight:800;}
 #grid .rank-lp-hit{min-width:auto;}
 #grid .ttag{font-size:8px;line-height:1.05;letter-spacing:0;}
-#grid .abyss-idle-card .ttag.idle{
-  font-size:8px;font-weight:700;line-height:13px;letter-spacing:0;
-  min-height:13px;height:13px;box-sizing:border-box;
-  display:flex;align-items:flex-end;
-  margin-bottom:3px;
+/* 上段予定時刻：放置と同じ丸み数字フォント */
+#grid .abyss-stam-card .ttag.stam.stam-plan-tag,
+#grid .abyss-idle-card .ttag.idle.idle-plan-tag{
+  font-size:13px;font-weight:700;line-height:13px;letter-spacing:.02em;
+  min-height:13px;height:13px;max-height:13px;
+  box-sizing:border-box;
+  display:flex;align-items:flex-end;gap:2px;
+  margin:0 0 3px 0;padding:0;
+  overflow:hidden;white-space:nowrap;
+  font-variant-numeric:tabular-nums;
+  flex:0 0 auto;
+  font-family:var(--timer-pop-system-font);
 }
-/* 現在値/上限：旧予定時刻の位置（上段） */
-#grid .abyss-stam-card .ttag.stam.stam-curmax{
+#grid .abyss-stam-card .stam-plan-clock,
+#grid .abyss-stam-card .stam-plan-tag .idle-clock{
+  color:var(--reach-plan)!important;
+  font-size:13px;font-weight:700;
+  font-family:var(--timer-pop-system-font);
+  font-variant-numeric:tabular-nums;
+}
+#grid .abyss-idle-card .idle-plan-tag,
+#grid .abyss-idle-card .idle-plan-tag .idle-clock{
+  color:var(--idle-plan)!important;
+  font-size:13px;font-weight:700;
+  font-family:var(--timer-pop-system-font);
+  font-variant-numeric:tabular-nums;
+}
+#grid .tval{
+  font-size:clamp(16px,4.6vw,19px);line-height:1.05;
+  flex:0 0 auto;margin:0;padding:0;
+}
+#grid .tsub{
+  height:var(--timer-card-sub-height);margin-top:1px;
+  font-size:var(--timer-sub-font);line-height:var(--timer-card-sub-height);font-weight:700;
+}
+#grid .abyss-stam-card .tsub.stam-curmax,
+#grid .abyss-idle-card .tsub.idle-bottom-spacer{
   position:relative;
-  display:block;
-  font-size:13px;font-weight:800;line-height:13px;letter-spacing:0;
-  min-height:13px;height:13px;box-sizing:border-box;
-  margin-bottom:3px;
-  overflow:hidden;white-space:nowrap;color:var(--ink);
-  font-variant-numeric:tabular-nums;
-}
-#grid .tval{font-size:clamp(16px,4.6vw,19px);line-height:1.05;}
-#grid .tsub{height:var(--timer-card-sub-height);margin-top:1px;font-size:var(--timer-sub-font);line-height:var(--timer-card-sub-height);font-weight:700;}
-/* 予定時刻：下段。放置側と横並び。色はスタミナ用ラベンダー */
-#grid .abyss-stam-card .tsub.stam-plan-line,
-#grid .abyss-idle-card .tsub{
-  margin-top:3px;height:17px;line-height:17px;font-size:13px;
-}
-#grid .abyss-stam-card .stam-plan-clock{
-  font-size:13px;font-weight:700;color:var(--reach-plan);
-  font-variant-numeric:tabular-nums;
+  margin:3px 0 0 0;padding:0;
+  height:19px;min-height:19px;max-height:19px;
+  line-height:19px;font-size:15px;
+  display:flex;align-items:baseline;
+  overflow:hidden;white-space:nowrap;
+  flex:0 0 auto;
+  box-sizing:border-box;
 }
 #grid .tsub-cur,#grid .tsub-max{font-size:var(--timer-sub-font);font-weight:800;}
-#grid .abyss-stam-card .tsub-cur,
-#grid .abyss-stam-card .tsub-max{font-size:13px;font-weight:800;}
+#grid .abyss-stam-card .tsub-max{
+  font-size:15px;font-weight:800;line-height:19px;color:var(--stam-cur-c);
+}
+#grid .abyss-stam-card .tsub-sep{font-size:15px;line-height:19px;margin:0 1px;}
 #grid .daily-mark{top:4px;right:5px;font-size:26px;line-height:1;font-weight:900;}
 #grid .card.stam-preview{background:rgba(0,0,0,.46)!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)!important;}
-/* インライン入力を上段の現在値にぴったり重ねる */
-#grid .abyss-stam-card .tsub-cur{
-  display:inline-block;width:calc(3ch + 2px);text-align:right;box-sizing:border-box;
+#grid .abyss-stam-card .stam-cur-field{
+  display:inline-block;
+  width:3.4ch;min-width:3.4ch;max-width:4.2ch;
+  height:19px;margin:0;padding:0;border:0;border-radius:0;
+  background:transparent;outline:none;box-sizing:border-box;
   font-family:var(--timer-pop-system-font);font-variant-numeric:tabular-nums;
-  font-size:13px;line-height:13px;font-weight:800;color:#ffb35e;
+  font-size:15px;line-height:19px;font-weight:800;
+  text-align:right;color:#ffb35e;letter-spacing:0;
+  -webkit-appearance:none;appearance:none;
+  caret-color:transparent;
+  pointer-events:none;
 }
-#grid .tsub-cur-input,
-#grid .abyss-stam-card .tsub-cur-input{
-  left:0;top:0;width:calc(3ch + 2px);height:13px;margin:0;padding:0;
-  border:0;background:transparent;outline:none;box-sizing:border-box;
-  font-family:var(--timer-pop-system-font);font-variant-numeric:tabular-nums;
-  font-size:13px;line-height:13px;font-weight:800;text-align:right;
-  color:#ffb35e;letter-spacing:0;
+#grid .abyss-stam-card .stam-curmax.stam-manual-editing .stam-cur-field{
+  pointer-events:auto;
+  caret-color:transparent;
+}
+/* 汎用（他ゲーム用の既存ルール用に残す） */
+#grid .tsub-cur-input{
+  left:0;top:0;width:calc(3ch + 2px);height:var(--timer-card-sub-height);margin:0;padding:0;
+  border:0;background:transparent;outline:none;
+  font-family:var(--timer-pop-system-font);font-size:var(--timer-sub-font);line-height:var(--timer-card-sub-height);font-weight:800;text-align:right;
+  color:#ffb35e;letter-spacing:inherit;
   -webkit-appearance:none;appearance:none;
 }
+
 #gamesAll{
   display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px;
   width:100%;max-width:none;margin:10px auto 0;
@@ -667,7 +693,7 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   .tsub-cur,.tsub-max,.gsub .gsub-cur,.gsub .gsub-max,.sl-stamina-current-display,
   .tsub-cur-input,.g-inline-field,.sl-stamina-current-input,
   .sl-orb-full-display,.sl-inline-field.sl-orb-full-input,.orb-full-at,
-  .idle-clock,.gsub-clock,#sl-stamina-clock,.orb-sub-left{
+  .idle-clock,.stam-plan-clock,.gsub-clock,#sl-stamina-clock,.orb-sub-left{
     font-family:var(--timer-pop-system-font);
     font-variant-numeric:tabular-nums;
   }
@@ -693,6 +719,32 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   .sl-stamina-current-input{
     width:calc(3ch + 1.5px);height:13px;top:1px;font-size:9.5px;line-height:13px;text-align:right;
   }
+
+  /* アビス現在値フィールド確定（共通ルールより後） */
+  #grid .abyss-stam-card .stam-cur-field{
+    position:static!important;left:auto!important;top:auto!important;
+    width:3.4ch!important;height:19px!important;
+    font-size:15px!important;line-height:19px!important;font-weight:800!important;
+    font-family:var(--timer-pop-system-font)!important;
+    text-align:right!important;padding:0!important;border:0!important;
+  }
+
+  /* 数値表示inputは通常時にカード操作を奪わず、編集時だけ有効にする。 */
+  #gamesAll .g-always-current-field,#gamesAll .g-always-max-field,
+  #gamesAll .sl-always-current-field,#gamesAll .sl-always-max-field{
+    display:inline-block!important;position:static!important;
+    height:var(--timer-card-sub-height)!important;margin:0;padding:0;border:0;background:transparent;outline:none;
+    box-sizing:border-box;font-family:var(--timer-pop-system-font);font-size:var(--timer-sub-font);line-height:var(--timer-card-sub-height);font-weight:800;
+    font-variant-numeric:tabular-nums;caret-color:transparent!important;pointer-events:none;vertical-align:baseline;transform:translateY(.5px);
+    -webkit-appearance:none;appearance:none;
+  }
+  #gamesAll .g-always-current-field,#gamesAll .sl-always-current-field{width:calc(3ch + 1.5px);text-align:right;color:#ffb35e;}
+  #gamesAll .g-always-max-field,#gamesAll .sl-always-max-field{width:3ch;text-align:left;color:var(--stam-cur-c);}
+  #gamesAll .g-inline-current .g-always-current-field,#gamesAll .g-inline-max .g-always-max-field,
+  #sl-card-stamina.sl-inline-current .sl-always-current-field{pointer-events:auto;}
+  /* 名前・ランク・数値・オーブを含め、Androidの点滅キャレットは表示しない。 */
+  input,textarea{caret-color:transparent!important;}
+
 
   /* STAR LEAP オーブ補助行: 共通レイアウト */
   .slsub.orb-sub{
@@ -927,7 +979,18 @@ function formatGameMinute(ms){
 function escapeHtml(s){
   return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
-function setText(el, text){ if (!el) return; if (el.dataset._h !== undefined) delete el.dataset._h; if (el.textContent !== text) el.textContent = text; }
+function setText(el, text){
+  if (!el) return;
+  if (el.dataset && el.dataset._h !== undefined) delete el.dataset._h;
+  // 常時表示の現在値inputは value を更新（編集フォーカス中は上書きしない）
+  if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+    if (document.activeElement === el) return;
+    const v = text == null ? '' : String(text);
+    if (el.value !== v) el.value = v;
+    return;
+  }
+  if (el.textContent !== text) el.textContent = text;
+}
 // 時刻値と接尾辞は固定DOMへ差分テキストだけを流し込み、毎秒のinnerHTML差替えを避ける。
 function setClockParts(timeEl, suffixEl, timeText, suffixText){
   setText(timeEl, timeText || '');
@@ -1261,7 +1324,11 @@ function clearStamEdit(){
   const r = refs[i];
   if (r && r.card) r.card.classList.remove('stam-preview');
   if (r && r.stamSub) r.stamSub.classList.remove('stam-manual-editing');
-  if (r && r.directCurEl) r.directCurEl.value = '';
+  if (r && r.directCurEl) {
+    r.directCurEl.readOnly = true;
+    r.directCurEl.tabIndex = -1;
+    try { r.directCurEl.blur(); } catch (_) {}
+  }
   stamEdit = null;
 }
 
@@ -1298,9 +1365,17 @@ function beginStamManualInput(i){
   }
   const input = r.directCurEl;
   input.value = '';
+  input.readOnly = false;
+  input.tabIndex = 0;
   r.stamSub.classList.add('stam-manual-editing');
   syncIdleConfirmBackdrop();
-  input.focus({ preventScroll: true });
+  // 同じ要素のまま編集するので、表示とのズレが起きない
+  requestAnimationFrame(() => {
+    try {
+      input.focus({ preventScroll: true });
+      if (typeof input.select === 'function') input.select();
+    } catch (_) {}
+  });
 }
 
 function commitStamEdit(rawValue){
@@ -1360,17 +1435,21 @@ function build(){
               '<input class="rank-input" id="rank-' + i + '" value="' + (s.rank || 1) + '" inputmode="numeric" enterkeyhint="done" aria-label="プレイヤレベル">' +
             '</div>' +
             '<div class="tblock tblock-stam">' +
-              '<div class="ttag stam stam-curmax" id="stam-sub-' + i + '"><span class="tsub-cur" id="stam-subcur-' + i + '"></span><input class="tsub-cur-input" type="text" id="stam-direct-cur-' + i + '" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" aria-label="スロット' + (i + 1) + 'の現在スタミナ"><span class="tsub-sep" id="stam-subsep-' + i + '">/</span><span class="tsub-max" id="stam-submax-' + i + '"></span></div>' +
+              '<div class="ttag stam stam-plan-tag" aria-label="全回復予定時刻"><span class="idle-clock stam-plan-clock" id="stam-plan-' + i + '"></span></div>' +
               '<div class="tval stam" id="stam-val-' + i + '">—:—</div>' +
-              '<div class="tsub stam-plan-line" aria-label="全回復予定時刻"><span class="idle-clock stam-plan-clock" id="stam-plan-' + i + '"></span></div>' +
+              '<div class="tsub stam-curmax" id="stam-sub-' + i + '">' +
+                '<input class="tsub-cur-input stam-cur-field" type="text" id="stam-direct-cur-' + i + '" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" readonly tabindex="-1" aria-label="スロット' + (i + 1) + 'の現在スタミナ">' +
+                '<span class="tsub-sep" id="stam-subsep-' + i + '">/</span>' +
+                '<span class="tsub-max" id="stam-submax-' + i + '"></span>' +
+              '</div>' +
             '</div>' +
           '</div>' +
           '<div class="card abyss-idle-card ' + group + ' tblock-idle" id="idle-block-' + i + '" style="' + cardVars + '" data-idle-receive="true" data-idx="' + i + '" role="button" aria-label="放置報酬。1回タップで確認、受取">' +
             '<span class="idle-mark daily-mark ' + group + (s.missionDone ? ' show' : '') + '" id="daily-mark-' + i + '" aria-hidden="true">✔</span>' +
             '<span class="weekly-mark' + (s.weeklyDone ? ' show' : '') + '" id="weekly-mark-' + i + '" aria-hidden="true">✦</span>' +
-            '<div class="ttag idle">放置報酬</div>' +
+            '<div class="ttag idle idle-plan-tag" aria-label="放置報酬の予定時刻"><span class="idle-clock" id="idle-subclock-time-' + i + '"></span><span id="idle-subclock-suffix-' + i + '"></span></div>' +
             '<div class="tval idle" id="idle-val-' + i + '">—:—</div>' +
-            '<div class="tsub idle-meta" id="idle-sub-' + i + '"><span class="idle-clock" id="idle-subclock-time-' + i + '"></span><span id="idle-subclock-suffix-' + i + '"></span></div>' +
+            '<div class="tsub idle-meta idle-bottom-spacer" id="idle-sub-' + i + '" aria-hidden="true"></div>' +
           '</div>' +
         '</div>' +
       '</div>';
@@ -1398,11 +1477,9 @@ function buildG(){
         '</div>' +
         '<div class="gval" id="g-val-' + i + '">—:—</div>' +
         '<div class="gsub" id="g-sub-' + i + '">' +
-          '<span class="gsub-cur" id="g-subcur-' + i + '"></span>' +
-          '<input class="g-inline-field g-inline-current-field" type="text" id="g-cur-' + i + '" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" aria-label="G' + (i + 1) + 'の現在スタミナ">' +
-          '<input class="g-inline-field g-inline-max-field" type="text" id="g-max-input-' + i + '" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" aria-label="G' + (i + 1) + 'のスタミナ上限">' +
+          '<input class="g-inline-field g-inline-current-field g-always-current-field" type="text" id="g-cur-' + i + '" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" readonly tabindex="-1" aria-label="G' + (i + 1) + 'の現在スタミナ">' +
           '<span class="gsub-sep" id="g-subsep-' + i + '">/</span>' +
-          '<span class="gsub-max" id="g-submax-' + i + '"></span>' +
+          '<input class="g-inline-field g-inline-max-field g-always-max-field" type="text" id="g-max-input-' + i + '" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" readonly tabindex="-1" aria-label="G' + (i + 1) + 'のスタミナ上限">' +
           '<span class="gsub-clock" id="g-subclock-' + i + '"></span>' +
         '</div>' +
       '</div>';
@@ -1417,8 +1494,8 @@ function cacheRefsG(){
     gRefs.push({
       card: document.getElementById('gcard-' + i),
       val: document.getElementById('g-val-' + i),
-      subCur: document.getElementById('g-subcur-' + i),
-      subMax: document.getElementById('g-submax-' + i),
+      subCur: document.getElementById('g-cur-' + i),
+      subMax: document.getElementById('g-max-input-' + i),
       subClock: document.getElementById('g-subclock-' + i),
       mark: document.getElementById('g-mark-' + i)
     });
@@ -1432,7 +1509,7 @@ function buildSL(){
     '<div class="slcard stam-card" id="sl-card-stamina" data-slaction="card" data-sltype="stamina">' +
       '<div class="slhead"><span class="slname">討伐依頼</span></div>' +
       '<div class="slmain" id="sl-stamina-main">—:—</div>' +
-      '<div class="slsub sl-stamina-sub" id="sl-stamina-sub"><span class="sl-stamina-current-display" id="sl-stamina-current-display"></span><input class="sl-inline-field sl-stamina-current-input" id="sl-stamina-current-input" type="text" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" aria-label="現在のスタミナ"><span class="sl-stamina-sep">/</span><span class="sl-stamina-max-display" id="sl-stamina-max-display"></span><span id="sl-stamina-clock"></span></div>' +
+      '<div class="slsub sl-stamina-sub" id="sl-stamina-sub"><input class="sl-inline-field sl-stamina-current-input sl-always-current-field" id="sl-stamina-current-input" type="text" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" readonly tabindex="-1" aria-label="現在のスタミナ"><span class="sl-stamina-sep">/</span><input class="sl-inline-field sl-stamina-max-input sl-always-max-field" id="sl-stamina-max-input" type="text" readonly tabindex="-1" aria-label="スタミナ上限"><span id="sl-stamina-clock"></span></div>' +
     '</div>' +
     '<div class="slcard orb-card" id="sl-card-orb" data-slaction="card" data-sltype="orb">' +
       '<div class="slhead"><span class="slname">御大樹の恵み</span></div>' +
@@ -1440,7 +1517,7 @@ function buildSL(){
       '<div class="slsub orb-sub"><span class="orb-sub-left" id="sl-orb-next"></span><span class="sl-orb-full-wrap"><span class="sl-orb-full-display" id="sl-orb-full-display"></span><input class="sl-inline-field sl-orb-full-input" id="sl-orb-full-input" type="text" inputmode="numeric" pattern="[0-9:]*" enterkeyhint="done" aria-label="オーブ全回復までの残り時間。数字は4桁まで。342、1800、または18:00で入力"></span><span class="orb-full-at" id="sl-orb-full-at"></span></div>' +
     '</div>';
   slRefs = {
-    stamina: { card: document.getElementById('sl-card-stamina'), main: document.getElementById('sl-stamina-main'), current: document.getElementById('sl-stamina-current-display'), max: document.getElementById('sl-stamina-max-display'), clock: document.getElementById('sl-stamina-clock'), input: document.getElementById('sl-stamina-current-input') },
+    stamina: { card: document.getElementById('sl-card-stamina'), main: document.getElementById('sl-stamina-main'), current: document.getElementById('sl-stamina-current-input'), max: document.getElementById('sl-stamina-max-input'), clock: document.getElementById('sl-stamina-clock'), input: document.getElementById('sl-stamina-current-input'), maxInput: document.getElementById('sl-stamina-max-input') },
     orb: { card: document.getElementById('sl-card-orb'), main: document.getElementById('sl-orb-main'), next: document.getElementById('sl-orb-next'), full: document.getElementById('sl-orb-full-display'), fullAt: document.getElementById('sl-orb-full-at'), input: document.getElementById('sl-orb-full-input') }
   };
 }
@@ -1516,9 +1593,15 @@ function slClearEdit(){
     const r = slRefs[key];
     if (!r || !r.card) return;
     r.card.classList.remove('sl-inline-active', 'sl-inline-current', 'sl-inline-orb');
-    if (r.input) r.input.value = '';
+    if (r.input) {
+      r.input.value = '';
+      r.input.readOnly = true;
+      r.input.tabIndex = -1;
+    }
   });
   slEdit = null;
+  renderSL();
+  requestAnimationFrame(renderSL);
   syncIdleConfirmBackdrop();
 }
 function closeSLCard(){ slClearEdit(); }
@@ -1536,6 +1619,8 @@ function slBeginEdit(type){
   if (!r || !r.card || !r.input) return;
   slEdit = { type, mode: 'input' };
   r.card.classList.add('sl-inline-active', type === 'orb' ? 'sl-inline-orb' : 'sl-inline-current');
+  r.input.readOnly = false;
+  r.input.tabIndex = 0;
   r.input.value = '';
   syncIdleConfirmBackdrop();
   // ドットアビス／Gジェネと同じ共通フォーカス補助を使い、端末差なく入力位置を整える。
@@ -1687,7 +1772,7 @@ function cacheRefs(){
       card: document.getElementById('card-' + i),
       stamVal: document.getElementById('stam-val-' + i),
       stamPlan: document.getElementById('stam-plan-' + i),
-      stamSubCur: document.getElementById('stam-subcur-' + i),
+      stamSubCur: document.getElementById('stam-direct-cur-' + i),
       stamSubSep: document.getElementById('stam-subsep-' + i),
       stamSubMax: document.getElementById('stam-submax-' + i),
       idleVal: document.getElementById('idle-val-' + i),
@@ -1813,9 +1898,11 @@ function gClearEdit(){
   const max = document.getElementById('g-max-input-' + i);
   if (card) card.classList.remove('g-inline-active');
   if (sub) sub.classList.remove('g-inline-editing', 'g-inline-current', 'g-inline-max');
-  if (cur) cur.value = '';
-  if (max) max.value = '';
+  if (cur) { cur.value = ''; cur.readOnly = true; cur.tabIndex = -1; }
+  if (max) { max.value = ''; max.readOnly = true; max.tabIndex = -1; }
   gEdit = null;
+  renderG();
+  requestAnimationFrame(renderG);
   syncIdleConfirmBackdrop();
 }
 
@@ -1826,6 +1913,8 @@ function gBeginEdit(i, mode){
   const sub = document.getElementById('g-sub-' + i);
   if (!field || !card || !sub) return;
   gEdit = { index: i, mode };
+  field.readOnly = false;
+  field.tabIndex = 0;
   field.value = '';
   card.classList.add('g-inline-active');
   sub.classList.add('g-inline-editing', mode === G_EDIT_MODE.MAX ? 'g-inline-max' : 'g-inline-current');
