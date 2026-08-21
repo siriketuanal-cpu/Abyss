@@ -1,8 +1,9 @@
 {
-  "name": "深淵",
+  "name": "深淵タイマー",
   "short_name": "深淵",
-  "description": "ドットアビス / Gジェネ / スターリープ タイマー",
-  "start_url": "./index.html",
+  "description": "ドットアビス、Gジェネレーション、スターリープの回復・放置報酬を管理するタイマー",
+  "lang": "ja",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",

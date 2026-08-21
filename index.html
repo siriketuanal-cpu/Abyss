@@ -419,6 +419,13 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   font-family:var(--timer-pop-system-font);
   font-variant-numeric:tabular-nums;
 }
+/* 確定待ちだけは予定時刻より控えめにし、通常の時刻表示は13pxのまま維持する。 */
+#grid .abyss-stam-card .stam-plan-clock.await-action-label,
+#grid .abyss-idle-card .idle-plan-tag .await-action-label{
+  font-size:10px!important;
+  line-height:13px!important;
+  letter-spacing:0!important;
+}
 #grid .tval{
   font-size:clamp(16px,4.6vw,19px);line-height:1.05;
   flex:0 0 auto;margin:0;padding:0;
@@ -437,6 +444,9 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
   overflow:hidden;white-space:nowrap;
   flex:0 0 auto;
   box-sizing:border-box;
+}
+#grid .abyss-stam-card .tsub.stam-curmax{
+  transform:translateX(-2px);
 }
 #grid .tsub-cur,#grid .tsub-max{font-size:var(--timer-sub-font);font-weight:800;}
 #grid .abyss-stam-card .tsub-max{
@@ -2186,6 +2196,7 @@ function updateIdleReceiveVisual(i, armed){
     const time = document.getElementById('idle-subclock-time-' + i);
     const suffix = document.getElementById('idle-subclock-suffix-' + i);
     setClockParts(time, suffix, '', '受取');
+    if (suffix) suffix.classList.toggle('await-action-label', true);
   }
   syncIdleConfirmBackdrop();
 }
@@ -2233,7 +2244,7 @@ function onIdleTimerTap(i){
   // 受取確認へ入る時点で状態を登録し、即時描画と毎秒更新を必ず開始する。
   armedIdle[i] = true;
   updateIdleReceiveVisual(i, true);
-  render();
+  // 待機開始で変わるのは対象カードと暗転だけなので、全カードの再描画は行わない。
   startTicking();
 }
 
@@ -2278,6 +2289,7 @@ function render(){
       if (renderVisibleCard) {
         setText(r.stamVal, stamMain); setClass(r.stamVal, stamCls);
         setText(r.stamPlan, stamPlanTxt);
+        r.stamPlan.classList.toggle('await-action-label', stamPlanTxt === '確定');
         setText(r.stamSubCur, stamCurTxt);
         setText(r.stamSubMax, stamMaxTxt);
         let idleCls = 'tval idle';
@@ -2299,6 +2311,7 @@ function render(){
             setClockParts(r.idleSubClockTime, r.idleSubClockSuffix, '', idle.meta);
           }
         }
+        r.idleSubClockSuffix.classList.toggle('await-action-label', idleArmed);
         setClass(r.idleVal, idleCls);
       }
     }
