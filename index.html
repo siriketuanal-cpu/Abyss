@@ -22,8 +22,9 @@
   --reach-g:#6fe8ff;
   --reach-sl:#b9aaff;
   --reach-orb:#f2a4b7;
-  /* 小さい予定時刻はゲームをまたいで同じ柔らかな色に統一する。 */
+  /* スタミナ予定時刻（ラベンダー）と、放置予定時刻・受取（水色）を分ける。 */
   --reach-plan:#c9b8ff;
+  --idle-plan:#bfe8ff;
   /* オーブは次回（ラベンダー）と全回復予定（桜色）を役割別に区別する。 */
   --orb-next:#c9b8ff;
   --orb-full:#f2a4b7;
@@ -160,15 +161,16 @@ input,textarea{
   color:#d0d8e8;background:transparent;border:none;box-shadow:none;
   text-shadow:0 0 7px rgba(208,216,232,.55);
 }
+/* ウィークリー✔：右下。到達と被らない。枠から少し内側。 */
 .abyss-idle-card .weekly-mark{
-  position:absolute;z-index:2;right:10px;bottom:25px;
-  color:transparent;font-size:18px;line-height:1;font-weight:900;
+  position:absolute;z-index:2;right:8px;bottom:6px;
+  color:transparent;font-size:16px;line-height:1;font-weight:900;
   text-shadow:none;pointer-events:none;cursor:inherit;
   -webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;user-select:none;
 }
 .abyss-idle-card .weekly-mark.show{
-  color:#4f9b70;
-  text-shadow:0 1px 0 rgba(0,0,0,.78),0 -1px 0 rgba(174,255,203,.18);
+  color:#5ef0a8;
+  text-shadow:0 0 6px rgba(94,240,168,.45),0 1px 0 rgba(0,0,0,.55);
 }
 .idle-mark.disabled-by-edit{pointer-events:none;opacity:.25;}
 .rank-disp,.rank-input{
@@ -250,20 +252,27 @@ input,textarea{
   font-size:10px;line-height:13px;font-weight:700;text-align:left;outline:none;appearance:textfield;-moz-appearance:textfield;
 }
 .tsub-cur-input::-webkit-outer-spin-button,.tsub-cur-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
-.tsub.stam-manual-editing .tsub-cur{visibility:hidden;}
-.tsub.stam-manual-editing .tsub-cur-input{display:block;}
+.tsub.stam-manual-editing .tsub-cur,
+.ttag.stam-manual-editing .tsub-cur{visibility:hidden;}
+.tsub.stam-manual-editing .tsub-cur-input,
+.ttag.stam-manual-editing .tsub-cur-input{display:block;}
 /* 1回目のタップで表示する40消費後の参考値。対象カードは暗転より前面に保つ。 */
 .card.stam-preview{z-index:28;}
 .tsub-sep{font-weight:600;color:var(--ink-dim);margin:0 1px;}
 .tsub-max{font-weight:800;color:var(--stam-cur-c);font-family:"Hiragino Sans","Hiragino Maru Gothic ProN","Yu Gothic UI","Yu Gothic","Meiryo","Noto Sans JP",sans-serif;}
 /* スタミナ補助行の予定時刻はラベル位置へ移したため、ここは通常非表示。 */
 .tsub-clock{display:none;margin-left:0;}
-.idle-clock{color:var(--reach-plan);font-weight:700;}
-.idle-meta{color:var(--reach-plan);font-weight:700;}
-/* 放置報酬の受取待機は色と文字だけで示し、点滅・アニメーションは使わない。 */
+/* 放置の予定時刻・受取は水色。スタミナ予定時刻と差別化。 */
+.idle-clock{color:var(--idle-plan);font-weight:700;}
+.idle-meta{color:var(--idle-plan);font-weight:700;}
+/* 確認待ち：タイマーは通常色。「受取」だけ水色。 */
 .tblock-idle{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
-.tblock-idle.receive-armed .tval.idle{color:#bfe8ff!important;}
-.tblock-idle.receive-armed .idle-meta{color:#bfe8ff!important;}
+.tblock-idle.receive-armed .idle-meta,
+.tblock-idle.receive-armed .idle-clock,
+.abyss-idle-card.receive-armed .idle-meta,
+.abyss-idle-card.receive-armed .idle-clock{
+  color:var(--idle-plan)!important;
+}
 .edit-panel{
   display:none;position:absolute;top:calc(100% + 6px);background:#000;
   border:1px solid var(--violet);border-radius:12px;padding:10px 12px;
@@ -388,40 +397,51 @@ footer{text-align:center;color:var(--ink-dim);font-size:10.5px;margin-top:10px;d
 #grid .rank-disp,#grid .rank-input{font-weight:800;}
 #grid .rank-lp-hit{min-width:auto;}
 #grid .ttag{font-size:8px;line-height:1.05;letter-spacing:0;}
-#grid .ttag.stam{
-  font-size:11px;font-weight:800;line-height:13px;letter-spacing:.02em;color:var(--reach-plan);
-  font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic UI","Yu Gothic",Meiryo,system-ui,sans-serif;
-  font-variant-numeric:tabular-nums;
-  min-height:13px;height:13px;box-sizing:border-box;
-  display:flex;align-items:flex-end;
-}
 #grid .abyss-idle-card .ttag.idle{
   font-size:8px;font-weight:700;line-height:13px;letter-spacing:0;
   min-height:13px;height:13px;box-sizing:border-box;
   display:flex;align-items:flex-end;
+  margin-bottom:3px;
 }
-#grid .abyss-stam-card .ttag.stam,
-#grid .abyss-idle-card .ttag.idle{margin-bottom:3px;}
+/* 現在値/上限：旧予定時刻の位置（上段） */
+#grid .abyss-stam-card .ttag.stam.stam-curmax{
+  position:relative;
+  display:block;
+  font-size:13px;font-weight:800;line-height:13px;letter-spacing:0;
+  min-height:13px;height:13px;box-sizing:border-box;
+  margin-bottom:3px;
+  overflow:hidden;white-space:nowrap;color:var(--ink);
+  font-variant-numeric:tabular-nums;
+}
 #grid .tval{font-size:clamp(16px,4.6vw,19px);line-height:1.05;}
 #grid .tsub{height:var(--timer-card-sub-height);margin-top:1px;font-size:var(--timer-sub-font);line-height:var(--timer-card-sub-height);font-weight:700;}
-#grid .abyss-stam-card .tsub,
+/* 予定時刻：下段。放置側と横並び。色はスタミナ用ラベンダー */
+#grid .abyss-stam-card .tsub.stam-plan-line,
 #grid .abyss-idle-card .tsub{
   margin-top:3px;height:17px;line-height:17px;font-size:13px;
 }
+#grid .abyss-stam-card .stam-plan-clock{
+  font-size:13px;font-weight:700;color:var(--reach-plan);
+  font-variant-numeric:tabular-nums;
+}
 #grid .tsub-cur,#grid .tsub-max{font-size:var(--timer-sub-font);font-weight:800;}
 #grid .abyss-stam-card .tsub-cur,
-#grid .abyss-stam-card .tsub-max,
-#grid .abyss-idle-card .tsub-cur,
-#grid .abyss-idle-card .tsub-max{font-size:13px;font-weight:800;}
-#grid .abyss-stam-card .tsub-cur-input{height:17px;line-height:17px;font-size:13px;}
+#grid .abyss-stam-card .tsub-max{font-size:13px;font-weight:800;}
 #grid .daily-mark{top:4px;right:5px;font-size:26px;line-height:1;font-weight:900;}
 #grid .card.stam-preview{background:rgba(0,0,0,.46)!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)!important;}
-/* コンパクト時も手入力欄を現在値表示と同じ幅・基準線・数字フォントへ完全に重ねる。 */
-#grid .tsub-cur-input{
-  left:0;top:0;width:calc(3ch + 2px);height:var(--timer-card-sub-height);margin:0;padding:0;
-  border:0;background:transparent;outline:none;
-  font-family:var(--timer-pop-system-font);font-size:var(--timer-sub-font);line-height:var(--timer-card-sub-height);font-weight:800;text-align:right;
-  color:#ffb35e;letter-spacing:inherit;
+/* インライン入力を上段の現在値にぴったり重ねる */
+#grid .abyss-stam-card .tsub-cur{
+  display:inline-block;width:calc(3ch + 2px);text-align:right;box-sizing:border-box;
+  font-family:var(--timer-pop-system-font);font-variant-numeric:tabular-nums;
+  font-size:13px;line-height:13px;font-weight:800;color:#ffb35e;
+}
+#grid .tsub-cur-input,
+#grid .abyss-stam-card .tsub-cur-input{
+  left:0;top:0;width:calc(3ch + 2px);height:13px;margin:0;padding:0;
+  border:0;background:transparent;outline:none;box-sizing:border-box;
+  font-family:var(--timer-pop-system-font);font-variant-numeric:tabular-nums;
+  font-size:13px;line-height:13px;font-weight:800;text-align:right;
+  color:#ffb35e;letter-spacing:0;
   -webkit-appearance:none;appearance:none;
 }
 #gamesAll{
@@ -1340,9 +1360,9 @@ function build(){
               '<input class="rank-input" id="rank-' + i + '" value="' + (s.rank || 1) + '" inputmode="numeric" enterkeyhint="done" aria-label="プレイヤレベル">' +
             '</div>' +
             '<div class="tblock tblock-stam">' +
-              '<div class="ttag stam" id="stam-plan-' + i + '" aria-label="全回復予定時刻"></div>' +
+              '<div class="ttag stam stam-curmax" id="stam-sub-' + i + '"><span class="tsub-cur" id="stam-subcur-' + i + '"></span><input class="tsub-cur-input" type="text" id="stam-direct-cur-' + i + '" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" aria-label="スロット' + (i + 1) + 'の現在スタミナ"><span class="tsub-sep" id="stam-subsep-' + i + '">/</span><span class="tsub-max" id="stam-submax-' + i + '"></span></div>' +
               '<div class="tval stam" id="stam-val-' + i + '">—:—</div>' +
-              '<div class="tsub" id="stam-sub-' + i + '"><span class="tsub-cur" id="stam-subcur-' + i + '"></span><input class="tsub-cur-input" type="text" id="stam-direct-cur-' + i + '" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" aria-label="スロット' + (i + 1) + 'の現在スタミナ"><span class="tsub-sep" id="stam-subsep-' + i + '">/</span><span class="tsub-max" id="stam-submax-' + i + '"></span></div>' +
+              '<div class="tsub stam-plan-line" aria-label="全回復予定時刻"><span class="idle-clock stam-plan-clock" id="stam-plan-' + i + '"></span></div>' +
             '</div>' +
           '</div>' +
           '<div class="card abyss-idle-card ' + group + ' tblock-idle" id="idle-block-' + i + '" style="' + cardVars + '" data-idle-receive="true" data-idx="' + i + '" role="button" aria-label="放置報酬。1回タップで確認、受取">' +
