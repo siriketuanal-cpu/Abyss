@@ -17,14 +17,16 @@
     --text:#eceef2; --sub:#8a8ea3; --accent:#9b8bff; --blue:#4fa3ff; --orange:#ffab5c;
     --danger:#ff6b6b; --ok:#5cd68a;
   }
-  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; -webkit-touch-callout:none;
+    -webkit-user-select:none; user-select:none;}
   html,body{height:100%; overscroll-behavior:none;}
   body{
     margin:0; background:var(--bg); color:var(--text);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
     padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-    user-select:none;
+    user-select:none; overscroll-behavior:none;
   }
+  input{ caret-color:transparent; }
   header{
     display:flex; align-items:center; gap:8px; padding:14px 12px 8px;
     position:sticky; top:0; background:var(--bg); z-index:5;
@@ -35,44 +37,50 @@
     background:var(--card2); color:var(--text); font-size:18px; line-height:1;
     display:flex; align-items:center; justify-content:center;
   }
-  #cards{padding:8px 8px 24px; display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+  #cards{padding:6px 6px 20px; display:grid; grid-template-columns:repeat(4,1fr); gap:6px;}
   .card{
-    background:var(--card); border:1px solid var(--line); border-radius:11px;
-    padding:7px 8px; position:relative; min-width:0;
+    background:var(--card); border:1px solid var(--line); border-radius:10px;
+    padding:7px 7px; position:relative; min-width:0;
   }
   .card.claim{border-color:var(--ok);}
   .card.full{border-color:var(--orange);}
-  .row{display:flex; align-items:center; gap:4px; min-width:0;}
-  .row + .row{margin-top:4px;}
+  .row{display:flex; align-items:center; gap:3px; min-width:0;}
+  .row + .row{margin-top:3px;}
+  .namerow{margin-bottom:5px; padding-right:20px;}
   .name{
-    width:50%; background:transparent; border:none; color:var(--text);
-    font-size:12px; font-weight:600; padding:2px 0; min-width:0;
+    width:100%; background:transparent; border:none; color:var(--text);
+    font-size:11px; font-weight:600; padding:2px 0; min-width:0;
   }
   .name::placeholder{color:var(--sub);}
   .del{
-    width:20px; height:20px; border:none; background:none; color:var(--sub);
-    font-size:14px; flex-shrink:0; padding:0; margin-left:auto;
+    position:absolute; top:3px; right:3px; width:16px; height:16px; border-radius:5px;
+    border:none; background:none; color:var(--sub);
+    font-size:12px; line-height:1; padding:0; z-index:2;
   }
-  .main{font-size:19px; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:.01em;}
-  .meta{font-size:10px; color:var(--sub); flex:1; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .del.pending{background:var(--danger); color:#fff;}
+  .main{font-size:17px; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:.01em;}
+  .valrow-stam{ margin-top:7px !important; }
   .stamval{
-    width:30px; background:transparent; border:none; border-bottom:1px solid var(--line);
-    color:var(--text); font-size:17px; font-weight:700; text-align:center; padding:0 0 1px;
+    width:26px; background:transparent; border:none; border-bottom:1px solid var(--line);
+    color:var(--text); font-size:15px; font-weight:700; text-align:center; padding:0 0 1px;
     font-variant-numeric:tabular-nums;
   }
-  .slash{color:var(--sub); font-size:15px;}
-  .recoverrow{justify-content:flex-end; font-size:10px; color:var(--sub);}
-  .recoverrow input{
-    width:26px; background:var(--card2); border:1px solid var(--line); border-radius:6px;
-    color:var(--text); font-size:11px; text-align:center; padding:3px 2px;
+  .slash{color:var(--sub); font-size:13px;}
+  .clockstack{
+    margin-left:auto; display:flex; flex-direction:column; align-items:center;
+    font-size:9px; font-weight:700; line-height:1.05; color:var(--accent);
   }
-  .idle-set{display:flex; align-items:center; gap:3px; font-size:10px; color:var(--sub); flex-wrap:wrap;}
-  .idle-set input{
-    width:28px; background:var(--card2); border:1px solid var(--line); border-radius:6px;
-    color:var(--text); font-size:11px; text-align:center; padding:3px 2px;
+  .clockstack .ok{color:var(--ok); font-size:13px; line-height:1;}
+  .valrow-idle{ justify-content:center; gap:10px; }
+  .valrow-idle .clockstack{ margin-left:0; }
+  .divider{
+    grid-column:1 / -1; display:flex; align-items:center; gap:6px;
+    padding:8px 2px 2px; border-bottom:1px solid var(--line); position:relative;
   }
-  .typebadge{font-size:9px; color:var(--sub); border:1px solid var(--line); border-radius:6px; padding:1px 4px; flex-shrink:0; display:none;}
-  @media (min-width:420px){ .typebadge{display:inline-block;} }
+  .divider .name{
+    width:auto; flex:1; font-size:13px; font-weight:700; color:var(--accent); padding:0 0 4px;
+  }
+  .divider .del{ position:static; margin-left:auto; }
   #empty{color:var(--sub); font-size:13px; text-align:center; padding:40px 0;}
   #addPanel{
     position:fixed; left:0; right:0; bottom:0; background:var(--card);
@@ -84,13 +92,29 @@
     flex:1; padding:12px; border-radius:12px; border:1px solid var(--line);
     background:var(--card2); color:var(--text); font-size:14px; font-weight:600;
   }
+  #setupPanel{
+    position:fixed; left:0; right:0; bottom:0; background:var(--card);
+    border-top:1px solid var(--line); padding:16px 16px calc(16px + env(safe-area-inset-bottom));
+    display:none; flex-direction:column; gap:12px; z-index:11;
+  }
+  #setupPanel.show{display:flex;}
+  #setupPanel .setupLabel{font-size:13px; color:var(--sub); text-align:center;}
+  #setupFields{display:flex; align-items:center; justify-content:center; gap:6px;}
+  #setupFields input{
+    width:60px; background:var(--card2); border:1px solid var(--line); border-radius:8px;
+    color:var(--text); font-size:16px; text-align:center; padding:8px 4px;
+  }
+  #setupFields span{color:var(--sub); font-size:13px;}
+  #setupConfirm{
+    padding:12px; border-radius:12px; border:none;
+    background:var(--accent); color:#100c26; font-size:14px; font-weight:700;
+  }
   #saveStamp{font-size:10px; color:var(--sub); text-align:center; padding-bottom:6px;}
 </style>
 </head>
 <body>
 <header>
   <h1 id="title">タイマー</h1>
-  <button class="iconbtn" id="refreshBtn">⟳</button>
   <button class="iconbtn" id="addBtn">＋</button>
 </header>
 <div id="cards"></div>
@@ -100,6 +124,12 @@
 <div id="addPanel">
   <button data-type="stam">スタミナ</button>
   <button data-type="idle">放置報酬</button>
+  <button data-type="header">見出し</button>
+</div>
+<div id="setupPanel">
+  <div class="setupLabel" id="setupLabel"></div>
+  <div id="setupFields"></div>
+  <button id="setupConfirm">追加</button>
 </div>
 
 <script>
@@ -108,6 +138,17 @@ let state = load();
 let refs = {};
 let tickId = null;
 let tickGen = 0;
+
+// DOM参照は一度だけ取得して使い回す(毎分ティックや毎クリックで検索し直さない)。
+const cardsEl = document.getElementById('cards');
+const emptyEl = document.getElementById('empty');
+const saveStampEl = document.getElementById('saveStamp');
+const addPanelEl = document.getElementById('addPanel');
+const addBtnEl = document.getElementById('addBtn');
+const setupPanelEl = document.getElementById('setupPanel');
+const setupLabelEl = document.getElementById('setupLabel');
+const setupFieldsEl = document.getElementById('setupFields');
+const setupConfirmEl = document.getElementById('setupConfirm');
 
 function load(){
   try{
@@ -121,9 +162,9 @@ function save(){
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     const d = new Date();
     const p = n => String(n).padStart(2,'0');
-    document.getElementById('saveStamp').textContent = '保存済み ' + p(d.getHours())+':'+p(d.getMinutes());
+    saveStampEl.textContent = '保存済み ' + p(d.getHours())+':'+p(d.getMinutes());
   }catch(e){
-    document.getElementById('saveStamp').textContent = '保存に失敗しました';
+    saveStampEl.textContent = '保存に失敗しました';
   }
 }
 function uid(){ return 'x' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
@@ -134,15 +175,29 @@ function forceCursorToEnd(input){
   input.addEventListener('focus', () => { place(); setTimeout(place, 0); });
   input.addEventListener('click', place);
 }
-
-function newStamItem(){
-  return { id: uid(), type:'stam', name:'', current:0, max:100, intervalMin:5, start: Date.now() };
-}
-function newIdleItem(){
-  return { id: uid(), type:'idle', name:'', durationMin: 720, state:'running', start: Date.now() };
+// スタミナ現在値/上限値はフォーカス時に空にして、そのまま打ち直せるようにする。
+function clearOnFocus(input){
+  input.addEventListener('focus', () => { input.value = ''; });
 }
 
-function fmtHM(ms){
+function newStamItem(intervalMin){
+  return { id: uid(), type:'stam', name:'', current:0, max:100, intervalMin, start: Date.now() };
+}
+function newIdleItem(durationMin){
+  return { id: uid(), type:'idle', name:'', durationMin, state:'running', start: Date.now() };
+}
+function newHeaderItem(){
+  return { id: uid(), type:'header', name:'' };
+}
+
+// 残り時間ではなく「何時何分に完了するか」を時刻表記で返す(スタミナ用)。
+function fmtClockAt(remainMs){
+  const d = new Date(Date.now() + Math.max(0, remainMs));
+  const p = n => String(n).padStart(2,'0');
+  return { h: p(d.getHours()), m: p(d.getMinutes()) };
+}
+// 残り時間を「あと◯:◯◯」のカウントダウン表記で返す(放置報酬用)。
+function fmtCountdown(ms){
   ms = Math.max(0, ms);
   const totalMin = Math.ceil(ms/60000);
   const h = Math.floor(totalMin/60), m = totalMin%60;
@@ -161,12 +216,18 @@ function stamInfo(it, now){
   const remainMs = (need-1)*intervalMs + nextIn;
   return { cur, remainMs, isFull };
 }
+// 現在値/上限値を書き換えても「次の1回復までの残り時間」がリセットされないよう、
+// サイクルの位相(既にどれだけ経過しているか)を維持したまま基準時刻だけを進める。
+function preserveCycle(it, now){
+  const intervalMs = Math.max(1, it.intervalMin) * 60000;
+  const phase = ((now - it.start) % intervalMs + intervalMs) % intervalMs;
+  it.start = now - phase;
+}
 function idleInfo(it, now){
-  if (it.state === 'claim') return { remainMs: it.pausedRemainMs||0, isFull:true, waiting:true };
   const durMs = Math.max(1, it.durationMin) * 60000;
   const elapsed = Math.max(0, now - it.start);
   const remainMs = Math.max(0, durMs - elapsed);
-  return { remainMs, isFull: remainMs<=0, waiting:false };
+  return { remainMs, isFull: remainMs<=0 };
 }
 
 function needsTicking(now){
@@ -197,51 +258,44 @@ function buildStamCard(it){
   const wrap = document.createElement('div');
   wrap.className = 'card';
   wrap.innerHTML = `
-    <div class="row">
+    <div class="row namerow">
       <input class="name" placeholder="アカウント名" value="${esc(it.name)}">
-      <span class="typebadge">スタミナ</span>
       <button class="del">×</button>
     </div>
-    <div class="row">
+    <div class="row valrow-stam">
       <input type="text" inputmode="numeric" pattern="[0-9]*" class="stamval" data-role="curInput">
       <span class="slash">/</span>
       <input type="text" inputmode="numeric" pattern="[0-9]*" class="stamval" data-role="maxInput">
-      <div class="meta" data-role="meta"></div>
-    </div>
-    <div class="row recoverrow">
-      <span>回復</span><input type="text" inputmode="numeric" pattern="[0-9]*" data-role="intervalInput"><span>分</span>
+      <div class="clockstack" data-role="clock"></div>
     </div>
   `;
   const nameEl = wrap.querySelector('.name');
   nameEl.addEventListener('input', ()=>{ it.name = nameEl.value; save(); });
-  wrap.querySelector('.del').addEventListener('click', (e)=>{ e.stopPropagation(); removeItem(it.id); });
+  const delBtn = wrap.querySelector('.del');
+  delBtn.addEventListener('click', (e)=>{ e.stopPropagation(); handleDeleteTap(it.id); });
   const curInput = wrap.querySelector('[data-role="curInput"]');
   const maxInput = wrap.querySelector('[data-role="maxInput"]');
-  const intInput = wrap.querySelector('[data-role="intervalInput"]');
-  [nameEl, curInput, maxInput, intInput].forEach(forceCursorToEnd);
-  curInput.addEventListener('change', ()=>{
+  forceCursorToEnd(nameEl);
+  [curInput, maxInput].forEach(clearOnFocus);
+  curInput.addEventListener('blur', ()=>{
     const now = Date.now();
     const info = stamInfo(it, now);
-    it.current = clampInt(curInput.value, 0, it.max, info.cur);
-    it.start = now;
+    const newCur = clampInt(curInput.value, 0, it.max, info.cur);
+    preserveCycle(it, now);
+    it.current = newCur;
     save(); render();
   });
-  maxInput.addEventListener('change', ()=>{
+  maxInput.addEventListener('blur', ()=>{
     const now = Date.now();
-    it.current = Math.min(stamInfo(it, now).cur, clampInt(maxInput.value,1,999,it.max));
-    it.max = clampInt(maxInput.value,1,999,it.max);
-    it.start = now;
+    const curNow = stamInfo(it, now).cur;
+    const newMax = clampInt(maxInput.value,1,999,it.max);
+    preserveCycle(it, now);
+    it.max = newMax;
+    it.current = Math.min(curNow, newMax);
     save(); render();
   });
-  intInput.addEventListener('change', ()=>{
-    const now = Date.now();
-    it.current = stamInfo(it, now).cur;
-    it.intervalMin = clampInt(intInput.value,1,999,it.intervalMin);
-    it.start = now;
-    save(); render();
-  });
-  refs[it.id] = { el: wrap, curInput, maxInput, intInput,
-    metaEl: wrap.querySelector('[data-role="meta"]') };
+  refs[it.id] = { el: wrap, nameEl, curInput, maxInput, delBtn,
+    clockEl: wrap.querySelector('[data-role="clock"]') };
   return wrap;
 }
 
@@ -249,74 +303,94 @@ function buildIdleCard(it){
   const wrap = document.createElement('div');
   wrap.className = 'card';
   wrap.innerHTML = `
-    <div class="row">
+    <div class="row namerow">
       <input class="name" placeholder="アカウント名" value="${esc(it.name)}">
-      <span class="typebadge">放置報酬</span>
       <button class="del">×</button>
     </div>
-    <div class="row">
+    <div class="row valrow-idle">
       <div class="main" data-role="cur"></div>
-      <div class="meta" data-role="meta"></div>
-    </div>
-    <div class="row idle-set">
-      <span>満タン</span>
-      <input type="text" inputmode="numeric" pattern="[0-9]*" data-role="hInput"><span>h</span>
-      <input type="text" inputmode="numeric" pattern="[0-9]*" data-role="mInput"><span>m</span>
+      <div class="clockstack" data-role="clock"></div>
     </div>
   `;
   const nameEl = wrap.querySelector('.name');
   nameEl.addEventListener('input', ()=>{ it.name = nameEl.value; save(); });
-  wrap.querySelector('.del').addEventListener('click', (e)=>{ e.stopPropagation(); removeItem(it.id); });
-  const hInput = wrap.querySelector('[data-role="hInput"]');
-  const mInput = wrap.querySelector('[data-role="mInput"]');
-  [nameEl, hInput, mInput].forEach(forceCursorToEnd);
-  function applyDuration(){
-    const h = clampInt(hInput.value,0,999,Math.floor(it.durationMin/60));
-    const m = clampInt(mInput.value,0,59,it.durationMin%60);
-    it.durationMin = h*60+m;
-    it.start = Date.now();
-    it.state = 'running';
-    save(); render();
-  }
-  hInput.addEventListener('change', applyDuration);
-  mInput.addEventListener('change', applyDuration);
+  const delBtn = wrap.querySelector('.del');
+  delBtn.addEventListener('click', (e)=>{ e.stopPropagation(); handleDeleteTap(it.id); });
+  forceCursorToEnd(nameEl);
   wrap.addEventListener('click', (e)=>{
-    if (e.target === nameEl || e.target===hInput || e.target===mInput) return;
+    if (e.target === nameEl || e.target===delBtn) return;
     toggleIdle(it);
   });
-  refs[it.id] = { el: wrap, hInput, mInput,
-    curEl: wrap.querySelector('[data-role="cur"]'), metaEl: wrap.querySelector('[data-role="meta"]') };
+  refs[it.id] = { el: wrap, nameEl, delBtn,
+    curEl: wrap.querySelector('[data-role="cur"]'), clockEl: wrap.querySelector('[data-role="clock"]') };
   return wrap;
 }
 
-// タップで受取待機へ。受取待機中に再タップ＝受取確定→フル時間で再開。
+function buildHeaderCard(it){
+  const wrap = document.createElement('div');
+  wrap.className = 'divider';
+  wrap.innerHTML = `
+    <input class="name" placeholder="見出し(ゲーム名など)" value="${esc(it.name)}">
+    <button class="del">×</button>
+  `;
+  const nameEl = wrap.querySelector('.name');
+  nameEl.addEventListener('input', ()=>{ it.name = nameEl.value; save(); });
+  const delBtn = wrap.querySelector('.del');
+  delBtn.addEventListener('click', (e)=>{ e.stopPropagation(); handleDeleteTap(it.id); });
+  forceCursorToEnd(nameEl);
+  refs[it.id] = { el: wrap, nameEl, delBtn };
+  return wrap;
+}
+
+// タップで「受取」表示に切替。内部の実時間は止めない(表示だけの上書き)。
+// もう一度タップ＝受取確定→フル時間で再開。
 function toggleIdle(it){
   if (it.state === 'claim'){
     it.state = 'running';
     it.start = Date.now();
-    delete it.pausedRemainMs;
   } else {
-    const info = idleInfo(it, Date.now());
-    it.pausedRemainMs = info.remainMs;
     it.state = 'claim';
   }
   save(); render(); startTicking(true);
 }
-// 受取待機中に枠外をタップ＝キャンセルし、止めた時点の残り時間から再開する。
+// 受取待機中に枠外をタップ＝キャンセル。内部時間は動き続けていたのでそのまま表示に戻すだけ。
 function cancelClaim(it){
-  const durMs = Math.max(1, it.durationMin) * 60000;
-  const remain = it.pausedRemainMs != null ? it.pausedRemainMs : durMs;
-  it.start = Date.now() - (durMs - remain);
   it.state = 'running';
-  delete it.pausedRemainMs;
   save(); render(); startTicking(true);
 }
+
+// ×タップ→確認状態(赤)→もう一度タップで削除。ネイティブconfirm()はPWA環境で
+// 動作しないことがあるため使わない。
+let pendingDeleteId = null;
+function handleDeleteTap(id){
+  if (pendingDeleteId === id){
+    removeItem(id);
+    pendingDeleteId = null;
+  } else {
+    pendingDeleteId = id;
+    render();
+  }
+}
+
 document.addEventListener('click', (e) => {
   for (const it of state.items){
     if (it.type === 'idle' && it.state === 'claim'){
       const r = refs[it.id];
       if (r && !r.el.contains(e.target)) cancelClaim(it);
     }
+  }
+  if (pendingDeleteId != null){
+    const r = refs[pendingDeleteId];
+    if (!r || e.target !== r.delBtn){
+      pendingDeleteId = null;
+      render();
+    }
+  }
+  if (addPanelEl.classList.contains('show') && !addPanelEl.contains(e.target) && e.target !== addBtnEl){
+    addPanelEl.classList.remove('show');
+  }
+  if (setupPanelEl.classList.contains('show') && !setupPanelEl.contains(e.target)){
+    closeSetup();
   }
 }, true);
 
@@ -327,15 +401,24 @@ function clampInt(v, min, max, fb){
 function esc(s){ return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 function removeItem(id){
+  if (refs[id]) refs[id].el.remove();
   state.items = state.items.filter(i=>i.id!==id);
   delete refs[id];
   save(); render(); startTicking(true);
 }
 
+// 04/20のようなデジタル時計表示を組み立てる共通処理(スタミナ・放置報酬で共用)。
+function renderClock(el, remainMs, isFull){
+  if (isFull){
+    el.innerHTML = '<span class="ok">✓</span>';
+  } else {
+    const c = fmtClockAt(remainMs);
+    el.innerHTML = `<span>${c.h}</span><span>${c.m}</span>`;
+  }
+}
+
 function render(){
   const now = Date.now();
-  const cardsEl = document.getElementById('cards');
-  const emptyEl = document.getElementById('empty');
   emptyEl.style.display = state.items.length ? 'none' : 'block';
 
   const existingIds = new Set(state.items.map(i=>i.id));
@@ -343,7 +426,7 @@ function render(){
 
   for (const it of state.items){
     if (!refs[it.id]){
-      const el = it.type==='stam' ? buildStamCard(it) : buildIdleCard(it);
+      const el = it.type==='stam' ? buildStamCard(it) : it.type==='idle' ? buildIdleCard(it) : buildHeaderCard(it);
       cardsEl.appendChild(el);
     }
   }
@@ -354,54 +437,85 @@ function render(){
 
   for (const it of state.items){
     const r = refs[it.id];
-    if (document.activeElement !== r.el.querySelector('.name')) r.el.querySelector('.name').value = it.name;
+    if (document.activeElement !== r.nameEl) r.nameEl.value = it.name;
+    r.delBtn.classList.toggle('pending', pendingDeleteId === it.id);
+    r.delBtn.textContent = pendingDeleteId === it.id ? '✓' : '×';
     if (it.type==='stam'){
       const info = stamInfo(it, now);
-      r.metaEl.textContent = info.isFull ? '満タン' : (fmtHM(info.remainMs) + '後');
       r.el.classList.toggle('full', info.isFull);
+      renderClock(r.clockEl, info.remainMs, info.isFull);
       if (document.activeElement !== r.curInput) r.curInput.value = info.cur;
       if (document.activeElement !== r.maxInput) r.maxInput.value = it.max;
-      if (document.activeElement !== r.intInput) r.intInput.value = it.intervalMin;
-    } else {
+    } else if (it.type==='idle'){
       const info = idleInfo(it, now);
       r.el.classList.toggle('claim', it.state==='claim');
       r.el.classList.toggle('full', info.isFull && it.state!=='claim');
-      if (it.state === 'claim'){
-        r.curEl.textContent = '受取済';
-        r.metaEl.textContent = '枠外タップで再開';
-      } else if (info.isFull){
-        r.curEl.textContent = 'MAX';
-        r.metaEl.textContent = 'タップで受取';
-      } else {
-        r.curEl.textContent = fmtHM(info.remainMs);
-        r.metaEl.textContent = '満タンまで';
-      }
-      if (document.activeElement !== r.hInput) r.hInput.value = Math.floor(it.durationMin/60);
-      if (document.activeElement !== r.mInput) r.mInput.value = it.durationMin%60;
+      r.curEl.textContent = it.state==='claim' ? '受取' : (info.isFull ? 'MAX' : fmtCountdown(info.remainMs));
+      renderClock(r.clockEl, info.remainMs, info.isFull);
     }
   }
 }
 
-document.getElementById('addBtn').addEventListener('click', ()=>{
-  document.getElementById('addPanel').classList.toggle('show');
+addBtnEl.addEventListener('click', ()=>{
+  addPanelEl.classList.toggle('show');
 });
-document.getElementById('addPanel').addEventListener('click', (e)=>{
+addPanelEl.addEventListener('click', (e)=>{
   const btn = e.target.closest('button[data-type]');
   if (!btn) return;
   const type = btn.dataset.type;
-  state.items.push(type==='stam' ? newStamItem() : newIdleItem());
-  document.getElementById('addPanel').classList.remove('show');
+  if (type === 'header'){
+    state.items.push(newHeaderItem());
+    addPanelEl.classList.remove('show');
+    save(); render(); startTicking(true);
+    return;
+  }
+  openSetup(type);
+});
+
+// 追加種別ごとの設定ダイアログ(回復間隔 / 満タンまでの時間をここで固定する)。
+let setupType = null;
+function openSetup(type){
+  setupType = type;
+  addPanelEl.classList.remove('show');
+  if (type === 'stam'){
+    setupLabelEl.textContent = 'スタミナ回復間隔';
+    setupFieldsEl.innerHTML = `<input type="text" inputmode="numeric" pattern="[0-9]*" id="setupInterval" value="5"><span>分で1回復</span>`;
+  } else {
+    setupLabelEl.textContent = '満タンまでの時間';
+    setupFieldsEl.innerHTML = `<input type="text" inputmode="numeric" pattern="[0-9]*" id="setupH" value="12"><span>h</span>
+      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupM" value="0"><span>m</span>`;
+  }
+  setupFieldsEl.querySelectorAll('input').forEach(forceCursorToEnd);
+  setupPanelEl.classList.add('show');
+}
+function closeSetup(){
+  setupType = null;
+  setupPanelEl.classList.remove('show');
+}
+setupConfirmEl.addEventListener('click', (e)=>{
+  e.stopPropagation();
+  if (setupType === 'stam'){
+    const interval = clampInt(setupFieldsEl.querySelector('#setupInterval').value, 1, 999, 5);
+    state.items.push(newStamItem(interval));
+  } else if (setupType === 'idle'){
+    const h = clampInt(setupFieldsEl.querySelector('#setupH').value, 0, 999, 12);
+    const m = clampInt(setupFieldsEl.querySelector('#setupM').value, 0, 59, 0);
+    state.items.push(newIdleItem(h*60+m));
+  }
+  closeSetup();
   save(); render(); startTicking(true);
 });
-document.getElementById('refreshBtn').addEventListener('click', ()=>{
-  render(); startTicking(true);
-});
+
 document.addEventListener('visibilitychange', ()=>{
   if (!document.hidden){ render(); startTicking(true); }
 });
 
 render();
 startTicking(true);
+
+// 長押しメニュー(コピー等)やドラッグ選択を出さない。
+document.addEventListener('contextmenu', (e)=> e.preventDefault());
+document.addEventListener('dragstart', (e)=> e.preventDefault());
 
 // Service worker: register once, never poll for updates automatically.
 if ('serviceWorker' in navigator){
