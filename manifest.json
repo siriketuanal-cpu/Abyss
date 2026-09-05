@@ -1,32 +1,14 @@
 {
-  "name": "深淵タイマー",
-  "short_name": "深淵",
-  "description": "ドットアビス、Gジェネレーション、スターリープの回復・放置報酬を管理するタイマー",
-  "lang": "ja",
-  "start_url": "./",
-  "scope": "./",
+  "name": "タイマー",
+  "short_name": "タイマー",
+  "start_url": "./index.html",
   "display": "standalone",
+  "background_color": "#0b0b14",
+  "theme_color": "#0b0b14",
   "orientation": "portrait",
-  "background_color": "#000000",
-  "theme_color": "#000000",
   "icons": [
-    {
-      "src": "icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "icon-maskable-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
-    }
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }
