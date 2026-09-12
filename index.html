@@ -58,6 +58,17 @@
     font-size:12px; line-height:1; padding:0; z-index:2;
   }
   .del.pending{background:var(--danger); color:#fff;}
+  .rank{
+    position:absolute; top:2px; right:2px; width:36px; max-width:40%;
+    background:transparent; border:none; color:var(--orange);
+    font-size:10px; font-weight:800; text-align:right; padding:2px 0; z-index:2;
+    font-variant-numeric:tabular-nums;
+  }
+  .stammax{
+    width:26px; color:var(--blue); font-size:15px; font-weight:700; text-align:center;
+    font-variant-numeric:tabular-nums; padding:0 0 1px; border-bottom:1px solid transparent;
+  }
+  .card.abyss .stammax{ border-bottom:1px dashed var(--line); }
   .main{font-size:17px; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:.01em;}
   .valrow-stam{ margin-top:7px !important; }
   .stamval{
@@ -196,8 +207,9 @@ function newStamItem(intervalMin){
   return { id: uid(), type:'stam', name:'', current:0, max:100, intervalMin, start: Date.now() };
 }
 function newAbyssItem(intervalMin){
-  // Dot Abyss 風: 回復は通常スタミナと同じ。カードタップで40使い切り(余り残し)。
-  return { id: uid(), type:'abyss', name:'', current:0, max:240, intervalMin, start: Date.now() };
+  // Dot Abyss 風: 最大はランク連動。最大値タップで40使い切り。削除は長押し。
+  const rank = 1;
+  return { id: uid(), type:'abyss', name:'', rank, current:0, max: abyssMaxFor(rank), intervalMin, start: Date.now() };
 }
 function newIdleItem(durationMin){
   return { id: uid(), type:'idle', name:'', durationMin, state:'running', start: Date.now() };
@@ -241,6 +253,16 @@ function remainingAfter40(cur){
   cur = Math.max(0, Math.floor(Number(cur) || 0));
   return cur % 40; // 例: 220→20, 40→0, 39→39
 }
+// Dot Abyss 相当: 基礎240 + (ランク-1)×5（最大は計算のみ・手編集しない）
+function abyssMaxFor(rank){
+  const r = Math.max(1, Math.min(200, Math.floor(Number(rank) || 1)));
+  return 240 + (r - 1) * 5;
+}
+function syncAbyssMax(it){
+  it.rank = Math.max(1, Math.min(200, Math.floor(Number(it.rank) || 1)));
+  it.max = abyssMaxFor(it.rank);
+  if (it.current > it.max) it.current = it.max;
+}
 function preserveCycle(it, now){
   const intervalMs = Math.max(1, it.intervalMin) * 60000;
   const phase = ((now - it.start) % intervalMs + intervalMs) % intervalMs;
@@ -277,6 +299,25 @@ function startTicking(force){
   if (!tickId && needsTicking()) scheduleTick(tickGen);
 }
 
+// 長押し削除（タイマーは1本だけ。常時負荷なし）
+function bindLongPressDelete(el, id){
+  let timer = null;
+  const clear = ()=>{ if (timer){ clearTimeout(timer); timer = null; } };
+  const start = (e)=>{
+    if (e.target.closest('input,button,.rank,.stammax')) return;
+    clear();
+    timer = setTimeout(()=>{
+      timer = null;
+      pending40Id = null;
+      removeItem(id);
+    }, 520);
+  };
+  el.addEventListener('pointerdown', start);
+  el.addEventListener('pointerup', clear);
+  el.addEventListener('pointercancel', clear);
+  el.addEventListener('pointerleave', clear);
+  el.addEventListener('touchmove', clear, { passive:true });
+}
 function buildStamCard(it){
   const wrap = document.createElement('div');
   wrap.className = 'card';
@@ -319,35 +360,49 @@ function buildStamCard(it){
   });
   refs[it.id] = { el: wrap, nameEl, curInput, maxInput, delBtn,
     clockEl: wrap.querySelector('[data-role="clock"]') };
+  bindLongPressDelete(wrap, it.id);
   return wrap;
 }
 
 
 function buildAbyssCard(it){
+  syncAbyssMax(it);
   const wrap = document.createElement('div');
-  wrap.className = 'card';
+  wrap.className = 'card abyss';
   wrap.innerHTML = `
     <div class="row namerow">
       <input class="name" placeholder="Abyssアカウント" value="${esc(it.name)}">
-      <button class="del">×</button>
+      <input class="rank" data-role="rankInput" inputmode="numeric" pattern="[0-9]*" title="ランク">
     </div>
     <div class="row valrow-stam">
       <input type="text" inputmode="numeric" pattern="[0-9]*" class="stamval" data-role="curInput">
       <span class="slash">/</span>
-      <input type="text" inputmode="numeric" pattern="[0-9]*" class="stamval" data-role="maxInput">
+      <span class="stammax" data-role="maxLabel" title="タップで40使い切り"></span>
       <div class="clockstack" data-role="clock"></div>
     </div>
   `;
   const nameEl = wrap.querySelector('.name');
   nameEl.addEventListener('blur', ()=>{ it.name = nameEl.value; save(); });
-  const delBtn = wrap.querySelector('.del');
-  delBtn.addEventListener('click', (e)=>{ e.stopPropagation(); handleDeleteTap(it.id); });
+  const rankInput = wrap.querySelector('[data-role="rankInput"]');
   const curInput = wrap.querySelector('[data-role="curInput"]');
-  const maxInput = wrap.querySelector('[data-role="maxInput"]');
+  const maxLabel = wrap.querySelector('[data-role="maxLabel"]');
   forceCursorToEnd(nameEl);
-  [curInput, maxInput].forEach(clearOnFocus);
+  forceCursorToEnd(rankInput);
+  clearOnFocus(curInput);
+  rankInput.addEventListener('focus', ()=>{ rankInput.value = String(it.rank || 1); });
+  rankInput.addEventListener('blur', ()=>{
+    const now = Date.now();
+    const live = stamInfo(it, now).cur;
+    it.rank = clampInt(rankInput.value, 1, 200, it.rank || 1);
+    syncAbyssMax(it);
+    preserveCycle(it, now);
+    it.current = Math.min(live, it.max);
+    pending40Id = null;
+    save(); render(); startTicking(true);
+  });
   curInput.addEventListener('blur', ()=>{
     const now = Date.now();
+    syncAbyssMax(it);
     const info = stamInfo(it, now);
     const newCur = clampInt(curInput.value, 0, it.max, info.cur);
     preserveCycle(it, now);
@@ -355,22 +410,11 @@ function buildAbyssCard(it){
     pending40Id = null;
     save(); render();
   });
-  maxInput.addEventListener('blur', ()=>{
+  // 最大スタミナ（表示のみ）タップ → 40使い切りプレビュー/確定
+  maxLabel.addEventListener('click', (e)=>{
+    e.stopPropagation();
     const now = Date.now();
-    const curNow = stamInfo(it, now).cur;
-    const newMax = clampInt(maxInput.value,1,999,it.max);
-    preserveCycle(it, now);
-    it.max = newMax;
-    it.current = Math.min(curNow, newMax);
-    pending40Id = null;
-    save(); render();
-  });
-  refs[it.id] = { el: wrap, nameEl, curInput, maxInput, delBtn,
-    clockEl: wrap.querySelector('[data-role="clock"]') };
-  // 1回目: 40使い切り後の余りをプレビュー / 2回目: 確定。入力・×は除外。
-  wrap.addEventListener('click', (e)=>{
-    if (e.target.closest('input') || e.target === delBtn) return;
-    const now = Date.now();
+    syncAbyssMax(it);
     const info = stamInfo(it, now);
     if (pending40Id === it.id){
       preserveCycle(it, now);
@@ -383,6 +427,9 @@ function buildAbyssCard(it){
       render();
     }
   });
+  refs[it.id] = { el: wrap, nameEl, rankInput, curInput, maxLabel, delBtn: null,
+    clockEl: wrap.querySelector('[data-role="clock"]') };
+  bindLongPressDelete(wrap, it.id);
   return wrap;
 }
 
@@ -410,6 +457,7 @@ function buildIdleCard(it){
   });
   refs[it.id] = { el: wrap, nameEl, delBtn,
     curEl: wrap.querySelector('[data-role="cur"]'), clockEl: wrap.querySelector('[data-role="clock"]') };
+  bindLongPressDelete(wrap, it.id);
   return wrap;
 }
 
@@ -422,6 +470,7 @@ function buildRuleCard(it){
   const delBtn = wrap.querySelector('.del');
   delBtn.addEventListener('click', (e)=>{ e.stopPropagation(); handleDeleteTap(it.id); });
   refs[it.id] = { el: wrap, delBtn };
+  bindLongPressDelete(wrap, it.id);
   return wrap;
 }
 function buildHeaderCard(it){
@@ -437,6 +486,7 @@ function buildHeaderCard(it){
   delBtn.addEventListener('click', (e)=>{ e.stopPropagation(); handleDeleteTap(it.id); });
   forceCursorToEnd(nameEl);
   refs[it.id] = { el: wrap, nameEl, delBtn };
+  bindLongPressDelete(wrap, it.id);
   return wrap;
 }
 
@@ -487,7 +537,7 @@ document.addEventListener('click', (e) => {
   }
   if (pendingDeleteId != null){
     const r = refs[pendingDeleteId];
-    if (!r || e.target !== r.delBtn){
+    if (!r || !r.delBtn || e.target !== r.delBtn){
       pendingDeleteId = null;
       render();
     }
@@ -544,19 +594,32 @@ function render(){
   for (const it of state.items){
     const r = refs[it.id];
     if (r.nameEl && document.activeElement !== r.nameEl) r.nameEl.value = it.name;
-    r.delBtn.classList.toggle('pending', pendingDeleteId === it.id);
-    r.delBtn.textContent = pendingDeleteId === it.id ? '✓' : '×';
+    if (r.delBtn){
+      r.delBtn.classList.toggle('pending', pendingDeleteId === it.id);
+      r.delBtn.textContent = pendingDeleteId === it.id ? '✓' : '×';
+    }
     if (it.type==='rule') r.el.style.borderTopColor = it.color || '#52617a';
-    if (it.type==='stam' || it.type==='abyss'){
+    if (it.type==='stam'){
       const info = stamInfo(it, now);
-      const wait40 = it.type==='abyss' && pending40Id === it.id;
+      r.el.classList.toggle('full', info.isFull);
+      r.el.classList.toggle('claim', false);
+      renderClock(r.clockEl, info.remainMs, info.isFull);
+      if (document.activeElement !== r.curInput) r.curInput.value = info.cur;
+      if (document.activeElement !== r.maxInput) r.maxInput.value = it.max;
+    } else if (it.type==='abyss'){
+      syncAbyssMax(it);
+      const info = stamInfo(it, now);
+      const wait40 = pending40Id === it.id;
       r.el.classList.toggle('full', info.isFull);
       r.el.classList.toggle('claim', wait40);
       renderClock(r.clockEl, info.remainMs, info.isFull);
+      if (r.rankInput && document.activeElement !== r.rankInput){
+        r.rankInput.value = 'Lv.' + (it.rank || 1);
+      }
       if (document.activeElement !== r.curInput){
         r.curInput.value = wait40 ? remainingAfter40(info.cur) : info.cur;
       }
-      if (document.activeElement !== r.maxInput) r.maxInput.value = it.max;
+      if (r.maxLabel) r.maxLabel.textContent = String(it.max);
     } else if (it.type==='idle'){
       const info = idleInfo(it, now);
       r.el.classList.toggle('claim', it.state==='claim');
