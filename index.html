@@ -28,10 +28,10 @@
   }
   input{ caret-color:transparent; }
   header{
-    display:flex; align-items:center; gap:8px; padding:14px 12px 8px;
+    display:flex; align-items:center; gap:8px; padding:10px 12px 6px;
     position:sticky; top:0; background:var(--bg); z-index:5;
   }
-  header h1{font-size:16px; margin:0; flex:1; color:var(--sub); font-weight:600; letter-spacing:.02em;}
+  header .spacer{flex:1; min-width:0;}
   .iconbtn{
     width:36px; height:36px; border-radius:10px; border:1px solid var(--line);
     background:var(--card2); color:var(--text); font-size:18px; line-height:1;
@@ -81,15 +81,24 @@
     width:auto; flex:1; font-size:13px; font-weight:700; color:var(--accent); padding:0 0 4px;
   }
   .divider .del{ position:static; margin-left:auto; }
+  /* ルナビィ下線と同系の太い仕切り。色は item.color */
+  .rule-line{
+    grid-column:1 / -1; position:relative;
+    height:0; margin:8px 2px 4px; padding:0;
+    border:0; border-top:2px solid #52617a;
+  }
+  .rule-line .del{
+    position:absolute; top:-10px; right:0; width:16px; height:16px;
+  }
   #empty{color:var(--sub); font-size:13px; text-align:center; padding:40px 0;}
   #addPanel{
     position:fixed; left:0; right:0; bottom:0; background:var(--card);
     border-top:1px solid var(--line); padding:14px 16px calc(16px + env(safe-area-inset-bottom));
     display:none; gap:10px; z-index:10;
   }
-  #addPanel.show{display:flex;}
+  #addPanel.show{display:flex; flex-wrap:wrap;}
   #addPanel button{
-    flex:1; padding:12px; border-radius:12px; border:1px solid var(--line);
+    flex:1 1 calc(50% - 5px); min-width:calc(40% - 5px); padding:12px; border-radius:12px; border:1px solid var(--line);
     background:var(--card2); color:var(--text); font-size:14px; font-weight:600;
   }
   #setupPanel{
@@ -114,8 +123,8 @@
 </head>
 <body>
 <header>
-  <h1 id="title">タイマー</h1>
   <button class="iconbtn" id="updateBtn" title="アプリを更新" aria-label="アプリを更新">↻</button>
+  <span class="spacer" aria-hidden="true"></span>
   <button class="iconbtn" id="addBtn">＋</button>
 </header>
 <div id="cards"></div>
@@ -124,8 +133,10 @@
 
 <div id="addPanel">
   <button data-type="stam">スタミナ</button>
+  <button data-type="abyss">Abyssスタミナ</button>
   <button data-type="idle">放置報酬</button>
   <button data-type="header">見出し</button>
+  <button data-type="rule">仕切り線</button>
 </div>
 <div id="setupPanel">
   <div class="setupLabel" id="setupLabel"></div>
@@ -184,11 +195,18 @@ function clearOnFocus(input){
 function newStamItem(intervalMin){
   return { id: uid(), type:'stam', name:'', current:0, max:100, intervalMin, start: Date.now() };
 }
+function newAbyssItem(intervalMin){
+  // Dot Abyss 風: 回復は通常スタミナと同じ。カードタップで40使い切り(余り残し)。
+  return { id: uid(), type:'abyss', name:'', current:0, max:240, intervalMin, start: Date.now() };
+}
 function newIdleItem(durationMin){
   return { id: uid(), type:'idle', name:'', durationMin, state:'running', start: Date.now() };
 }
 function newHeaderItem(){
   return { id: uid(), type:'header', name:'' };
+}
+function newRuleItem(color){
+  return { id: uid(), type:'rule', color: color || '#52617a' };
 }
 
 // 残り時間ではなく「何時何分に完了するか」を時刻表記で返す(スタミナ用)。
@@ -219,7 +237,10 @@ function stamInfo(it, now){
 }
 // 現在値/上限値を書き換えても「次の1回復までの残り時間」がリセットされないよう、
 // サイクルの位相(既にどれだけ経過しているか)を維持したまま基準時刻だけを進める。
-function remainingAfter40(cur){ return Math.max(0, cur - 40); }
+function remainingAfter40(cur){
+  cur = Math.max(0, Math.floor(Number(cur) || 0));
+  return cur % 40; // 例: 220→20, 40→0, 39→39
+}
 function preserveCycle(it, now){
   const intervalMs = Math.max(1, it.intervalMin) * 60000;
   const phase = ((now - it.start) % intervalMs + intervalMs) % intervalMs;
@@ -235,7 +256,7 @@ function idleInfo(it, now){
 function needsTicking(now){
   now = now || Date.now();
   return state.items.some(it=>{
-    if (it.type==='stam') return !stamInfo(it, now).isFull;
+    if (it.type==='stam' || it.type==='abyss') return !stamInfo(it, now).isFull;
     if (it.type==='idle') return !idleInfo(it, now).isFull;
     return false;
   });
@@ -298,7 +319,55 @@ function buildStamCard(it){
   });
   refs[it.id] = { el: wrap, nameEl, curInput, maxInput, delBtn,
     clockEl: wrap.querySelector('[data-role="clock"]') };
-  // カード本体タップ: 1回目=40消費プレビュー、2回目=確定。入力欄・×は除外。
+  return wrap;
+}
+
+
+function buildAbyssCard(it){
+  const wrap = document.createElement('div');
+  wrap.className = 'card';
+  wrap.innerHTML = `
+    <div class="row namerow">
+      <input class="name" placeholder="Abyssアカウント" value="${esc(it.name)}">
+      <button class="del">×</button>
+    </div>
+    <div class="row valrow-stam">
+      <input type="text" inputmode="numeric" pattern="[0-9]*" class="stamval" data-role="curInput">
+      <span class="slash">/</span>
+      <input type="text" inputmode="numeric" pattern="[0-9]*" class="stamval" data-role="maxInput">
+      <div class="clockstack" data-role="clock"></div>
+    </div>
+  `;
+  const nameEl = wrap.querySelector('.name');
+  nameEl.addEventListener('blur', ()=>{ it.name = nameEl.value; save(); });
+  const delBtn = wrap.querySelector('.del');
+  delBtn.addEventListener('click', (e)=>{ e.stopPropagation(); handleDeleteTap(it.id); });
+  const curInput = wrap.querySelector('[data-role="curInput"]');
+  const maxInput = wrap.querySelector('[data-role="maxInput"]');
+  forceCursorToEnd(nameEl);
+  [curInput, maxInput].forEach(clearOnFocus);
+  curInput.addEventListener('blur', ()=>{
+    const now = Date.now();
+    const info = stamInfo(it, now);
+    const newCur = clampInt(curInput.value, 0, it.max, info.cur);
+    preserveCycle(it, now);
+    it.current = newCur;
+    pending40Id = null;
+    save(); render();
+  });
+  maxInput.addEventListener('blur', ()=>{
+    const now = Date.now();
+    const curNow = stamInfo(it, now).cur;
+    const newMax = clampInt(maxInput.value,1,999,it.max);
+    preserveCycle(it, now);
+    it.max = newMax;
+    it.current = Math.min(curNow, newMax);
+    pending40Id = null;
+    save(); render();
+  });
+  refs[it.id] = { el: wrap, nameEl, curInput, maxInput, delBtn,
+    clockEl: wrap.querySelector('[data-role="clock"]') };
+  // 1回目: 40使い切り後の余りをプレビュー / 2回目: 確定。入力・×は除外。
   wrap.addEventListener('click', (e)=>{
     if (e.target.closest('input') || e.target === delBtn) return;
     const now = Date.now();
@@ -344,6 +413,17 @@ function buildIdleCard(it){
   return wrap;
 }
 
+
+function buildRuleCard(it){
+  const wrap = document.createElement('div');
+  wrap.className = 'rule-line';
+  wrap.style.borderTopColor = it.color || '#52617a';
+  wrap.innerHTML = `<button class="del">×</button>`;
+  const delBtn = wrap.querySelector('.del');
+  delBtn.addEventListener('click', (e)=>{ e.stopPropagation(); handleDeleteTap(it.id); });
+  refs[it.id] = { el: wrap, delBtn };
+  return wrap;
+}
 function buildHeaderCard(it){
   const wrap = document.createElement('div');
   wrap.className = 'divider';
@@ -452,7 +532,7 @@ function render(){
 
   for (const it of state.items){
     if (!refs[it.id]){
-      const el = it.type==='stam' ? buildStamCard(it) : it.type==='idle' ? buildIdleCard(it) : buildHeaderCard(it);
+      const el = it.type==='stam' ? buildStamCard(it) : it.type==='abyss' ? buildAbyssCard(it) : it.type==='idle' ? buildIdleCard(it) : it.type==='rule' ? buildRuleCard(it) : buildHeaderCard(it);
       cardsEl.appendChild(el);
     }
   }
@@ -463,12 +543,13 @@ function render(){
 
   for (const it of state.items){
     const r = refs[it.id];
-    if (document.activeElement !== r.nameEl) r.nameEl.value = it.name;
+    if (r.nameEl && document.activeElement !== r.nameEl) r.nameEl.value = it.name;
     r.delBtn.classList.toggle('pending', pendingDeleteId === it.id);
     r.delBtn.textContent = pendingDeleteId === it.id ? '✓' : '×';
-    if (it.type==='stam'){
+    if (it.type==='rule') r.el.style.borderTopColor = it.color || '#52617a';
+    if (it.type==='stam' || it.type==='abyss'){
       const info = stamInfo(it, now);
-      const wait40 = pending40Id === it.id;
+      const wait40 = it.type==='abyss' && pending40Id === it.id;
       r.el.classList.toggle('full', info.isFull);
       r.el.classList.toggle('claim', wait40);
       renderClock(r.clockEl, info.remainMs, info.isFull);
@@ -499,6 +580,10 @@ addPanelEl.addEventListener('click', (e)=>{
     save(); render(); startTicking(true);
     return;
   }
+  if (type === 'rule'){
+    openSetup('rule');
+    return;
+  }
   openSetup(type);
 });
 
@@ -507,15 +592,30 @@ let setupType = null;
 function openSetup(type){
   setupType = type;
   addPanelEl.classList.remove('show');
-  if (type === 'stam'){
-    setupLabelEl.textContent = 'スタミナ回復間隔';
-    setupFieldsEl.innerHTML = `<input type="text" inputmode="numeric" pattern="[0-9]*" id="setupInterval" value="5"><span>分で1回復</span>`;
+  if (type === 'stam' || type === 'abyss'){
+    setupLabelEl.textContent = type === 'abyss' ? 'Abyssスタミナ回復間隔' : 'スタミナ回復間隔';
+    setupFieldsEl.innerHTML = `<input type="text" inputmode="numeric" pattern="[0-9]*" id="setupInterval" value="${type==='abyss'?'3':'5'}"><span>分で1回復</span>`;
+  } else if (type === 'rule'){
+    setupLabelEl.textContent = '仕切り線の色（#RRGGBB）';
+    setupFieldsEl.innerHTML = `<input type="color" id="setupColorPick" value="#52617a" style="width:42px;height:36px;padding:0;border:1px solid var(--line);background:transparent;">
+      <input type="text" id="setupColor" value="#52617a" maxlength="7" style="width:7em;background:var(--card2);border:1px solid var(--line);border-radius:8px;color:var(--text);font-size:14px;padding:8px;">`;
   } else {
     setupLabelEl.textContent = '満タンまでの時間';
     setupFieldsEl.innerHTML = `<input type="text" inputmode="numeric" pattern="[0-9]*" id="setupH" value="12"><span>h</span>
       <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupM" value="0"><span>m</span>`;
   }
-  setupFieldsEl.querySelectorAll('input').forEach(forceCursorToEnd);
+  setupFieldsEl.querySelectorAll('input').forEach(el=>{ if (el.type!=='color') forceCursorToEnd(el); });
+  if (type === 'rule'){
+    const pick = setupFieldsEl.querySelector('#setupColorPick');
+    const text = setupFieldsEl.querySelector('#setupColor');
+    if (pick && text){
+      pick.addEventListener('input', ()=>{ text.value = pick.value; });
+      text.addEventListener('input', ()=>{
+        const v = text.value.trim();
+        if (/^#[0-9a-fA-F]{6}$/.test(v)) pick.value = v;
+      });
+    }
+  }
   setupPanelEl.classList.add('show');
 }
 function closeSetup(){
@@ -527,6 +627,14 @@ setupConfirmEl.addEventListener('click', (e)=>{
   if (setupType === 'stam'){
     const interval = clampInt(setupFieldsEl.querySelector('#setupInterval').value, 1, 999, 5);
     state.items.push(newStamItem(interval));
+  } else if (setupType === 'abyss'){
+    const interval = clampInt(setupFieldsEl.querySelector('#setupInterval').value, 1, 999, 3);
+    state.items.push(newAbyssItem(interval));
+  } else if (setupType === 'rule'){
+    let color = (setupFieldsEl.querySelector('#setupColor')||{}).value || '#52617a';
+    color = String(color).trim();
+    if (!/^#[0-9a-fA-F]{6}$/.test(color)) color = '#52617a';
+    state.items.push(newRuleItem(color));
   } else if (setupType === 'idle'){
     const h = clampInt(setupFieldsEl.querySelector('#setupH').value, 0, 999, 12);
     const m = clampInt(setupFieldsEl.querySelector('#setupM').value, 0, 59, 0);
