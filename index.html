@@ -115,6 +115,7 @@
 <body>
 <header>
   <h1 id="title">タイマー</h1>
+  <button class="iconbtn" id="updateBtn" title="アプリを更新" aria-label="アプリを更新">↻</button>
   <button class="iconbtn" id="addBtn">＋</button>
 </header>
 <div id="cards"></div>
@@ -218,6 +219,7 @@ function stamInfo(it, now){
 }
 // 現在値/上限値を書き換えても「次の1回復までの残り時間」がリセットされないよう、
 // サイクルの位相(既にどれだけ経過しているか)を維持したまま基準時刻だけを進める。
+function remainingAfter40(cur){ return Math.max(0, cur - 40); }
 function preserveCycle(it, now){
   const intervalMs = Math.max(1, it.intervalMin) * 60000;
   const phase = ((now - it.start) % intervalMs + intervalMs) % intervalMs;
@@ -270,7 +272,7 @@ function buildStamCard(it){
     </div>
   `;
   const nameEl = wrap.querySelector('.name');
-  nameEl.addEventListener('input', ()=>{ it.name = nameEl.value; save(); });
+  nameEl.addEventListener('blur', ()=>{ it.name = nameEl.value; save(); });
   const delBtn = wrap.querySelector('.del');
   delBtn.addEventListener('click', (e)=>{ e.stopPropagation(); handleDeleteTap(it.id); });
   const curInput = wrap.querySelector('[data-role="curInput"]');
@@ -296,6 +298,22 @@ function buildStamCard(it){
   });
   refs[it.id] = { el: wrap, nameEl, curInput, maxInput, delBtn,
     clockEl: wrap.querySelector('[data-role="clock"]') };
+  // カード本体タップ: 1回目=40消費プレビュー、2回目=確定。入力欄・×は除外。
+  wrap.addEventListener('click', (e)=>{
+    if (e.target.closest('input') || e.target === delBtn) return;
+    const now = Date.now();
+    const info = stamInfo(it, now);
+    if (pending40Id === it.id){
+      preserveCycle(it, now);
+      it.current = remainingAfter40(info.cur);
+      pending40Id = null;
+      save(); render(); startTicking(true);
+    } else {
+      pending40Id = it.id;
+      if (pendingDeleteId) pendingDeleteId = null;
+      render();
+    }
+  });
   return wrap;
 }
 
@@ -313,7 +331,7 @@ function buildIdleCard(it){
     </div>
   `;
   const nameEl = wrap.querySelector('.name');
-  nameEl.addEventListener('input', ()=>{ it.name = nameEl.value; save(); });
+  nameEl.addEventListener('blur', ()=>{ it.name = nameEl.value; save(); });
   const delBtn = wrap.querySelector('.del');
   delBtn.addEventListener('click', (e)=>{ e.stopPropagation(); handleDeleteTap(it.id); });
   forceCursorToEnd(nameEl);
@@ -334,7 +352,7 @@ function buildHeaderCard(it){
     <button class="del">×</button>
   `;
   const nameEl = wrap.querySelector('.name');
-  nameEl.addEventListener('input', ()=>{ it.name = nameEl.value; save(); });
+  nameEl.addEventListener('blur', ()=>{ it.name = nameEl.value; save(); });
   const delBtn = wrap.querySelector('.del');
   delBtn.addEventListener('click', (e)=>{ e.stopPropagation(); handleDeleteTap(it.id); });
   forceCursorToEnd(nameEl);
@@ -362,6 +380,7 @@ function cancelClaim(it){
 // ×タップ→確認状態(赤)→もう一度タップで削除。ネイティブconfirm()はPWA環境で
 // 動作しないことがあるため使わない。
 let pendingDeleteId = null;
+let pending40Id = null; // 40消費の確認待ち
 function handleDeleteTap(id){
   if (pendingDeleteId === id){
     removeItem(id);
@@ -377,6 +396,13 @@ document.addEventListener('click', (e) => {
     if (it.type === 'idle' && it.state === 'claim'){
       const r = refs[it.id];
       if (r && !r.el.contains(e.target)) cancelClaim(it);
+    }
+  }
+  if (pending40Id != null){
+    const r = refs[pending40Id];
+    if (!r || !r.el.contains(e.target)){
+      pending40Id = null;
+      render();
     }
   }
   if (pendingDeleteId != null){
@@ -442,9 +468,13 @@ function render(){
     r.delBtn.textContent = pendingDeleteId === it.id ? '✓' : '×';
     if (it.type==='stam'){
       const info = stamInfo(it, now);
+      const wait40 = pending40Id === it.id;
       r.el.classList.toggle('full', info.isFull);
+      r.el.classList.toggle('claim', wait40);
       renderClock(r.clockEl, info.remainMs, info.isFull);
-      if (document.activeElement !== r.curInput) r.curInput.value = info.cur;
+      if (document.activeElement !== r.curInput){
+        r.curInput.value = wait40 ? remainingAfter40(info.cur) : info.cur;
+      }
       if (document.activeElement !== r.maxInput) r.maxInput.value = it.max;
     } else if (it.type==='idle'){
       const info = idleInfo(it, now);
@@ -516,6 +546,10 @@ startTicking(true);
 // 長押しメニュー(コピー等)やドラッグ選択を出さない。
 document.addEventListener('contextmenu', (e)=> e.preventDefault());
 document.addEventListener('dragstart', (e)=> e.preventDefault());
+
+document.getElementById('updateBtn').addEventListener('click', ()=>{
+  location.href = 'update.html';
+});
 
 // Service worker: register once, never poll for updates automatically.
 if ('serviceWorker' in navigator){

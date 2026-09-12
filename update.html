@@ -15,17 +15,20 @@
 <script>
 async function run(){
   try{
+    // 1) SW 登録解除
     if ('serviceWorker' in navigator){
       const regs = await navigator.serviceWorker.getRegistrations();
       for (const r of regs) await r.unregister();
     }
+    // 2) Cache Storage を掃除
     if ('caches' in window){
       const keys = await caches.keys();
       await Promise.all(keys.map(k => caches.delete(k)));
     }
   }catch(e){}
   document.getElementById('msg').textContent = '更新完了。移動します…';
-  setTimeout(() => { location.replace('index.html'); }, 500);
+  // 3) ネットワークから index を読み直し → 新しい SW が再登録される
+  setTimeout(() => { location.replace('index.html?r=' + Date.now().toString(36)); }, 400);
 }
 run();
 </script>

@@ -1,4 +1,5 @@
-// 更新時は CACHE_NAME を変更してコミットしてください（update.html と併用）。
+// キャッシュ名は固定。更新は update.html で SW解除＋Cache全削除→再取得する。
+// （名前を上げなくても、更新ボタンで中身を取り直せる）
 const CACHE_NAME = 'freetimer-cache-v1';
 const ASSETS = [
   './',
@@ -11,7 +12,7 @@ const ASSETS = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting())
   );
 });
 
