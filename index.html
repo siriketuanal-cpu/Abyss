@@ -58,17 +58,20 @@
     background:transparent; border:none; color:var(--orange);
     font-size:10px; font-weight:800; text-align:right; padding:2px 0; z-index:2;
     font-variant-numeric:tabular-nums;
+    -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
   }
   .stammax{
-    width:26px; color:var(--blue); font-size:14px; font-weight:700; text-align:center;
-    font-variant-numeric:tabular-nums; padding:0 0 1px; border-bottom:1px solid transparent;
+    display:inline-block; width:28px; height:20px; line-height:20px; box-sizing:border-box;
+    color:var(--blue); font-size:14px; font-weight:700; text-align:center; padding:0;
+    font-variant-numeric:tabular-nums; border-bottom:1px dashed var(--line); vertical-align:middle;
   }
-  .card.abyss .stammax{ border-bottom:1px dashed var(--line); }
+  .clockstack{ justify-content:center; }
   .main{font-size:15px; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:.01em;}
-  .valrow-stam{ margin-top:5px !important; }
+  .valrow-stam{ margin-top:5px !important; align-items:center; min-height:22px; }
   .stamval{
-    width:26px; background:transparent; border:none; border-bottom:1px solid var(--line);
-    color:var(--text); font-size:14px; font-weight:700; text-align:center; padding:0 0 1px;
+    width:28px; height:20px; line-height:20px; box-sizing:border-box;
+    background:transparent; border:none; border-bottom:1px solid var(--line);
+    color:var(--text); font-size:14px; font-weight:700; text-align:center; padding:0;
     font-variant-numeric:tabular-nums;
   }
   .slash{color:var(--sub); font-size:13px;}
@@ -77,8 +80,15 @@
     font-size:9px; font-weight:700; line-height:1.05; color:var(--accent);
   }
   .clockstack .ok{color:var(--ok); font-size:13px; line-height:1;}
-  .valrow-idle{ justify-content:center; gap:10px; }
-  .valrow-idle .clockstack{ margin-left:0; }
+  /* 放置もスタミナ系と同じ：左に本体、右に予定時刻 */
+  .valrow-idle{
+    margin-top:5px !important; align-items:center; min-height:22px;
+    justify-content:flex-start; gap:6px;
+  }
+  .valrow-idle .main{
+    min-width:2.6em; text-align:left; padding-left:2px;
+  }
+  .valrow-idle .clockstack{ margin-left:auto; }
   .divider{
     grid-column:1 / -1; display:flex; align-items:center; gap:6px;
     padding:8px 2px 2px; border-bottom:1px solid var(--line); position:relative;
@@ -166,6 +176,7 @@ let state = load();
 let refs = {};
 let tickId = null;
 let tickGen = 0;
+let pending40Id = null;
 
 // DOM参照は一度だけ取得して使い回す(毎分ティックや毎クリックで検索し直さない)。
 const cardsEl = document.getElementById('cards');
@@ -181,11 +192,27 @@ const setupConfirmEl = document.getElementById('setupConfirm');
 function load(){
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw){
+      const data = JSON.parse(raw);
+      if (data && Array.isArray(data.items)){
+        data.items.forEach(it=>{
+          if (it && it.type === 'abyss'){
+            if (!it.rank) it.rank = 1;
+            // max はランクから再計算（旧データの手編集maxは捨てる）
+            it.max = 240 + (Math.max(1, Math.min(200, it.rank|0)) - 1) * 5;
+            if (it.current > it.max) it.current = it.max;
+          }
+        });
+      }
+      return data;
+    }
   }catch(e){}
   return { items: [] };
 }
-function save(){
+// 同期localStorageは描画を止めることがある → 既定は次タスクに遅延。
+// 即時が必要なときだけ save(true)
+let saveTimer = null;
+function saveNow(){
   try{
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     const d = new Date();
@@ -194,6 +221,24 @@ function save(){
   }catch(e){
     saveStampEl.textContent = '保存に失敗しました';
   }
+}
+function save(immediate){
+  if (immediate){
+    if (saveTimer){ clearTimeout(saveTimer); saveTimer = null; }
+    saveNow();
+    return;
+  }
+  if (saveTimer) return; // 連続操作は1回にまとめる
+  saveTimer = setTimeout(()=>{
+    saveTimer = null;
+    saveNow();
+  }, 0);
+}
+// 描画を先にコミットしてから保存（確定タップ用）
+function saveAfterPaint(){
+  requestAnimationFrame(()=>{
+    setTimeout(()=> saveNow(), 0);
+  });
 }
 function uid(){ return 'x' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 
@@ -309,7 +354,7 @@ function bindLongPressDelete(el, id){
   let timer = null;
   const clear = ()=>{ if (timer){ clearTimeout(timer); timer = null; } };
   const start = (e)=>{
-    if (e.target.closest('input,button,.rank,.stammax')) return;
+    if (e.target.closest('input,button,.rank,.stammax,.clockstack')) return;
     clear();
     timer = setTimeout(()=>{
       timer = null;
@@ -403,12 +448,21 @@ function buildAbyssCard(it){
   const curInput = wrap.querySelector('[data-role="curInput"]');
   const maxLabel = wrap.querySelector('[data-role="maxLabel"]');
   forceCursorToEnd(nameEl);
-  forceCursorToEnd(rankInput);
   clearOnFocus(curInput);
-  curInput.addEventListener('focus', ()=>{ if (pending40Id === it.id){ pending40Id = null; wrap.classList.remove('claim'); } });
+  clearOnFocus(rankInput); // フォーカスで空欄
+  // 長押しの貼り付けメニュー等を出さない
+  ['paste','copy','cut','contextmenu','selectstart'].forEach(ev=>{
+    rankInput.addEventListener(ev, e=>{ e.preventDefault(); });
+  });
+  rankInput.setAttribute('autocomplete','off');
+  rankInput.setAttribute('autocapitalize','off');
+  rankInput.setAttribute('autocorrect','off');
+  rankInput.setAttribute('spellcheck','false');
+  curInput.addEventListener('focus', ()=>{
+    if (pending40Id === it.id){ pending40Id = null; paintAbyssFortyPreview(it.id); }
+  });
   rankInput.addEventListener('focus', ()=>{
-    if (pending40Id === it.id){ pending40Id = null; wrap.classList.remove('claim'); }
-    rankInput.value = String(it.rank || 1);
+    if (pending40Id === it.id){ pending40Id = null; paintAbyssFortyPreview(it.id); }
   });
   rankInput.addEventListener('blur', ()=>{
     const now = Date.now();
@@ -430,9 +484,11 @@ function buildAbyssCard(it){
     pending40Id = null;
     save(); render();
   });
-  // 最大スタミナ（表示のみ）タップ → 40使い切りプレビュー/確定
-  maxLabel.addEventListener('click', (e)=>{
+  const clockEl = wrap.querySelector('[data-role="clock"]');
+  // 最大 or 予定時刻タップ → 40使い切りプレビュー/確定（ルナビィに近い）
+  const onForty = (e)=>{
     e.stopPropagation();
+    e.preventDefault();
     const now = Date.now();
     syncAbyssMax(it);
     const info = stamInfo(it, now);
@@ -440,14 +496,28 @@ function buildAbyssCard(it){
       preserveCycle(it, now);
       it.current = remainingAfter40(info.cur);
       pending40Id = null;
-      save(); render(); startTicking(true);
+      paintAbyssFortyPreview(it.id);
+      startTicking(true);
+      saveAfterPaint();
     } else {
+      // 他カードのプレビューが残っていれば外す
+      if (pending40Id && pending40Id !== it.id){
+        const prev = pending40Id;
+        pending40Id = null;
+        paintAbyssFortyPreview(prev);
+      }
       pending40Id = it.id;
-      render();
+      paintAbyssFortyPreview(it.id);
     }
-  });
-  refs[it.id] = { el: wrap, nameEl, rankInput, curInput, maxLabel,
-    clockEl: wrap.querySelector('[data-role="clock"]') };
+  };
+  maxLabel.addEventListener('click', onForty);
+  clockEl.addEventListener('click', onForty);
+  // 初回から数字を出しておく（更新直後の空表示防止）
+  const info0 = stamInfo(it, Date.now());
+  curInput.value = String(info0.cur);
+  maxLabel.textContent = String(it.max);
+  rankInput.value = 'Lv.' + (it.rank || 1);
+  refs[it.id] = { el: wrap, nameEl, rankInput, curInput, maxLabel, clockEl };
   bindLongPressDelete(wrap, it.id);
   return wrap;
 }
@@ -510,12 +580,16 @@ function toggleIdle(it){
   } else {
     it.state = 'claim';
   }
-  save(); render(); startTicking(true);
+  // 先に描画、永続化は次フレーム以降（復帰直後のタップでも重くなりにくい）
+  render();
+  startTicking(true);
+  saveAfterPaint();
 }
-// 受取待機中に枠外をタップ＝キャンセル。内部時間は動き続けていたのでそのまま表示に戻すだけ。
 function cancelClaim(it){
   it.state = 'running';
-  save(); render(); startTicking(true);
+  render();
+  startTicking(true);
+  saveAfterPaint();
 }
 
 // ×タップ→確認状態(赤)→もう一度タップで削除。ネイティブconfirm()はPWA環境で
@@ -531,16 +605,15 @@ document.addEventListener('click', (e) => {
   if (pending40Id != null){
     const r = refs[pending40Id];
     if (!r || !r.el.contains(e.target)){
+      const id = pending40Id;
       pending40Id = null;
-      render();
+      paintAbyssFortyPreview(id);
     }
   }
   if (addPanelEl.classList.contains('show') && !addPanelEl.contains(e.target) && e.target !== addBtnEl){
     addPanelEl.classList.remove('show');
   }
-  if (setupPanelEl.classList.contains('show') && !setupPanelEl.contains(e.target)){
-    closeSetup();
-  }
+  // 作成パネルは枠外タップで閉じない（キーボード閉じでキャンセルされるのを防ぐ）
 }, true);
 
 function clampInt(v, min, max, fb){
@@ -558,14 +631,33 @@ function removeItem(id){
 
 // 04/20のようなデジタル時計表示を組み立てる共通処理(スタミナ・放置報酬で共用)。
 function renderClock(el, remainMs, isFull){
-  if (isFull){
-    el.innerHTML = '<span class="ok">✓</span>';
-  } else {
+  if (!el) return;
+  const key = isFull ? 'full' : (()=>{ const c = fmtClockAt(remainMs); return c.h+c.m; })();
+  if (el.dataset.clk === key) return;
+  el.dataset.clk = key;
+  if (isFull) el.innerHTML = '<span class="ok">✓</span>';
+  else {
     const c = fmtClockAt(remainMs);
     el.innerHTML = `<span>${c.h}</span><span>${c.m}</span>`;
   }
 }
 
+
+// 40計算プレビュー/確定は当該Abyssカードだけ触る（全renderしない）
+function paintAbyssFortyPreview(id){
+  const it = state.items.find(x=>x.id===id);
+  const r = refs[id];
+  if (!it || !r || it.type!=='abyss') return;
+  syncAbyssMax(it);
+  const info = stamInfo(it, Date.now());
+  const wait = pending40Id === id;
+  r.el.classList.toggle('claim', wait);
+  if (document.activeElement !== r.curInput){
+    r.curInput.value = wait ? remainingAfter40(info.cur) : info.cur;
+  }
+  if (r.maxLabel) r.maxLabel.textContent = String(it.max);
+  renderClock(r.clockEl, info.remainMs, info.isFull);
+}
 function render(){
   const now = Date.now();
   emptyEl.style.display = state.items.length ? 'none' : 'block';
@@ -579,9 +671,17 @@ function render(){
       cardsEl.appendChild(el);
     }
   }
-  // reorder to match state order
-  for (const it of state.items){
-    cardsEl.appendChild(refs[it.id].el);
+  // 順序が違うときだけ並べ替え（毎分の append を避ける）
+  let needOrder = false;
+  const kids = cardsEl.children;
+  for (let i = 0; i < state.items.length; i++){
+    const el = refs[state.items[i].id] && refs[state.items[i].id].el;
+    if (!el || kids[i] !== el){ needOrder = true; break; }
+  }
+  if (needOrder){
+    for (const it of state.items){
+      if (refs[it.id]) cardsEl.appendChild(refs[it.id].el);
+    }
   }
 
   for (const it of state.items){
@@ -591,29 +691,41 @@ function render(){
     if (it.type==='stam'){
       const info = stamInfo(it, now);
       r.el.classList.toggle('full', info.isFull);
-      r.el.classList.toggle('claim', false);
       renderClock(r.clockEl, info.remainMs, info.isFull);
-      if (document.activeElement !== r.curInput) r.curInput.value = info.cur;
-      if (document.activeElement !== r.maxInput) r.maxInput.value = it.max;
+      if (document.activeElement !== r.curInput){
+        const v = String(info.cur);
+        if (r.curInput.value !== v) r.curInput.value = v;
+      }
+      if (document.activeElement !== r.maxInput){
+        const v = String(it.max);
+        if (r.maxInput.value !== v) r.maxInput.value = v;
+      }
     } else if (it.type==='abyss'){
-      syncAbyssMax(it);
+      // maxはランク変更時だけ変わる。毎分のsyncは不要だが安価なので維持
+      if (it.max !== abyssMaxFor(it.rank||1)) syncAbyssMax(it);
       const info = stamInfo(it, now);
       const wait40 = pending40Id === it.id;
       r.el.classList.toggle('full', info.isFull);
       r.el.classList.toggle('claim', wait40);
       renderClock(r.clockEl, info.remainMs, info.isFull);
       if (r.rankInput && document.activeElement !== r.rankInput){
-        r.rankInput.value = 'Lv.' + (it.rank || 1);
+        const v = 'Lv.' + (it.rank || 1);
+        if (r.rankInput.value !== v) r.rankInput.value = v;
       }
       if (document.activeElement !== r.curInput){
-        r.curInput.value = wait40 ? remainingAfter40(info.cur) : info.cur;
+        const v = String(wait40 ? remainingAfter40(info.cur) : info.cur);
+        if (r.curInput.value !== v) r.curInput.value = v;
       }
-      if (r.maxLabel) r.maxLabel.textContent = String(it.max);
+      if (r.maxLabel){
+        const v = String(it.max);
+        if (r.maxLabel.textContent !== v) r.maxLabel.textContent = v;
+      }
     } else if (it.type==='idle'){
       const info = idleInfo(it, now);
       r.el.classList.toggle('claim', it.state==='claim');
       r.el.classList.toggle('full', info.isFull && it.state!=='claim');
-      r.curEl.textContent = it.state==='claim' ? '受取' : (info.isFull ? 'MAX' : fmtCountdown(info.remainMs));
+      const label = it.state==='claim' ? '受取' : (info.isFull ? 'MAX' : fmtCountdown(info.remainMs));
+      if (r.curEl.textContent !== label) r.curEl.textContent = label;
       renderClock(r.clockEl, info.remainMs, info.isFull);
     }
   }
@@ -656,7 +768,11 @@ function openSetup(type){
     setupFieldsEl.innerHTML = `<input type="text" inputmode="numeric" pattern="[0-9]*" id="setupH" value="12"><span>h</span>
       <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupM" value="0"><span>m</span>`;
   }
-  setupFieldsEl.querySelectorAll('input').forEach(el=>{ if (el.type!=='color') forceCursorToEnd(el); });
+  setupFieldsEl.querySelectorAll('input').forEach(el=>{
+    if (el.type === 'color') return;
+    forceCursorToEnd(el);
+    clearOnFocus(el); // フォーカスで空欄（放置の h/m や回復間隔）
+  });
   if (type === 'rule'){
     const pick = setupFieldsEl.querySelector('#setupColorPick');
     const text = setupFieldsEl.querySelector('#setupColor');
@@ -697,7 +813,11 @@ setupConfirmEl.addEventListener('click', (e)=>{
 });
 
 document.addEventListener('visibilitychange', ()=>{
-  if (!document.hidden){ render(); startTicking(true); }
+  if (!document.hidden){
+    // 復帰時も差分スキップ付き render のみ。force 連打でメインタスクを膨らませない
+    render();
+    startTicking(true);
+  }
 });
 
 render();
@@ -706,6 +826,8 @@ startTicking(true);
 // 長押しメニュー(コピー等)やドラッグ選択を出さない。
 document.addEventListener('contextmenu', (e)=> e.preventDefault());
 document.addEventListener('dragstart', (e)=> e.preventDefault());
+document.addEventListener('selectstart', (e)=> e.preventDefault());
+document.addEventListener('paste', (e)=> e.preventDefault());
 
 document.getElementById('updateBtn').addEventListener('click', ()=>{
   location.href = 'update.html';
