@@ -40,24 +40,19 @@
   #cards{padding:6px 6px 20px; display:grid; grid-template-columns:repeat(4,1fr); gap:6px;}
   .card{
     background:var(--card); border:1px solid var(--line); border-radius:10px;
-    padding:7px 7px; position:relative; min-width:0;
+    padding:6px 6px; position:relative; min-width:0;
   }
   .card.claim{border-color:var(--ok);}
   .card.full{border-color:var(--orange);}
   .row{display:flex; align-items:center; gap:3px; min-width:0;}
   .row + .row{margin-top:3px;}
-  .namerow{margin-bottom:5px; padding-right:20px;}
+  .namerow{margin-bottom:4px;}
+  .card.abyss .namerow{padding-right:38px;}
   .name{
     width:100%; background:transparent; border:none; color:var(--text);
     font-size:11px; font-weight:600; padding:2px 0; min-width:0;
   }
   .name::placeholder{color:var(--sub);}
-  .del{
-    position:absolute; top:3px; right:3px; width:16px; height:16px; border-radius:5px;
-    border:none; background:none; color:var(--sub);
-    font-size:12px; line-height:1; padding:0; z-index:2;
-  }
-  .del.pending{background:var(--danger); color:#fff;}
   .rank{
     position:absolute; top:2px; right:2px; width:36px; max-width:40%;
     background:transparent; border:none; color:var(--orange);
@@ -65,15 +60,15 @@
     font-variant-numeric:tabular-nums;
   }
   .stammax{
-    width:26px; color:var(--blue); font-size:15px; font-weight:700; text-align:center;
+    width:26px; color:var(--blue); font-size:14px; font-weight:700; text-align:center;
     font-variant-numeric:tabular-nums; padding:0 0 1px; border-bottom:1px solid transparent;
   }
   .card.abyss .stammax{ border-bottom:1px dashed var(--line); }
-  .main{font-size:17px; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:.01em;}
-  .valrow-stam{ margin-top:7px !important; }
+  .main{font-size:15px; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:.01em;}
+  .valrow-stam{ margin-top:5px !important; }
   .stamval{
     width:26px; background:transparent; border:none; border-bottom:1px solid var(--line);
-    color:var(--text); font-size:15px; font-weight:700; text-align:center; padding:0 0 1px;
+    color:var(--text); font-size:14px; font-weight:700; text-align:center; padding:0 0 1px;
     font-variant-numeric:tabular-nums;
   }
   .slash{color:var(--sub); font-size:13px;}
@@ -91,16 +86,25 @@
   .divider .name{
     width:auto; flex:1; font-size:13px; font-weight:700; color:var(--accent); padding:0 0 4px;
   }
-  .divider .del{ position:static; margin-left:auto; }
   /* ルナビィ下線と同系の太い仕切り。色は item.color */
   .rule-line{
     grid-column:1 / -1; position:relative;
     height:0; margin:8px 2px 4px; padding:0;
     border:0; border-top:2px solid #52617a;
   }
-  .rule-line .del{
-    position:absolute; top:-10px; right:0; width:16px; height:16px;
+  #toast{
+    position:fixed; left:50%; bottom:calc(24px + env(safe-area-inset-bottom));
+    transform:translateX(-50%); max-width:90%;
+    background:#1e1e2c; color:var(--text); border:1px solid var(--line);
+    border-radius:10px; padding:10px 14px; font-size:13px; z-index:30;
+    display:none; box-shadow:0 8px 24px rgba(0,0,0,.35);
   }
+  #toast.show{display:flex; gap:10px; align-items:center;}
+  #toast button{
+    border:1px solid var(--line); background:var(--card2); color:var(--text);
+    border-radius:8px; padding:6px 10px; font-size:12px; font-weight:600;
+  }
+  #toast button.ok{background:var(--danger); border-color:transparent; color:#fff;}
   #empty{color:var(--sub); font-size:13px; text-align:center; padding:40px 0;}
   #addPanel{
     position:fixed; left:0; right:0; bottom:0; background:var(--card);
@@ -141,6 +145,7 @@
 <div id="cards"></div>
 <div id="empty">＋ でタイマーを追加</div>
 <div id="saveStamp"></div>
+<div id="toast" role="status"></div>
 
 <div id="addPanel">
   <button data-type="stam">スタミナ</button>
@@ -299,7 +304,7 @@ function startTicking(force){
   if (!tickId && needsTicking()) scheduleTick(tickGen);
 }
 
-// 長押し削除（タイマーは1本だけ。常時負荷なし）
+// 長押し → 簡易確認トースト → 削除（タイマー1本のみ）
 function bindLongPressDelete(el, id){
   let timer = null;
   const clear = ()=>{ if (timer){ clearTimeout(timer); timer = null; } };
@@ -309,7 +314,7 @@ function bindLongPressDelete(el, id){
     timer = setTimeout(()=>{
       timer = null;
       pending40Id = null;
-      removeItem(id);
+      askRemoveItem(id);
     }, 520);
   };
   el.addEventListener('pointerdown', start);
@@ -318,13 +323,26 @@ function bindLongPressDelete(el, id){
   el.addEventListener('pointerleave', clear);
   el.addEventListener('touchmove', clear, { passive:true });
 }
+function askRemoveItem(id){
+  const toast = document.getElementById('toast');
+  if (!toast){ removeItem(id); return; }
+  toast.innerHTML = '<span>削除する？</span><button type="button" class="ok" data-act="yes">削除</button><button type="button" data-act="no">やめる</button>';
+  toast.classList.add('show');
+  const onClick = (e)=>{
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    toast.classList.remove('show');
+    toast.removeEventListener('click', onClick);
+    if (btn.dataset.act === 'yes') removeItem(id);
+  };
+  toast.addEventListener('click', onClick);
+}
 function buildStamCard(it){
   const wrap = document.createElement('div');
   wrap.className = 'card';
   wrap.innerHTML = `
     <div class="row namerow">
       <input class="name" placeholder="アカウント名" value="${esc(it.name)}">
-      <button class="del">×</button>
     </div>
     <div class="row valrow-stam">
       <input type="text" inputmode="numeric" pattern="[0-9]*" class="stamval" data-role="curInput">
@@ -335,8 +353,6 @@ function buildStamCard(it){
   `;
   const nameEl = wrap.querySelector('.name');
   nameEl.addEventListener('blur', ()=>{ it.name = nameEl.value; save(); });
-  const delBtn = wrap.querySelector('.del');
-  delBtn.addEventListener('click', (e)=>{ e.stopPropagation(); handleDeleteTap(it.id); });
   const curInput = wrap.querySelector('[data-role="curInput"]');
   const maxInput = wrap.querySelector('[data-role="maxInput"]');
   forceCursorToEnd(nameEl);
@@ -358,7 +374,7 @@ function buildStamCard(it){
     it.current = Math.min(curNow, newMax);
     save(); render();
   });
-  refs[it.id] = { el: wrap, nameEl, curInput, maxInput, delBtn,
+  refs[it.id] = { el: wrap, nameEl, curInput, maxInput,
     clockEl: wrap.querySelector('[data-role="clock"]') };
   bindLongPressDelete(wrap, it.id);
   return wrap;
@@ -389,7 +405,11 @@ function buildAbyssCard(it){
   forceCursorToEnd(nameEl);
   forceCursorToEnd(rankInput);
   clearOnFocus(curInput);
-  rankInput.addEventListener('focus', ()=>{ rankInput.value = String(it.rank || 1); });
+  curInput.addEventListener('focus', ()=>{ if (pending40Id === it.id){ pending40Id = null; wrap.classList.remove('claim'); } });
+  rankInput.addEventListener('focus', ()=>{
+    if (pending40Id === it.id){ pending40Id = null; wrap.classList.remove('claim'); }
+    rankInput.value = String(it.rank || 1);
+  });
   rankInput.addEventListener('blur', ()=>{
     const now = Date.now();
     const live = stamInfo(it, now).cur;
@@ -423,11 +443,10 @@ function buildAbyssCard(it){
       save(); render(); startTicking(true);
     } else {
       pending40Id = it.id;
-      if (pendingDeleteId) pendingDeleteId = null;
       render();
     }
   });
-  refs[it.id] = { el: wrap, nameEl, rankInput, curInput, maxLabel, delBtn: null,
+  refs[it.id] = { el: wrap, nameEl, rankInput, curInput, maxLabel,
     clockEl: wrap.querySelector('[data-role="clock"]') };
   bindLongPressDelete(wrap, it.id);
   return wrap;
@@ -439,7 +458,6 @@ function buildIdleCard(it){
   wrap.innerHTML = `
     <div class="row namerow">
       <input class="name" placeholder="アカウント名" value="${esc(it.name)}">
-      <button class="del">×</button>
     </div>
     <div class="row valrow-idle">
       <div class="main" data-role="cur"></div>
@@ -448,14 +466,12 @@ function buildIdleCard(it){
   `;
   const nameEl = wrap.querySelector('.name');
   nameEl.addEventListener('blur', ()=>{ it.name = nameEl.value; save(); });
-  const delBtn = wrap.querySelector('.del');
-  delBtn.addEventListener('click', (e)=>{ e.stopPropagation(); handleDeleteTap(it.id); });
   forceCursorToEnd(nameEl);
   wrap.addEventListener('click', (e)=>{
-    if (e.target === nameEl || e.target===delBtn) return;
+    if (e.target === nameEl) return;
     toggleIdle(it);
   });
-  refs[it.id] = { el: wrap, nameEl, delBtn,
+  refs[it.id] = { el: wrap, nameEl,
     curEl: wrap.querySelector('[data-role="cur"]'), clockEl: wrap.querySelector('[data-role="clock"]') };
   bindLongPressDelete(wrap, it.id);
   return wrap;
@@ -466,10 +482,8 @@ function buildRuleCard(it){
   const wrap = document.createElement('div');
   wrap.className = 'rule-line';
   wrap.style.borderTopColor = it.color || '#52617a';
-  wrap.innerHTML = `<button class="del">×</button>`;
-  const delBtn = wrap.querySelector('.del');
-  delBtn.addEventListener('click', (e)=>{ e.stopPropagation(); handleDeleteTap(it.id); });
-  refs[it.id] = { el: wrap, delBtn };
+  wrap.innerHTML = '';
+  refs[it.id] = { el: wrap };
   bindLongPressDelete(wrap, it.id);
   return wrap;
 }
@@ -478,14 +492,11 @@ function buildHeaderCard(it){
   wrap.className = 'divider';
   wrap.innerHTML = `
     <input class="name" placeholder="見出し(ゲーム名など)" value="${esc(it.name)}">
-    <button class="del">×</button>
   `;
   const nameEl = wrap.querySelector('.name');
   nameEl.addEventListener('blur', ()=>{ it.name = nameEl.value; save(); });
-  const delBtn = wrap.querySelector('.del');
-  delBtn.addEventListener('click', (e)=>{ e.stopPropagation(); handleDeleteTap(it.id); });
   forceCursorToEnd(nameEl);
-  refs[it.id] = { el: wrap, nameEl, delBtn };
+  refs[it.id] = { el: wrap, nameEl };
   bindLongPressDelete(wrap, it.id);
   return wrap;
 }
@@ -509,17 +520,6 @@ function cancelClaim(it){
 
 // ×タップ→確認状態(赤)→もう一度タップで削除。ネイティブconfirm()はPWA環境で
 // 動作しないことがあるため使わない。
-let pendingDeleteId = null;
-let pending40Id = null; // 40消費の確認待ち
-function handleDeleteTap(id){
-  if (pendingDeleteId === id){
-    removeItem(id);
-    pendingDeleteId = null;
-  } else {
-    pendingDeleteId = id;
-    render();
-  }
-}
 
 document.addEventListener('click', (e) => {
   for (const it of state.items){
@@ -532,13 +532,6 @@ document.addEventListener('click', (e) => {
     const r = refs[pending40Id];
     if (!r || !r.el.contains(e.target)){
       pending40Id = null;
-      render();
-    }
-  }
-  if (pendingDeleteId != null){
-    const r = refs[pendingDeleteId];
-    if (!r || !r.delBtn || e.target !== r.delBtn){
-      pendingDeleteId = null;
       render();
     }
   }
@@ -594,10 +587,6 @@ function render(){
   for (const it of state.items){
     const r = refs[it.id];
     if (r.nameEl && document.activeElement !== r.nameEl) r.nameEl.value = it.name;
-    if (r.delBtn){
-      r.delBtn.classList.toggle('pending', pendingDeleteId === it.id);
-      r.delBtn.textContent = pendingDeleteId === it.id ? '✓' : '×';
-    }
     if (it.type==='rule') r.el.style.borderTopColor = it.color || '#52617a';
     if (it.type==='stam'){
       const info = stamInfo(it, now);
