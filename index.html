@@ -830,7 +830,8 @@ document.addEventListener('selectstart', (e)=> e.preventDefault());
 document.addEventListener('paste', (e)=> e.preventDefault());
 
 document.getElementById('updateBtn').addEventListener('click', ()=>{
-  location.href = 'update.html';
+  // クエリ付きで update.html 自体のキャッシュも避ける
+  location.href = 'update.html?r=' + Date.now().toString(36);
 });
 
 // Service worker: register once, never poll for updates automatically.

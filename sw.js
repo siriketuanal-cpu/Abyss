@@ -1,18 +1,19 @@
-// キャッシュ名は固定。更新は update.html で SW解除＋Cache全削除→再取得する。
-// （名前を上げなくても、更新ボタンで中身を取り直せる）
+// キャッシュ名固定。中身の差し替えは update.html（SW解除＋Cache削除＋no-store取得）で行う。
 const CACHE_NAME = 'freetimer-cache-v1';
 const ASSETS = [
   './',
-  'index.html',
-  'manifest.json',
-  'icon-192.png',
-  'icon-512.png',
-  'icon-maskable-512.png'
+  './index.html',
+  './manifest.json',
+  './icon-192.png',
+  './icon-512.png',
+  './icon-maskable-512.png'
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME)
+      .then((cache) => cache.addAll(ASSETS))
+      .then(() => self.skipWaiting())
   );
 });
 
@@ -24,12 +25,22 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// キャッシュ優先。ネットワークへの更新確認・再検証は行わない。
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+  const url = new URL(event.request.url);
+  // 更新ページは常にネット（古い update.html をキャッシュから出さない）
+  if (url.pathname.endsWith('/update.html') || url.pathname.endsWith('update.html')) {
+    event.respondWith(fetch(event.request, { cache: 'no-store' }));
+    return;
+  }
+  // 通常はキャッシュ優先（オフライン用）
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
+      // クエリ付き index.html?r=... は index.html 本体にもフォールバック
+      if (url.pathname.endsWith('/index.html') || url.pathname.endsWith('index.html')) {
+        return caches.match('./index.html').then((c) => c || fetch(event.request).catch(() => cached));
+      }
       return fetch(event.request).catch(() => cached);
     })
   );
