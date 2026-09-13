@@ -58,13 +58,14 @@
   .card.linking{outline:2px dashed var(--accent); outline-offset:2px;}
   .name.shared{color:var(--sub);}
   #cards .pairhost{
+    grid-column: span 2;
     background:var(--card); border:1px solid var(--line); border-radius:10px;
-    display:flex; flex-direction:column; overflow:hidden; min-width:0;
+    display:flex; flex-direction:row; overflow:hidden; min-width:0;
   }
   .pairhost.claim{border-color:var(--ok);}
   .pairhost.full{border-color:var(--orange);}
-  .card.paired{background:transparent; border:none; border-radius:0;}
-  .card.paired + .card.paired{border-top:1px solid var(--line);}
+  .card.paired{background:transparent; border:none; border-radius:0; flex:1 1 0; min-width:0;}
+  .card.paired + .card.paired{border-left:1px solid var(--line);}
   .card.paired.claim{background:rgba(92,214,138,.08);}
   .card.paired.full{background:rgba(255,171,92,.08);}
   .name{
@@ -198,6 +199,7 @@ let tickGen = 0;
 let pending40Id = null;
 let linkPickId = null; // 放置カードのリンク先選択中はこのidleのidが入る
 let pairHosts = {}; // headId(スタミナ/Abyss側のid) -> 連結表示用の外枠div
+let suppressNextClick = false; // 長押し確定直後の指離しclickを1回だけ無視する
 
 // DOM参照は一度だけ取得して使い回す(毎分ティックや毎クリックで検索し直さない)。
 const cardsEl = document.getElementById('cards');
@@ -392,6 +394,7 @@ function bindLongPressDelete(el, id){
 function askRemoveItem(id){
   const toast = document.getElementById('toast');
   if (!toast){ removeItem(id); return; }
+  suppressNextClick = true; // 長押し確定→指を離した瞬間のclickでバーが即閉じないようにする
   toast.innerHTML = '<span>削除する？</span><button type="button" class="ok" data-act="yes">削除</button><button type="button" data-act="no">やめる</button>';
   toast.classList.add('show');
   const onClick = (e)=>{
@@ -623,15 +626,13 @@ function cancelClaim(it){
 // ×タップ→確認状態(赤)→もう一度タップで削除。ネイティブconfirm()はPWA環境で
 // 動作しないことがあるため使わない。
 
-function sameSection(idxA, idxB){
-  const lo = Math.min(idxA, idxB), hi = Math.max(idxA, idxB);
-  for (let i = lo+1; i < hi; i++){
-    const t = state.items[i].type;
-    if (t === 'header' || t === 'rule') return false;
-  }
-  return true;
-}
 document.addEventListener('click', (e) => {
+  if (suppressNextClick){
+    suppressNextClick = false;
+    e.stopPropagation();
+    e.preventDefault();
+    return;
+  }
   if (linkPickId != null){
     const cardEl = e.target.closest('.card');
     let targetId = null;
@@ -644,8 +645,9 @@ document.addEventListener('click', (e) => {
       if (targetItem && idleItem && (targetItem.type==='stam' || targetItem.type==='abyss')){
         const idleIdx = state.items.indexOf(idleItem);
         const targetIdx = state.items.indexOf(targetItem);
-        if (sameSection(idleIdx, targetIdx)){
-          // 見出し/仕切り線をまたがない場合だけ、放置カードをスタミナ側の直後に移動して連結
+        const targetCol = computeColumns(buildSlots())[targetId];
+        if (sameSection(idleIdx, targetIdx) && targetCol !== GRID_COLS-1){
+          // 見出し/仕切り線をまたがない・右端(4列目)でない場合だけ、放置カードをスタミナ側の直後に移動して連結
           state.items.splice(idleIdx, 1);
           const newTargetIdx = state.items.indexOf(targetItem);
           state.items.splice(newTargetIdx+1, 0, idleItem);
@@ -676,6 +678,10 @@ document.addEventListener('click', (e) => {
   }
   if (addPanelEl.classList.contains('show') && !addPanelEl.contains(e.target) && e.target !== addBtnEl){
     addPanelEl.classList.remove('show');
+  }
+  const toastEl = document.getElementById('toast');
+  if (toastEl && toastEl.classList.contains('show') && !toastEl.contains(e.target)){
+    toastEl.classList.remove('show');
   }
   // 作成パネルは枠外タップで閉じない（キーボード閉じでキャンセルされるのを防ぐ）
 }, true);
@@ -724,20 +730,8 @@ function paintAbyssFortyPreview(id){
   if (r.maxLabel) r.maxLabel.textContent = String(it.max);
   renderClock(r.clockEl, info.remainMs, info.isFull);
 }
-function render(){
-  const now = Date.now();
-  emptyEl.style.display = state.items.length ? 'none' : 'block';
-
-  const existingIds = new Set(state.items.map(i=>i.id));
-  Object.keys(refs).forEach(id=>{ if(!existingIds.has(id)) delete refs[id]; });
-
-  for (const it of state.items){
-    if (!refs[it.id]){
-      const el = it.type==='stam' ? buildStamCard(it) : it.type==='abyss' ? buildAbyssCard(it) : it.type==='idle' ? buildIdleCard(it) : it.type==='rule' ? buildRuleCard(it) : buildHeaderCard(it);
-    }
-  }
-
-  // 連結ペアをまとめて1スロットにする（直後に隣接している場合のみ合体。見出し/仕切り線越しには合体しない）
+// 連結ペアをまとめて1スロットにする（直後に隣接している場合のみ合体。見出し/仕切り線越しには合体しない）
+function buildSlots(){
   const skip = new Set();
   const slots = [];
   for (let i = 0; i < state.items.length; i++){
@@ -753,6 +747,51 @@ function render(){
     }
     slots.push({kind:'single', id:it.id});
   }
+  return slots;
+}
+const GRID_COLS = 4;
+// 各スロットが実際に何列目から始まるかをシミュレート（横連結は2列分の幅を取るため、
+// 4列目(右端)から始まる連結は成立しない＝連結不可の判定に使う）
+function computeColumns(slots){
+  const cols = {};
+  let col = 0;
+  for (const s of slots){
+    if (s.kind==='single'){
+      const it = state.items.find(x=>x.id===s.id);
+      if (it.type==='header' || it.type==='rule'){ col = 0; continue; }
+      cols[s.id] = col;
+      col = (col+1) % GRID_COLS;
+    } else {
+      if (col + 2 > GRID_COLS) col = 0;
+      cols[s.headId] = col;
+      cols[s.idleId] = col;
+      col = (col+2) % GRID_COLS;
+    }
+  }
+  return cols;
+}
+function sameSection(idxA, idxB){
+  const lo = Math.min(idxA, idxB), hi = Math.max(idxA, idxB);
+  for (let i = lo+1; i < hi; i++){
+    const t = state.items[i].type;
+    if (t === 'header' || t === 'rule') return false;
+  }
+  return true;
+}
+function render(){
+  const now = Date.now();
+  emptyEl.style.display = state.items.length ? 'none' : 'block';
+
+  const existingIds = new Set(state.items.map(i=>i.id));
+  Object.keys(refs).forEach(id=>{ if(!existingIds.has(id)) delete refs[id]; });
+
+  for (const it of state.items){
+    if (!refs[it.id]){
+      const el = it.type==='stam' ? buildStamCard(it) : it.type==='abyss' ? buildAbyssCard(it) : it.type==='idle' ? buildIdleCard(it) : it.type==='rule' ? buildRuleCard(it) : buildHeaderCard(it);
+    }
+  }
+
+  const slots = buildSlots();
   const pairedIds = new Set();
   slots.forEach(s=>{ if (s.kind==='pair'){ pairedIds.add(s.headId); pairedIds.add(s.idleId); } });
   Object.keys(refs).forEach(id=> refs[id].el.classList.toggle('paired', pairedIds.has(id)));
