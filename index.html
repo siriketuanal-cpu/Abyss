@@ -48,6 +48,15 @@
   .row + .row{margin-top:3px;}
   .namerow{margin-bottom:4px;}
   .card.abyss .namerow{padding-right:38px;}
+  .card.idle{position:relative;}
+  .card.idle .namerow{padding-right:26px;}
+  .linkbtn{
+    position:absolute; top:2px; right:2px; width:22px; height:22px;
+    display:flex; align-items:center; justify-content:center;
+    background:transparent; border:none; color:var(--sub); font-size:13px; padding:0; z-index:2;
+  }
+  .card.linking{outline:2px dashed var(--accent); outline-offset:2px;}
+  .name.shared{color:var(--sub); pointer-events:none;}
   .name{
     width:100%; background:transparent; border:none; color:var(--text);
     font-size:11px; font-weight:600; padding:2px 0; min-width:0;
@@ -177,6 +186,7 @@ let refs = {};
 let tickId = null;
 let tickGen = 0;
 let pending40Id = null;
+let linkPickId = null; // 放置カードのリンク先選択中はこのidleのidが入る
 
 // DOM参照は一度だけ取得して使い回す(毎分ティックや毎クリックで検索し直さない)。
 const cardsEl = document.getElementById('cards');
@@ -262,7 +272,7 @@ function newAbyssItem(intervalMin){
   return { id: uid(), type:'abyss', name:'', rank, current:0, max: abyssMaxFor(rank), intervalMin, start: Date.now() };
 }
 function newIdleItem(durationMin){
-  return { id: uid(), type:'idle', name:'', durationMin, state:'running', start: Date.now() };
+  return { id: uid(), type:'idle', name:'', durationMin, state:'running', start: Date.now(), pairId: null };
 }
 function newHeaderItem(){
   return { id: uid(), type:'header', name:'' };
@@ -397,7 +407,7 @@ function buildStamCard(it){
     </div>
   `;
   const nameEl = wrap.querySelector('.name');
-  nameEl.addEventListener('blur', ()=>{ it.name = nameEl.value; save(); });
+  nameEl.addEventListener('blur', ()=>{ it.name = nameEl.value; save(); render(); });
   const curInput = wrap.querySelector('[data-role="curInput"]');
   const maxInput = wrap.querySelector('[data-role="maxInput"]');
   forceCursorToEnd(nameEl);
@@ -443,7 +453,7 @@ function buildAbyssCard(it){
     </div>
   `;
   const nameEl = wrap.querySelector('.name');
-  nameEl.addEventListener('blur', ()=>{ it.name = nameEl.value; save(); });
+  nameEl.addEventListener('blur', ()=>{ it.name = nameEl.value; save(); render(); });
   const rankInput = wrap.querySelector('[data-role="rankInput"]');
   const curInput = wrap.querySelector('[data-role="curInput"]');
   const maxLabel = wrap.querySelector('[data-role="maxLabel"]');
@@ -524,24 +534,33 @@ function buildAbyssCard(it){
 
 function buildIdleCard(it){
   const wrap = document.createElement('div');
-  wrap.className = 'card';
+  wrap.className = 'card idle';
   wrap.innerHTML = `
     <div class="row namerow">
       <input class="name" placeholder="アカウント名" value="${esc(it.name)}">
+      <div class="name shared" data-role="sharedName" style="display:none"></div>
+      <button type="button" class="linkbtn" data-role="linkBtn" title="スタミナカードと連結">🔗</button>
     </div>
     <div class="row valrow-idle">
       <div class="main" data-role="cur"></div>
       <div class="clockstack" data-role="clock"></div>
     </div>
   `;
-  const nameEl = wrap.querySelector('.name');
+  const nameEl = wrap.querySelector('.name:not(.shared)');
+  const sharedNameEl = wrap.querySelector('[data-role="sharedName"]');
+  const linkBtn = wrap.querySelector('[data-role="linkBtn"]');
   nameEl.addEventListener('blur', ()=>{ it.name = nameEl.value; save(); });
   forceCursorToEnd(nameEl);
+  linkBtn.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    linkPickId = (linkPickId === it.id) ? null : it.id;
+    render();
+  });
   wrap.addEventListener('click', (e)=>{
-    if (e.target === nameEl) return;
+    if (e.target === nameEl || e.target.closest('.linkbtn')) return;
     toggleIdle(it);
   });
-  refs[it.id] = { el: wrap, nameEl,
+  refs[it.id] = { el: wrap, nameEl, sharedNameEl, linkBtn,
     curEl: wrap.querySelector('[data-role="cur"]'), clockEl: wrap.querySelector('[data-role="clock"]') };
   bindLongPressDelete(wrap, it.id);
   return wrap;
@@ -596,6 +615,26 @@ function cancelClaim(it){
 // 動作しないことがあるため使わない。
 
 document.addEventListener('click', (e) => {
+  if (linkPickId != null){
+    const cardEl = e.target.closest('.card');
+    let targetId = null;
+    if (cardEl){
+      for (const id in refs){ if (refs[id].el === cardEl){ targetId = id; break; } }
+    }
+    if (targetId && targetId !== linkPickId){
+      const targetItem = state.items.find(i=>i.id===targetId);
+      const idleItem = state.items.find(i=>i.id===linkPickId);
+      if (targetItem && idleItem && (targetItem.type==='stam' || targetItem.type==='abyss')){
+        idleItem.pairId = targetId;
+        save();
+      }
+    }
+    linkPickId = null;
+    render();
+    e.stopPropagation();
+    e.preventDefault();
+    return;
+  }
   for (const it of state.items){
     if (it.type === 'idle' && it.state === 'claim'){
       const r = refs[it.id];
@@ -625,7 +664,9 @@ function esc(s){ return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'
 function removeItem(id){
   if (refs[id]) refs[id].el.remove();
   state.items = state.items.filter(i=>i.id!==id);
+  state.items.forEach(it=>{ if (it.type==='idle' && it.pairId===id) it.pairId = null; });
   delete refs[id];
+  if (linkPickId === id) linkPickId = null;
   save(); render(); startTicking(true);
 }
 
@@ -727,6 +768,21 @@ function render(){
       const label = it.state==='claim' ? '受取' : (info.isFull ? 'MAX' : fmtCountdown(info.remainMs));
       if (r.curEl.textContent !== label) r.curEl.textContent = label;
       renderClock(r.clockEl, info.remainMs, info.isFull);
+      // ペア連結: リンク先が消えていたら自動的に解除して自分の名前欄に戻す
+      const paired = it.pairId ? state.items.find(x=>x.id===it.pairId) : null;
+      if (it.pairId && !paired) it.pairId = null;
+      r.el.classList.toggle('linking', linkPickId === it.id);
+      if (r.linkBtn) r.linkBtn.style.display = it.pairId ? 'none' : '';
+      if (paired){
+        r.nameEl.style.display = 'none';
+        r.sharedNameEl.style.display = '';
+        const v = paired.name || '';
+        if (r.sharedNameEl.textContent !== v) r.sharedNameEl.textContent = v;
+      } else {
+        r.nameEl.style.display = '';
+        r.sharedNameEl.style.display = 'none';
+        if (document.activeElement !== r.nameEl && r.nameEl.value !== it.name) r.nameEl.value = it.name;
+      }
     }
   }
 }
