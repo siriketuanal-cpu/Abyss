@@ -56,7 +56,17 @@
     background:transparent; border:none; color:var(--sub); font-size:13px; padding:0; z-index:2;
   }
   .card.linking{outline:2px dashed var(--accent); outline-offset:2px;}
-  .name.shared{color:var(--sub); pointer-events:none;}
+  .name.shared{color:var(--sub);}
+  #cards .pairhost{
+    background:var(--card); border:1px solid var(--line); border-radius:10px;
+    display:flex; flex-direction:column; overflow:hidden; min-width:0;
+  }
+  .pairhost.claim{border-color:var(--ok);}
+  .pairhost.full{border-color:var(--orange);}
+  .card.paired{background:transparent; border:none; border-radius:0;}
+  .card.paired + .card.paired{border-top:1px solid var(--line);}
+  .card.paired.claim{background:rgba(92,214,138,.08);}
+  .card.paired.full{background:rgba(255,171,92,.08);}
   .name{
     width:100%; background:transparent; border:none; color:var(--text);
     font-size:11px; font-weight:600; padding:2px 0; min-width:0;
@@ -187,6 +197,7 @@ let tickId = null;
 let tickGen = 0;
 let pending40Id = null;
 let linkPickId = null; // 放置カードのリンク先選択中はこのidleのidが入る
+let pairHosts = {}; // headId(スタミナ/Abyss側のid) -> 連結表示用の外枠div
 
 // DOM参照は一度だけ取得して使い回す(毎分ティックや毎クリックで検索し直さない)。
 const cardsEl = document.getElementById('cards');
@@ -538,7 +549,6 @@ function buildIdleCard(it){
   wrap.innerHTML = `
     <div class="row namerow">
       <input class="name" placeholder="アカウント名" value="${esc(it.name)}">
-      <div class="name shared" data-role="sharedName" style="display:none"></div>
       <button type="button" class="linkbtn" data-role="linkBtn" title="スタミナカードと連結">🔗</button>
     </div>
     <div class="row valrow-idle">
@@ -546,10 +556,9 @@ function buildIdleCard(it){
       <div class="clockstack" data-role="clock"></div>
     </div>
   `;
-  const nameEl = wrap.querySelector('.name:not(.shared)');
-  const sharedNameEl = wrap.querySelector('[data-role="sharedName"]');
+  const nameEl = wrap.querySelector('.name');
   const linkBtn = wrap.querySelector('[data-role="linkBtn"]');
-  nameEl.addEventListener('blur', ()=>{ it.name = nameEl.value; save(); });
+  nameEl.addEventListener('blur', ()=>{ if (!nameEl.readOnly){ it.name = nameEl.value; save(); } });
   forceCursorToEnd(nameEl);
   linkBtn.addEventListener('click', (e)=>{
     e.stopPropagation();
@@ -560,7 +569,7 @@ function buildIdleCard(it){
     if (e.target === nameEl || e.target.closest('.linkbtn')) return;
     toggleIdle(it);
   });
-  refs[it.id] = { el: wrap, nameEl, sharedNameEl, linkBtn,
+  refs[it.id] = { el: wrap, nameEl, linkBtn,
     curEl: wrap.querySelector('[data-role="cur"]'), clockEl: wrap.querySelector('[data-role="clock"]') };
   bindLongPressDelete(wrap, it.id);
   return wrap;
@@ -709,25 +718,59 @@ function render(){
   for (const it of state.items){
     if (!refs[it.id]){
       const el = it.type==='stam' ? buildStamCard(it) : it.type==='abyss' ? buildAbyssCard(it) : it.type==='idle' ? buildIdleCard(it) : it.type==='rule' ? buildRuleCard(it) : buildHeaderCard(it);
-      cardsEl.appendChild(el);
     }
   }
+
+  // 連結ペアをまとめて1スロットにする（放置カードは連結先の直後に合流）
+  const skip = new Set();
+  const slots = [];
+  for (const it of state.items){
+    if (skip.has(it.id)) continue;
+    if (it.type==='stam' || it.type==='abyss'){
+      const idle = state.items.find(x=>x.type==='idle' && x.pairId===it.id);
+      if (idle){ slots.push({kind:'pair', headId:it.id, idleId:idle.id}); skip.add(idle.id); continue; }
+    }
+    slots.push({kind:'single', id:it.id});
+  }
+  const pairedIds = new Set();
+  slots.forEach(s=>{ if (s.kind==='pair'){ pairedIds.add(s.headId); pairedIds.add(s.idleId); } });
+  Object.keys(refs).forEach(id=> refs[id].el.classList.toggle('paired', pairedIds.has(id)));
+
+  // 不要になった合体枠(pairhost)を破棄。中の要素は下の配置パスで単体としてcardsに戻る
+  Object.keys(pairHosts).forEach(headId=>{
+    const stillPaired = slots.some(s=>s.kind==='pair' && s.headId===headId);
+    if (!stillPaired){ pairHosts[headId].remove(); delete pairHosts[headId]; }
+  });
+  for (const s of slots){
+    if (s.kind==='pair' && !pairHosts[s.headId]){
+      const host = document.createElement('div');
+      host.className = 'pairhost';
+      pairHosts[s.headId] = host;
+    }
+  }
+
+  const topEls = slots.map(s=>{
+    if (s.kind==='single') return refs[s.id].el;
+    const host = pairHosts[s.headId];
+    const headEl = refs[s.headId].el, idleEl = refs[s.idleId].el;
+    if (host.children[0] !== headEl) host.appendChild(headEl);
+    if (host.children[1] !== idleEl) host.appendChild(idleEl);
+    return host;
+  });
+
   // 順序が違うときだけ並べ替え（毎分の append を避ける）
   let needOrder = false;
   const kids = cardsEl.children;
-  for (let i = 0; i < state.items.length; i++){
-    const el = refs[state.items[i].id] && refs[state.items[i].id].el;
-    if (!el || kids[i] !== el){ needOrder = true; break; }
+  for (let i = 0; i < topEls.length; i++){
+    if (kids[i] !== topEls[i]){ needOrder = true; break; }
   }
   if (needOrder){
-    for (const it of state.items){
-      if (refs[it.id]) cardsEl.appendChild(refs[it.id].el);
-    }
+    for (const el of topEls) cardsEl.appendChild(el);
   }
 
   for (const it of state.items){
     const r = refs[it.id];
-    if (r.nameEl && document.activeElement !== r.nameEl) r.nameEl.value = it.name;
+    if (it.type!=='idle' && r.nameEl && document.activeElement !== r.nameEl) r.nameEl.value = it.name;
     if (it.type==='rule') r.el.style.borderTopColor = it.color || '#52617a';
     if (it.type==='stam'){
       const info = stamInfo(it, now);
@@ -741,6 +784,8 @@ function render(){
         const v = String(it.max);
         if (r.maxInput.value !== v) r.maxInput.value = v;
       }
+      const host = pairHosts[it.id];
+      if (host) host.classList.toggle('full', info.isFull);
     } else if (it.type==='abyss'){
       // maxはランク変更時だけ変わる。毎分のsyncは不要だが安価なので維持
       if (it.max !== abyssMaxFor(it.rank||1)) syncAbyssMax(it);
@@ -761,6 +806,8 @@ function render(){
         const v = String(it.max);
         if (r.maxLabel.textContent !== v) r.maxLabel.textContent = v;
       }
+      const host = pairHosts[it.id];
+      if (host) host.classList.toggle('full', info.isFull);
     } else if (it.type==='idle'){
       const info = idleInfo(it, now);
       r.el.classList.toggle('claim', it.state==='claim');
@@ -773,16 +820,12 @@ function render(){
       if (it.pairId && !paired) it.pairId = null;
       r.el.classList.toggle('linking', linkPickId === it.id);
       if (r.linkBtn) r.linkBtn.style.display = it.pairId ? 'none' : '';
-      if (paired){
-        r.nameEl.style.display = 'none';
-        r.sharedNameEl.style.display = '';
-        const v = paired.name || '';
-        if (r.sharedNameEl.textContent !== v) r.sharedNameEl.textContent = v;
-      } else {
-        r.nameEl.style.display = '';
-        r.sharedNameEl.style.display = 'none';
-        if (document.activeElement !== r.nameEl && r.nameEl.value !== it.name) r.nameEl.value = it.name;
-      }
+      const wantName = paired ? (paired.name || '') : it.name;
+      if (r.nameEl.readOnly !== !!paired) r.nameEl.readOnly = !!paired;
+      r.nameEl.classList.toggle('shared', !!paired);
+      if (document.activeElement !== r.nameEl && r.nameEl.value !== wantName) r.nameEl.value = wantName;
+      const host = pairHosts[it.pairId];
+      if (host) host.classList.toggle('claim', it.state==='claim');
     }
   }
 }
