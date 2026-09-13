@@ -37,7 +37,7 @@
     background:var(--card2); color:var(--text); font-size:18px; line-height:1;
     display:flex; align-items:center; justify-content:center;
   }
-  #cards{padding:6px 6px 20px; display:grid; grid-template-columns:repeat(4,1fr); gap:6px;}
+  #cards{padding:6px 6px 20px; display:grid; grid-template-columns:repeat(4,1fr); gap:6px; align-items:start;}
   .card{
     background:var(--card); border:1px solid var(--line); border-radius:10px;
     padding:6px 6px; position:relative; min-width:0;
@@ -623,6 +623,14 @@ function cancelClaim(it){
 // ×タップ→確認状態(赤)→もう一度タップで削除。ネイティブconfirm()はPWA環境で
 // 動作しないことがあるため使わない。
 
+function sameSection(idxA, idxB){
+  const lo = Math.min(idxA, idxB), hi = Math.max(idxA, idxB);
+  for (let i = lo+1; i < hi; i++){
+    const t = state.items[i].type;
+    if (t === 'header' || t === 'rule') return false;
+  }
+  return true;
+}
 document.addEventListener('click', (e) => {
   if (linkPickId != null){
     const cardEl = e.target.closest('.card');
@@ -634,8 +642,16 @@ document.addEventListener('click', (e) => {
       const targetItem = state.items.find(i=>i.id===targetId);
       const idleItem = state.items.find(i=>i.id===linkPickId);
       if (targetItem && idleItem && (targetItem.type==='stam' || targetItem.type==='abyss')){
-        idleItem.pairId = targetId;
-        save();
+        const idleIdx = state.items.indexOf(idleItem);
+        const targetIdx = state.items.indexOf(targetItem);
+        if (sameSection(idleIdx, targetIdx)){
+          // 見出し/仕切り線をまたがない場合だけ、放置カードをスタミナ側の直後に移動して連結
+          state.items.splice(idleIdx, 1);
+          const newTargetIdx = state.items.indexOf(targetItem);
+          state.items.splice(newTargetIdx+1, 0, idleItem);
+          idleItem.pairId = targetId;
+          save();
+        }
       }
     }
     linkPickId = null;
@@ -721,14 +737,19 @@ function render(){
     }
   }
 
-  // 連結ペアをまとめて1スロットにする（放置カードは連結先の直後に合流）
+  // 連結ペアをまとめて1スロットにする（直後に隣接している場合のみ合体。見出し/仕切り線越しには合体しない）
   const skip = new Set();
   const slots = [];
-  for (const it of state.items){
+  for (let i = 0; i < state.items.length; i++){
+    const it = state.items[i];
     if (skip.has(it.id)) continue;
     if (it.type==='stam' || it.type==='abyss'){
-      const idle = state.items.find(x=>x.type==='idle' && x.pairId===it.id);
-      if (idle){ slots.push({kind:'pair', headId:it.id, idleId:idle.id}); skip.add(idle.id); continue; }
+      const next = state.items[i+1];
+      if (next && next.type==='idle' && next.pairId===it.id){
+        slots.push({kind:'pair', headId:it.id, idleId:next.id});
+        skip.add(next.id);
+        continue;
+      }
     }
     slots.push({kind:'single', id:it.id});
   }
