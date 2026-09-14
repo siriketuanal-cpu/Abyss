@@ -417,7 +417,6 @@ function buildStamCard(it){
   `;
   const curInput = wrap.querySelector('[data-role="curInput"]');
   const maxInput = wrap.querySelector('[data-role="maxInput"]');
-  forceCursorToEnd(nameEl);
   [curInput, maxInput].forEach(clearOnFocus);
   curInput.addEventListener('blur', ()=>{
     const now = Date.now();
