@@ -48,26 +48,6 @@
   .row + .row{margin-top:3px;}
   .namerow{margin-bottom:4px;}
   .card.abyss .namerow{padding-right:38px;}
-  .card.idle{position:relative;}
-  .card.idle .namerow{padding-right:26px;}
-  .linkbtn{
-    position:absolute; top:2px; right:2px; width:22px; height:22px;
-    display:flex; align-items:center; justify-content:center;
-    background:transparent; border:none; color:var(--sub); font-size:13px; padding:0; z-index:2;
-  }
-  .card.linking{outline:2px dashed var(--accent); outline-offset:2px;}
-  .name.shared{color:var(--sub);}
-  #cards .pairhost{
-    grid-column: span 2;
-    background:var(--card); border:1px solid var(--line); border-radius:10px;
-    display:flex; flex-direction:row; overflow:hidden; min-width:0;
-  }
-  .pairhost.claim{border-color:var(--ok);}
-  .pairhost.full{border-color:var(--orange);}
-  .card.paired{background:transparent; border:none; border-radius:0; flex:1 1 0; min-width:0;}
-  .card.paired + .card.paired{border-left:1px solid var(--line);}
-  .card.paired.claim{background:rgba(92,214,138,.08);}
-  .card.paired.full{background:rgba(255,171,92,.08);}
   .name{
     width:100%; background:transparent; border:none; color:var(--text);
     font-size:11px; font-weight:600; padding:2px 0; min-width:0;
@@ -197,8 +177,6 @@ let refs = {};
 let tickId = null;
 let tickGen = 0;
 let pending40Id = null;
-let linkPickId = null; // 放置カードのリンク先選択中はこのidleのidが入る
-let pairHosts = {}; // headId(スタミナ/Abyss側のid) -> 連結表示用の外枠div
 let suppressNextClick = false; // 長押し確定直後の指離しclickを1回だけ無視する
 
 // DOM参照は一度だけ取得して使い回す(毎分ティックや毎クリックで検索し直さない)。
@@ -285,7 +263,7 @@ function newAbyssItem(intervalMin){
   return { id: uid(), type:'abyss', name:'', rank, current:0, max: abyssMaxFor(rank), intervalMin, start: Date.now() };
 }
 function newIdleItem(durationMin){
-  return { id: uid(), type:'idle', name:'', durationMin, state:'running', start: Date.now(), pairId: null };
+  return { id: uid(), type:'idle', name:'', durationMin, state:'running', start: Date.now() };
 }
 function newHeaderItem(){
   return { id: uid(), type:'header', name:'' };
@@ -552,7 +530,6 @@ function buildIdleCard(it){
   wrap.innerHTML = `
     <div class="row namerow">
       <input class="name" placeholder="アカウント名" value="${esc(it.name)}">
-      <button type="button" class="linkbtn" data-role="linkBtn" title="スタミナカードと連結">🔗</button>
     </div>
     <div class="row valrow-idle">
       <div class="main" data-role="cur"></div>
@@ -560,19 +537,13 @@ function buildIdleCard(it){
     </div>
   `;
   const nameEl = wrap.querySelector('.name');
-  const linkBtn = wrap.querySelector('[data-role="linkBtn"]');
   nameEl.addEventListener('blur', ()=>{ if (!nameEl.readOnly){ it.name = nameEl.value; save(); } });
   forceCursorToEnd(nameEl);
-  linkBtn.addEventListener('click', (e)=>{
-    e.stopPropagation();
-    linkPickId = (linkPickId === it.id) ? null : it.id;
-    render();
-  });
   wrap.addEventListener('click', (e)=>{
-    if (e.target === nameEl || e.target.closest('.linkbtn')) return;
+    if (e.target === nameEl) return;
     toggleIdle(it);
   });
-  refs[it.id] = { el: wrap, nameEl, linkBtn,
+  refs[it.id] = { el: wrap, nameEl,
     curEl: wrap.querySelector('[data-role="cur"]'), clockEl: wrap.querySelector('[data-role="clock"]') };
   bindLongPressDelete(wrap, it.id);
   return wrap;
@@ -633,35 +604,6 @@ document.addEventListener('click', (e) => {
     e.preventDefault();
     return;
   }
-  if (linkPickId != null){
-    const cardEl = e.target.closest('.card');
-    let targetId = null;
-    if (cardEl){
-      for (const id in refs){ if (refs[id].el === cardEl){ targetId = id; break; } }
-    }
-    if (targetId && targetId !== linkPickId){
-      const targetItem = state.items.find(i=>i.id===targetId);
-      const idleItem = state.items.find(i=>i.id===linkPickId);
-      if (targetItem && idleItem && (targetItem.type==='stam' || targetItem.type==='abyss')){
-        const idleIdx = state.items.indexOf(idleItem);
-        const targetIdx = state.items.indexOf(targetItem);
-        const targetCol = computeColumns(buildSlots())[targetId];
-        if (sameSection(idleIdx, targetIdx) && targetCol !== GRID_COLS-1){
-          // 見出し/仕切り線をまたがない・右端(4列目)でない場合だけ、放置カードをスタミナ側の直後に移動して連結
-          state.items.splice(idleIdx, 1);
-          const newTargetIdx = state.items.indexOf(targetItem);
-          state.items.splice(newTargetIdx+1, 0, idleItem);
-          idleItem.pairId = targetId;
-          save();
-        }
-      }
-    }
-    linkPickId = null;
-    render();
-    e.stopPropagation();
-    e.preventDefault();
-    return;
-  }
   for (const it of state.items){
     if (it.type === 'idle' && it.state === 'claim'){
       const r = refs[it.id];
@@ -695,9 +637,7 @@ function esc(s){ return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'
 function removeItem(id){
   if (refs[id]) refs[id].el.remove();
   state.items = state.items.filter(i=>i.id!==id);
-  state.items.forEach(it=>{ if (it.type==='idle' && it.pairId===id) it.pairId = null; });
   delete refs[id];
-  if (linkPickId === id) linkPickId = null;
   save(); render(); startTicking(true);
 }
 
@@ -730,54 +670,6 @@ function paintAbyssFortyPreview(id){
   if (r.maxLabel) r.maxLabel.textContent = String(it.max);
   renderClock(r.clockEl, info.remainMs, info.isFull);
 }
-// 連結ペアをまとめて1スロットにする（直後に隣接している場合のみ合体。見出し/仕切り線越しには合体しない）
-function buildSlots(){
-  const skip = new Set();
-  const slots = [];
-  for (let i = 0; i < state.items.length; i++){
-    const it = state.items[i];
-    if (skip.has(it.id)) continue;
-    if (it.type==='stam' || it.type==='abyss'){
-      const next = state.items[i+1];
-      if (next && next.type==='idle' && next.pairId===it.id){
-        slots.push({kind:'pair', headId:it.id, idleId:next.id});
-        skip.add(next.id);
-        continue;
-      }
-    }
-    slots.push({kind:'single', id:it.id});
-  }
-  return slots;
-}
-const GRID_COLS = 4;
-// 各スロットが実際に何列目から始まるかをシミュレート（横連結は2列分の幅を取るため、
-// 4列目(右端)から始まる連結は成立しない＝連結不可の判定に使う）
-function computeColumns(slots){
-  const cols = {};
-  let col = 0;
-  for (const s of slots){
-    if (s.kind==='single'){
-      const it = state.items.find(x=>x.id===s.id);
-      if (it.type==='header' || it.type==='rule'){ col = 0; continue; }
-      cols[s.id] = col;
-      col = (col+1) % GRID_COLS;
-    } else {
-      if (col + 2 > GRID_COLS) col = 0;
-      cols[s.headId] = col;
-      cols[s.idleId] = col;
-      col = (col+2) % GRID_COLS;
-    }
-  }
-  return cols;
-}
-function sameSection(idxA, idxB){
-  const lo = Math.min(idxA, idxB), hi = Math.max(idxA, idxB);
-  for (let i = lo+1; i < hi; i++){
-    const t = state.items[i].type;
-    if (t === 'header' || t === 'rule') return false;
-  }
-  return true;
-}
 function render(){
   const now = Date.now();
   emptyEl.style.display = state.items.length ? 'none' : 'block';
@@ -791,32 +683,7 @@ function render(){
     }
   }
 
-  const slots = buildSlots();
-  const pairedIds = new Set();
-  slots.forEach(s=>{ if (s.kind==='pair'){ pairedIds.add(s.headId); pairedIds.add(s.idleId); } });
-  Object.keys(refs).forEach(id=> refs[id].el.classList.toggle('paired', pairedIds.has(id)));
-
-  // 不要になった合体枠(pairhost)を破棄。中の要素は下の配置パスで単体としてcardsに戻る
-  Object.keys(pairHosts).forEach(headId=>{
-    const stillPaired = slots.some(s=>s.kind==='pair' && s.headId===headId);
-    if (!stillPaired){ pairHosts[headId].remove(); delete pairHosts[headId]; }
-  });
-  for (const s of slots){
-    if (s.kind==='pair' && !pairHosts[s.headId]){
-      const host = document.createElement('div');
-      host.className = 'pairhost';
-      pairHosts[s.headId] = host;
-    }
-  }
-
-  const topEls = slots.map(s=>{
-    if (s.kind==='single') return refs[s.id].el;
-    const host = pairHosts[s.headId];
-    const headEl = refs[s.headId].el, idleEl = refs[s.idleId].el;
-    if (host.children[0] !== headEl) host.appendChild(headEl);
-    if (host.children[1] !== idleEl) host.appendChild(idleEl);
-    return host;
-  });
+  const topEls = state.items.map(it => refs[it.id].el);
 
   // 順序が違うときだけ並べ替え（毎分の append を避ける）
   let needOrder = false;
@@ -844,8 +711,6 @@ function render(){
         const v = String(it.max);
         if (r.maxInput.value !== v) r.maxInput.value = v;
       }
-      const host = pairHosts[it.id];
-      if (host) host.classList.toggle('full', info.isFull);
     } else if (it.type==='abyss'){
       // maxはランク変更時だけ変わる。毎分のsyncは不要だが安価なので維持
       if (it.max !== abyssMaxFor(it.rank||1)) syncAbyssMax(it);
@@ -866,8 +731,6 @@ function render(){
         const v = String(it.max);
         if (r.maxLabel.textContent !== v) r.maxLabel.textContent = v;
       }
-      const host = pairHosts[it.id];
-      if (host) host.classList.toggle('full', info.isFull);
     } else if (it.type==='idle'){
       const info = idleInfo(it, now);
       r.el.classList.toggle('claim', it.state==='claim');
@@ -875,17 +738,7 @@ function render(){
       const label = it.state==='claim' ? '受取' : (info.isFull ? 'MAX' : fmtCountdown(info.remainMs));
       if (r.curEl.textContent !== label) r.curEl.textContent = label;
       renderClock(r.clockEl, info.remainMs, info.isFull);
-      // ペア連結: リンク先が消えていたら自動的に解除して自分の名前欄に戻す
-      const paired = it.pairId ? state.items.find(x=>x.id===it.pairId) : null;
-      if (it.pairId && !paired) it.pairId = null;
-      r.el.classList.toggle('linking', linkPickId === it.id);
-      if (r.linkBtn) r.linkBtn.style.display = it.pairId ? 'none' : '';
-      const wantName = paired ? (paired.name || '') : it.name;
-      if (r.nameEl.readOnly !== !!paired) r.nameEl.readOnly = !!paired;
-      r.nameEl.classList.toggle('shared', !!paired);
-      if (document.activeElement !== r.nameEl && r.nameEl.value !== wantName) r.nameEl.value = wantName;
-      const host = pairHosts[it.pairId];
-      if (host) host.classList.toggle('claim', it.state==='claim');
+      if (document.activeElement !== r.nameEl && r.nameEl.value !== it.name) r.nameEl.value = it.name;
     }
   }
 }
