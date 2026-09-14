@@ -60,8 +60,8 @@
     font-variant-numeric:tabular-nums;
     -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
   }
-  /* アカウント枠 */
-  .card.group{grid-column:1 / -1; padding:8px;}
+  /* アカウント枠：通常カード2枚分の横幅 */
+  .card.group{grid-column:span 2; padding:8px;}
   .group-namerow{margin-bottom:6px;}
   .group-namerow .name{font-size:13px; font-weight:700; color:var(--accent);}
   .group-body{display:grid; grid-template-columns:repeat(2,1fr); gap:6px;}
@@ -133,6 +133,8 @@
     display:none; gap:10px; z-index:10;
   }
   #addPanel.show{display:flex; flex-wrap:wrap;}
+  #addPanel .timerType{display:none;}
+  #addPanel.group-mode .timerType{display:block;}
   #addPanel.group-mode .onlyTop{display:none;}
   #addPanel button{
     flex:1 1 calc(50% - 5px); min-width:calc(40% - 5px); padding:12px; border-radius:12px; border:1px solid var(--line);
@@ -170,9 +172,9 @@
 <div id="toast" role="status"></div>
 
 <div id="addPanel">
-  <button data-type="stam">スタミナ</button>
-  <button data-type="abyss">Abyssスタミナ</button>
-  <button data-type="idle">放置報酬</button>
+  <button data-type="stam" class="timerType">スタミナ</button>
+  <button data-type="abyss" class="timerType">Abyssスタミナ</button>
+  <button data-type="idle" class="timerType">放置報酬</button>
   <button data-type="group" class="onlyTop">アカウント枠</button>
   <button data-type="header" class="onlyTop">見出し</button>
   <button data-type="rule" class="onlyTop">仕切り線</button>
