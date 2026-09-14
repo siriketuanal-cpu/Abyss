@@ -47,7 +47,7 @@
   .row{display:flex; align-items:center; gap:3px; min-width:0;}
   .row + .row{margin-top:3px;}
   .namerow{margin-bottom:4px;}
-  .card.abyss .namerow{padding-right:38px;}
+  .card.abyss{padding-top:18px;}
   .name{
     width:100%; background:transparent; border:none; color:var(--text);
     font-size:11px; font-weight:600; padding:2px 0; min-width:0;
@@ -59,6 +59,17 @@
     font-size:10px; font-weight:800; text-align:right; padding:2px 0; z-index:2;
     font-variant-numeric:tabular-nums;
     -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+  }
+  /* アカウント枠 */
+  .card.group{grid-column:1 / -1; padding:8px;}
+  .group-namerow{margin-bottom:6px;}
+  .group-namerow .name{font-size:13px; font-weight:700; color:var(--accent);}
+  .group-body{display:grid; grid-template-columns:repeat(2,1fr); gap:6px;}
+  .group-body.one{grid-template-columns:1fr;}
+  .group-add{margin-top:6px;}
+  .group-add button{
+    width:100%; padding:8px; border-radius:8px; border:1px dashed var(--line);
+    background:transparent; color:var(--sub); font-size:12px; font-weight:600;
   }
   .stammax{
     display:inline-block; width:28px; height:20px; line-height:20px; box-sizing:border-box;
@@ -122,6 +133,7 @@
     display:none; gap:10px; z-index:10;
   }
   #addPanel.show{display:flex; flex-wrap:wrap;}
+  #addPanel.group-mode .onlyTop{display:none;}
   #addPanel button{
     flex:1 1 calc(50% - 5px); min-width:calc(40% - 5px); padding:12px; border-radius:12px; border:1px solid var(--line);
     background:var(--card2); color:var(--text); font-size:14px; font-weight:600;
@@ -161,8 +173,9 @@
   <button data-type="stam">スタミナ</button>
   <button data-type="abyss">Abyssスタミナ</button>
   <button data-type="idle">放置報酬</button>
-  <button data-type="header">見出し</button>
-  <button data-type="rule">仕切り線</button>
+  <button data-type="group" class="onlyTop">アカウント枠</button>
+  <button data-type="header" class="onlyTop">見出し</button>
+  <button data-type="rule" class="onlyTop">仕切り線</button>
 </div>
 <div id="setupPanel">
   <div class="setupLabel" id="setupLabel"></div>
@@ -271,6 +284,9 @@ function newHeaderItem(){
 function newRuleItem(color){
   return { id: uid(), type:'rule', color: color || '#52617a' };
 }
+function newGroupItem(){
+  return { id: uid(), type:'group', name:'', children: [] };
+}
 
 // 残り時間ではなく「何時何分に完了するか」を時刻表記で返す(スタミナ用)。
 function fmtClockAt(remainMs){
@@ -326,12 +342,16 @@ function idleInfo(it, now){
   return { remainMs, isFull: remainMs<=0 };
 }
 
+function timerNeedsTick(it, now){
+  if (it.type==='stam' || it.type==='abyss') return !stamInfo(it, now).isFull;
+  if (it.type==='idle') return !idleInfo(it, now).isFull;
+  return false;
+}
 function needsTicking(now){
   now = now || Date.now();
   return state.items.some(it=>{
-    if (it.type==='stam' || it.type==='abyss') return !stamInfo(it, now).isFull;
-    if (it.type==='idle') return !idleInfo(it, now).isFull;
-    return false;
+    if (it.type==='group') return it.children.some(c=>timerNeedsTick(c, now));
+    return timerNeedsTick(it, now);
   });
 }
 function scheduleTick(gen){
@@ -388,9 +408,6 @@ function buildStamCard(it){
   const wrap = document.createElement('div');
   wrap.className = 'card';
   wrap.innerHTML = `
-    <div class="row namerow">
-      <input class="name" placeholder="アカウント名" value="${esc(it.name)}">
-    </div>
     <div class="row valrow-stam">
       <input type="text" inputmode="numeric" pattern="[0-9]*" class="stamval" data-role="curInput">
       <span class="slash">/</span>
@@ -398,8 +415,6 @@ function buildStamCard(it){
       <div class="clockstack" data-role="clock"></div>
     </div>
   `;
-  const nameEl = wrap.querySelector('.name');
-  nameEl.addEventListener('blur', ()=>{ it.name = nameEl.value; save(); render(); });
   const curInput = wrap.querySelector('[data-role="curInput"]');
   const maxInput = wrap.querySelector('[data-role="maxInput"]');
   forceCursorToEnd(nameEl);
@@ -421,7 +436,7 @@ function buildStamCard(it){
     it.current = Math.min(curNow, newMax);
     save(); render();
   });
-  refs[it.id] = { el: wrap, nameEl, curInput, maxInput,
+  refs[it.id] = { el: wrap, curInput, maxInput,
     clockEl: wrap.querySelector('[data-role="clock"]') };
   bindLongPressDelete(wrap, it.id);
   return wrap;
@@ -433,10 +448,7 @@ function buildAbyssCard(it){
   const wrap = document.createElement('div');
   wrap.className = 'card abyss';
   wrap.innerHTML = `
-    <div class="row namerow">
-      <input class="name" placeholder="Abyssアカウント" value="${esc(it.name)}">
-      <input class="rank" data-role="rankInput" inputmode="numeric" pattern="[0-9]*" title="ランク">
-    </div>
+    <input class="rank" data-role="rankInput" inputmode="numeric" pattern="[0-9]*" title="ランク">
     <div class="row valrow-stam">
       <input type="text" inputmode="numeric" pattern="[0-9]*" class="stamval" data-role="curInput">
       <span class="slash">/</span>
@@ -444,12 +456,9 @@ function buildAbyssCard(it){
       <div class="clockstack" data-role="clock"></div>
     </div>
   `;
-  const nameEl = wrap.querySelector('.name');
-  nameEl.addEventListener('blur', ()=>{ it.name = nameEl.value; save(); render(); });
   const rankInput = wrap.querySelector('[data-role="rankInput"]');
   const curInput = wrap.querySelector('[data-role="curInput"]');
   const maxLabel = wrap.querySelector('[data-role="maxLabel"]');
-  forceCursorToEnd(nameEl);
   clearOnFocus(curInput);
   clearOnFocus(rankInput); // フォーカスで空欄
   // 長押しの貼り付けメニュー等を出さない
@@ -519,7 +528,7 @@ function buildAbyssCard(it){
   curInput.value = String(info0.cur);
   maxLabel.textContent = String(it.max);
   rankInput.value = 'Lv.' + (it.rank || 1);
-  refs[it.id] = { el: wrap, nameEl, rankInput, curInput, maxLabel, clockEl };
+  refs[it.id] = { el: wrap, rankInput, curInput, maxLabel, clockEl };
   bindLongPressDelete(wrap, it.id);
   return wrap;
 }
@@ -528,28 +537,77 @@ function buildIdleCard(it){
   const wrap = document.createElement('div');
   wrap.className = 'card idle';
   wrap.innerHTML = `
-    <div class="row namerow">
-      <input class="name" placeholder="アカウント名" value="${esc(it.name)}">
-    </div>
     <div class="row valrow-idle">
       <div class="main" data-role="cur"></div>
       <div class="clockstack" data-role="clock"></div>
     </div>
   `;
-  const nameEl = wrap.querySelector('.name');
-  nameEl.addEventListener('blur', ()=>{ if (!nameEl.readOnly){ it.name = nameEl.value; save(); } });
-  forceCursorToEnd(nameEl);
-  wrap.addEventListener('click', (e)=>{
-    if (e.target === nameEl) return;
+  wrap.addEventListener('click', ()=>{
     toggleIdle(it);
   });
-  refs[it.id] = { el: wrap, nameEl,
+  refs[it.id] = { el: wrap,
     curEl: wrap.querySelector('[data-role="cur"]'), clockEl: wrap.querySelector('[data-role="clock"]') };
   bindLongPressDelete(wrap, it.id);
   return wrap;
 }
 
 
+function buildTimerChild(it){
+  return it.type==='stam' ? buildStamCard(it) : it.type==='abyss' ? buildAbyssCard(it) : buildIdleCard(it);
+}
+function buildGroupCard(it){
+  const wrap = document.createElement('div');
+  wrap.className = 'card group';
+  wrap.innerHTML = `
+    <div class="row namerow group-namerow">
+      <input class="name" placeholder="アカウント名" value="${esc(it.name)}">
+    </div>
+    <div class="group-body" data-role="body"></div>
+    <div class="group-add" data-role="addRow"></div>
+  `;
+  const nameEl = wrap.querySelector('.name');
+  nameEl.addEventListener('blur', ()=>{ it.name = nameEl.value; save(); });
+  forceCursorToEnd(nameEl);
+  const nameRowEl = wrap.querySelector('.group-namerow');
+  refs[it.id] = { el: wrap, nameEl,
+    bodyEl: wrap.querySelector('[data-role="body"]'),
+    addRowEl: wrap.querySelector('[data-role="addRow"]'),
+    childRefs: {} };
+  bindLongPressDelete(nameRowEl, it.id); // 枠全体の削除は名前欄を長押し
+  renderGroupBody(it);
+  return wrap;
+}
+function renderGroupBody(it){
+  const r = refs[it.id];
+  if (!r) return;
+  // 子カードの追加/削除に合わせてDOMを作り直す（並べ替えは発生しない：移動機能なし）
+  const existingChildIds = new Set(it.children.map(c=>c.id));
+  Object.keys(r.childRefs).forEach(id=>{ if(!existingChildIds.has(id)) delete r.childRefs[id]; });
+  r.bodyEl.classList.toggle('one', it.children.length <= 1);
+  for (const child of it.children){
+    if (!r.childRefs[child.id]){
+      const el = buildTimerChild(child);
+      r.childRefs[child.id] = refs[child.id];
+      r.bodyEl.appendChild(el);
+    }
+  }
+  const wantAdd = it.children.length < 2;
+  if (r.addRowEl.dataset.has !== String(wantAdd)){
+    r.addRowEl.dataset.has = String(wantAdd);
+    r.addRowEl.innerHTML = '';
+    if (wantAdd){
+      const btn = document.createElement('button');
+      btn.textContent = '＋ このアカウント枠にタイマー追加';
+      btn.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        pendingAddGroupId = it.id;
+        addPanelEl.classList.add('group-mode');
+        addPanelEl.classList.add('show');
+      });
+      r.addRowEl.appendChild(btn);
+    }
+  }
+}
 function buildRuleCard(it){
   const wrap = document.createElement('div');
   wrap.className = 'rule-line';
@@ -636,8 +694,22 @@ function esc(s){ return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'
 
 function removeItem(id){
   if (refs[id]) refs[id].el.remove();
-  state.items = state.items.filter(i=>i.id!==id);
   delete refs[id];
+  const topIdx = state.items.findIndex(i=>i.id===id);
+  if (topIdx !== -1){
+    state.items.splice(topIdx, 1);
+  } else {
+    for (const it of state.items){
+      if (it.type !== 'group') continue;
+      const idx = it.children.findIndex(c=>c.id===id);
+      if (idx !== -1){
+        it.children.splice(idx, 1);
+        const parentRef = refs[it.id];
+        if (parentRef) delete parentRef.childRefs[id];
+        break;
+      }
+    }
+  }
   save(); render(); startTicking(true);
 }
 
@@ -675,11 +747,14 @@ function render(){
   emptyEl.style.display = state.items.length ? 'none' : 'block';
 
   const existingIds = new Set(state.items.map(i=>i.id));
+  state.items.forEach(it=>{ if (it.type==='group') it.children.forEach(c=>existingIds.add(c.id)); });
   Object.keys(refs).forEach(id=>{ if(!existingIds.has(id)) delete refs[id]; });
 
   for (const it of state.items){
     if (!refs[it.id]){
-      const el = it.type==='stam' ? buildStamCard(it) : it.type==='abyss' ? buildAbyssCard(it) : it.type==='idle' ? buildIdleCard(it) : it.type==='rule' ? buildRuleCard(it) : buildHeaderCard(it);
+      const el = it.type==='stam' ? buildStamCard(it) : it.type==='abyss' ? buildAbyssCard(it) : it.type==='idle' ? buildIdleCard(it) : it.type==='rule' ? buildRuleCard(it) : it.type==='group' ? buildGroupCard(it) : buildHeaderCard(it);
+    } else if (it.type==='group'){
+      renderGroupBody(it);
     }
   }
 
@@ -697,59 +772,76 @@ function render(){
 
   for (const it of state.items){
     const r = refs[it.id];
-    if (it.type!=='idle' && r.nameEl && document.activeElement !== r.nameEl) r.nameEl.value = it.name;
     if (it.type==='rule') r.el.style.borderTopColor = it.color || '#52617a';
-    if (it.type==='stam'){
-      const info = stamInfo(it, now);
-      r.el.classList.toggle('full', info.isFull);
-      renderClock(r.clockEl, info.remainMs, info.isFull);
-      if (document.activeElement !== r.curInput){
-        const v = String(info.cur);
-        if (r.curInput.value !== v) r.curInput.value = v;
-      }
-      if (document.activeElement !== r.maxInput){
-        const v = String(it.max);
-        if (r.maxInput.value !== v) r.maxInput.value = v;
-      }
-    } else if (it.type==='abyss'){
-      // maxはランク変更時だけ変わる。毎分のsyncは不要だが安価なので維持
-      if (it.max !== abyssMaxFor(it.rank||1)) syncAbyssMax(it);
-      const info = stamInfo(it, now);
-      const wait40 = pending40Id === it.id;
-      r.el.classList.toggle('full', info.isFull);
-      r.el.classList.toggle('claim', wait40);
-      renderClock(r.clockEl, info.remainMs, info.isFull);
-      if (r.rankInput && document.activeElement !== r.rankInput){
-        const v = 'Lv.' + (it.rank || 1);
-        if (r.rankInput.value !== v) r.rankInput.value = v;
-      }
-      if (document.activeElement !== r.curInput){
-        const v = String(wait40 ? remainingAfter40(info.cur) : info.cur);
-        if (r.curInput.value !== v) r.curInput.value = v;
-      }
-      if (r.maxLabel){
-        const v = String(it.max);
-        if (r.maxLabel.textContent !== v) r.maxLabel.textContent = v;
-      }
-    } else if (it.type==='idle'){
-      const info = idleInfo(it, now);
-      r.el.classList.toggle('claim', it.state==='claim');
-      r.el.classList.toggle('full', info.isFull && it.state!=='claim');
-      const label = it.state==='claim' ? '受取' : (info.isFull ? 'MAX' : fmtCountdown(info.remainMs));
-      if (r.curEl.textContent !== label) r.curEl.textContent = label;
-      renderClock(r.clockEl, info.remainMs, info.isFull);
+    if (it.type==='group'){
       if (document.activeElement !== r.nameEl && r.nameEl.value !== it.name) r.nameEl.value = it.name;
+      for (const child of it.children) updateTimerCard(child, r.childRefs[child.id], now);
+    } else {
+      updateTimerCard(it, r, now);
     }
   }
 }
+// stam/abyss/idle の値更新をトップレベル/アカウント枠の子どちらでも共用する
+function updateTimerCard(it, r, now){
+  if (!it || !r) return;
+  if (it.type==='stam'){
+    const info = stamInfo(it, now);
+    r.el.classList.toggle('full', info.isFull);
+    renderClock(r.clockEl, info.remainMs, info.isFull);
+    if (document.activeElement !== r.curInput){
+      const v = String(info.cur);
+      if (r.curInput.value !== v) r.curInput.value = v;
+    }
+    if (document.activeElement !== r.maxInput){
+      const v = String(it.max);
+      if (r.maxInput.value !== v) r.maxInput.value = v;
+    }
+  } else if (it.type==='abyss'){
+    // maxはランク変更時だけ変わる。毎分のsyncは不要だが安価なので維持
+    if (it.max !== abyssMaxFor(it.rank||1)) syncAbyssMax(it);
+    const info = stamInfo(it, now);
+    const wait40 = pending40Id === it.id;
+    r.el.classList.toggle('full', info.isFull);
+    r.el.classList.toggle('claim', wait40);
+    renderClock(r.clockEl, info.remainMs, info.isFull);
+    if (r.rankInput && document.activeElement !== r.rankInput){
+      const v = 'Lv.' + (it.rank || 1);
+      if (r.rankInput.value !== v) r.rankInput.value = v;
+    }
+    if (document.activeElement !== r.curInput){
+      const v = String(wait40 ? remainingAfter40(info.cur) : info.cur);
+      if (r.curInput.value !== v) r.curInput.value = v;
+    }
+    if (r.maxLabel){
+      const v = String(it.max);
+      if (r.maxLabel.textContent !== v) r.maxLabel.textContent = v;
+    }
+  } else if (it.type==='idle'){
+    const info = idleInfo(it, now);
+    r.el.classList.toggle('claim', it.state==='claim');
+    r.el.classList.toggle('full', info.isFull && it.state!=='claim');
+    const label = it.state==='claim' ? '受取' : (info.isFull ? 'MAX' : fmtCountdown(info.remainMs));
+    if (r.curEl.textContent !== label) r.curEl.textContent = label;
+    renderClock(r.clockEl, info.remainMs, info.isFull);
+  }
+}
 
+let pendingAddGroupId = null;
 addBtnEl.addEventListener('click', ()=>{
+  pendingAddGroupId = null;
+  addPanelEl.classList.remove('group-mode');
   addPanelEl.classList.toggle('show');
 });
 addPanelEl.addEventListener('click', (e)=>{
   const btn = e.target.closest('button[data-type]');
   if (!btn) return;
   const type = btn.dataset.type;
+  if (type === 'group'){
+    state.items.push(newGroupItem());
+    addPanelEl.classList.remove('show');
+    save(); render(); startTicking(true);
+    return;
+  }
   if (type === 'header'){
     state.items.push(newHeaderItem());
     addPanelEl.classList.remove('show');
@@ -802,14 +894,24 @@ function closeSetup(){
   setupType = null;
   setupPanelEl.classList.remove('show');
 }
+function pushNewTimer(item){
+  const group = pendingAddGroupId ? state.items.find(g=>g.id===pendingAddGroupId && g.type==='group') : null;
+  if (group && group.children.length < 2){
+    group.children.push(item);
+  } else {
+    state.items.push(item);
+  }
+  pendingAddGroupId = null;
+  addPanelEl.classList.remove('group-mode');
+}
 setupConfirmEl.addEventListener('click', (e)=>{
   e.stopPropagation();
   if (setupType === 'stam'){
     const interval = clampInt(setupFieldsEl.querySelector('#setupInterval').value, 1, 999, 5);
-    state.items.push(newStamItem(interval));
+    pushNewTimer(newStamItem(interval));
   } else if (setupType === 'abyss'){
     const interval = clampInt(setupFieldsEl.querySelector('#setupInterval').value, 1, 999, 3);
-    state.items.push(newAbyssItem(interval));
+    pushNewTimer(newAbyssItem(interval));
   } else if (setupType === 'rule'){
     let color = (setupFieldsEl.querySelector('#setupColor')||{}).value || '#52617a';
     color = String(color).trim();
@@ -818,7 +920,7 @@ setupConfirmEl.addEventListener('click', (e)=>{
   } else if (setupType === 'idle'){
     const h = clampInt(setupFieldsEl.querySelector('#setupH').value, 0, 999, 12);
     const m = clampInt(setupFieldsEl.querySelector('#setupM').value, 0, 59, 0);
-    state.items.push(newIdleItem(h*60+m));
+    pushNewTimer(newIdleItem(h*60+m));
   }
   closeSetup();
   save(); render(); startTicking(true);
