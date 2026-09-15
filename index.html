@@ -66,12 +66,12 @@
   /* アカウント枠：通常カード2枚分の横幅 */
   .card.group{grid-column:span 2; padding:4px;}
   .card.group.single{grid-column:span 1;}
-  .group-namerow{margin-bottom:4px; gap:4px; padding:0 2px;}
-  .group-namerow .name{font-size:13px; font-weight:700; color:var(--accent); flex:1 1 auto;}
+  .group-namerow{margin-bottom:3px; gap:3px; padding:0 1px;}
+  .group-namerow .name{font-size:12px; padding:1px 0; font-weight:700; color:var(--accent); flex:0 1 50%; max-width:50%;}
   .group-namerow .groupAddBtn{
-    flex:0 0 auto; width:24px; height:24px; line-height:22px; text-align:center;
-    padding:0; border-radius:7px; border:1px solid var(--line); background:transparent;
-    color:var(--accent); font-size:15px; font-weight:700;
+    flex:0 0 auto; width:20px; height:20px; line-height:18px; text-align:center;
+    padding:0; border-radius:6px; border:1px solid var(--line); background:transparent;
+    color:var(--accent); font-size:13px; font-weight:700;
   }
   .group-body{display:grid; grid-template-columns:repeat(2,1fr); gap:6px; min-height:1px; align-items:end;}
   .group-body.one{grid-template-columns:1fr;}
@@ -110,7 +110,7 @@
     padding:8px 2px 2px; border-bottom:1px solid var(--line); position:relative;
   }
   .divider .name{
-    width:auto; flex:1; font-size:13px; font-weight:700; color:var(--accent); padding:0 0 4px;
+    width:65%; max-width:260px; flex:0 1 auto; font-size:13px; font-weight:700; color:var(--accent); padding:0 0 4px;
   }
   /* ルナビィ下線と同系の太い仕切り。色は item.color */
   .rule-line{
