@@ -75,6 +75,11 @@
     display:inline-block; width:28px; height:20px; line-height:20px; box-sizing:border-box;
     color:var(--blue); font-size:14px; font-weight:700; text-align:center; padding:0;
     font-variant-numeric:tabular-nums; border-bottom:1px dashed var(--line); vertical-align:middle;
+    border-radius:4px;
+  }
+  /* Abyss「40使い切り」プレビュー中：押した所が分かるよう点線で囲む */
+  .card.claim .stammax, .card.claim .clockstack{
+    outline:1.5px dashed var(--ok); outline-offset:2px; border-radius:4px;
   }
   .clockstack{ justify-content:center; }
   .main{font-size:15px; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:.01em;}
@@ -345,7 +350,12 @@ function idleInfo(it, now){
   const durMs = Math.max(1, it.durationMin) * 60000;
   const elapsed = Math.max(0, now - it.start);
   const remainMs = Math.max(0, durMs - elapsed);
-  return { remainMs, isFull: remainMs<=0 };
+  return { remainMs, isFull: remainMs<=0, fullAt: it.start + durMs };
+}
+function fmtHM(ts){
+  const d = new Date(ts);
+  const p = n => String(n).padStart(2,'0');
+  return p(d.getHours()) + ':' + p(d.getMinutes());
 }
 
 function timerNeedsTick(it, now){
@@ -401,8 +411,7 @@ function askRemoveItem(id){
   if (!toast){ removeItem(id); return; }
   suppressNextClick = true; // 長押し確定→指を離した瞬間のclickでバーが即閉じないようにする
   const canAdd = it && it.type === 'group' && it.children.length < 2;
-  toast.innerHTML = '<span>削除する？</span>'
-    + (canAdd ? '<button type="button" data-act="add">タイマー追加</button>' : '')
+  toast.innerHTML = (canAdd ? '<button type="button" data-act="add">タイマー追加</button>' : '')
     + '<button type="button" class="ok" data-act="yes">削除</button>'
     + '<button type="button" data-act="no">やめる</button>';
   toast.classList.add('show');
@@ -831,7 +840,7 @@ function updateTimerCard(it, r, now){
     const info = idleInfo(it, now);
     r.el.classList.toggle('claim', it.state==='claim');
     r.el.classList.toggle('full', info.isFull && it.state!=='claim');
-    const label = it.state==='claim' ? '受取' : (info.isFull ? 'MAX' : fmtCountdown(info.remainMs));
+    const label = it.state==='claim' ? '受取' : (info.isFull ? fmtHM(info.fullAt) : fmtCountdown(info.remainMs));
     if (r.curEl.textContent !== label) r.curEl.textContent = label;
     renderClock(r.clockEl, info.remainMs, info.isFull);
   }
