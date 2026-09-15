@@ -65,6 +65,7 @@
   }
   /* アカウント枠：通常カード2枚分の横幅 */
   .card.group{grid-column:span 2; padding:8px;}
+  .card.group.single{grid-column:span 1;}
   .group-namerow{margin-bottom:6px; gap:6px;}
   .group-namerow .name{font-size:13px; font-weight:700; color:var(--accent); flex:1 1 auto;}
   .group-namerow .groupAddBtn{
@@ -73,6 +74,7 @@
     color:var(--accent); font-size:15px; font-weight:700;
   }
   .group-body{display:grid; grid-template-columns:repeat(2,1fr); gap:6px; min-height:1px; align-items:end;}
+  .group-body.one{grid-template-columns:1fr;}
   .group-body:empty{display:none;}
   .stammax{
     display:inline-block; width:28px; height:20px; line-height:20px; box-sizing:border-box;
@@ -594,6 +596,9 @@ function renderGroupBody(it){
   // 子カードの追加/削除に合わせてDOMを作り直す（並べ替えは発生しない：移動機能なし）
   const existingChildIds = new Set(it.children.map(c=>c.id));
   Object.keys(r.childRefs).forEach(id=>{ if(!existingChildIds.has(id)) delete r.childRefs[id]; });
+  const single = it.children.length <= 1;
+  r.el.classList.toggle('single', single);
+  r.bodyEl.classList.toggle('one', single);
   for (const child of it.children){
     if (!r.childRefs[child.id]){
       const el = buildTimerChild(child);
