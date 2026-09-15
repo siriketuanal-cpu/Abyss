@@ -43,6 +43,8 @@
     padding:6px 6px; position:relative; min-width:0;
   }
   .card.claim{border-color:var(--ok);}
+  /* 長押し中(削除/枠メニュー呼び出し中)であることが分かる表示 */
+  .pressing{outline:2px dashed var(--orange); outline-offset:2px;}
   .card.full{border-color:var(--orange);}
   .row{display:flex; align-items:center; gap:3px; min-width:0;}
   .row + .row{margin-top:3px;}
@@ -78,9 +80,6 @@
     border-radius:4px;
   }
   /* Abyss「40使い切り」プレビュー中：押した所が分かるよう点線で囲む */
-  .card.claim .stammax, .card.claim .clockstack{
-    outline:1.5px dashed var(--ok); outline-offset:2px; border-radius:4px;
-  }
   .clockstack{ justify-content:center; }
   .main{font-size:15px; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:.01em;}
   .valrow-stam{ margin-top:5px !important; align-items:center; min-height:22px; }
@@ -135,6 +134,7 @@
     border-radius:8px; padding:6px 10px; font-size:12px; font-weight:600;
   }
   #toast button.ok{background:var(--danger); border-color:transparent; color:#fff;}
+  #toast button:active{outline:2px dashed var(--orange); outline-offset:2px;}
   #empty{color:var(--sub); font-size:13px; text-align:center; padding:40px 0;}
   #addPanel{
     position:fixed; left:0; right:0; bottom:0; background:var(--card);
@@ -389,13 +389,16 @@ function startTicking(force){
 // 長押し → 簡易確認トースト → 削除（タイマー1本のみ）
 function bindLongPressDelete(el, id){
   let timer = null;
-  const clear = ()=>{ if (timer){ clearTimeout(timer); timer = null; } };
+  const clearPressing = ()=>{ el.classList.remove('pressing'); };
+  const clear = ()=>{ if (timer){ clearTimeout(timer); timer = null; } clearPressing(); };
   const start = (e)=>{
     if (e.target.closest('input,button,.rank,.stammax,.clockstack')) return;
     clear();
+    el.classList.add('pressing'); // 長押し中であることが分かるよう点線で囲む
     timer = setTimeout(()=>{
       timer = null;
       pending40Id = null;
+      clearPressing();
       askRemoveItem(id);
     }, 520);
   };
