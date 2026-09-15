@@ -132,8 +132,8 @@
     border-radius:8px; padding:6px 10px; font-size:12px; font-weight:600;
   }
   #toast button.ok{background:var(--danger); border-color:transparent; color:#fff;}
-  /* 削除ボタンは1回目タップで「確定待ち」を破線で表示したままにする */
-  #toast button.ok.armed{outline:2px dashed #fff; outline-offset:2px;}
+  /* 1回目タップで破線（確定待ち）。2回目で実行 */
+  #toast button.armed{outline:2px dashed #fff; outline-offset:2px;}
   #empty{color:var(--sub); font-size:13px; text-align:center; padding:40px 0;}
   #addPanel{
     position:fixed; left:0; right:0; bottom:0; background:var(--card);
@@ -435,30 +435,35 @@ function askRemoveItem(id){
     + '<button type="button" class="ok" data-act="yes">削除</button>'
     + '<button type="button" data-act="no">やめる</button>';
   toast.classList.add('show');
-  let armed = false;
   const onClick = (e)=>{
     const btn = e.target.closest('button');
-    if (!btn || armed) return;
-    if (btn.dataset.act === 'yes'){
-      // 破線で「削除確定」を見せてから実際に消す（一瞬で消えて分からなくならないように）
-      armed = true;
-      btn.classList.add('armed');
+    if (!btn) return;
+    const act = btn.dataset.act;
+    if (act === 'no'){
+      // やめるは即閉じ
+      toast.classList.remove('show');
       toast.removeEventListener('click', onClick);
       toastClickHandler = null;
-      setTimeout(()=>{
-        toast.classList.remove('show');
-        removeItem(id);
-      }, 260);
       return;
     }
-    armed = true;
-    toast.classList.remove('show');
-    toast.removeEventListener('click', onClick);
-    toastClickHandler = null;
-    if (btn.dataset.act === 'add'){
-      pendingAddGroupId = id;
-      addPanelEl.classList.add('group-mode');
-      addPanelEl.classList.add('show');
+    if (act === 'yes' || act === 'add'){
+      // 1回目: 破線で囲って確定待ち。他ボタンの破線は外す
+      if (!btn.classList.contains('armed')){
+        toast.querySelectorAll('button.armed').forEach(b => b.classList.remove('armed'));
+        btn.classList.add('armed');
+        return;
+      }
+      // 2回目: 実行
+      toast.classList.remove('show');
+      toast.removeEventListener('click', onClick);
+      toastClickHandler = null;
+      if (act === 'yes'){
+        removeItem(id);
+      } else {
+        pendingAddGroupId = id;
+        addPanelEl.classList.add('group-mode');
+        addPanelEl.classList.add('show');
+      }
     }
   };
   toastClickHandler = onClick;
