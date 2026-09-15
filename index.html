@@ -404,11 +404,13 @@ function bindLongPressDelete(el, id){
   el.addEventListener('pointerleave', clear);
   el.addEventListener('touchmove', clear, { passive:true });
 }
+let toastClickHandler = null;
 function askRemoveItem(id){
   const it = findItemById(id);
   const toast = document.getElementById('toast');
   if (!toast){ removeItem(id); return; }
   suppressNextClick = true; // 長押し確定→指を離した瞬間のclickでバーが即閉じないようにする
+  if (toastClickHandler){ toast.removeEventListener('click', toastClickHandler); toastClickHandler = null; }
   const canAdd = it && it.type === 'group' && it.children.length < 2;
   toast.innerHTML = (canAdd ? '<button type="button" data-act="add">タイマー追加</button>' : '')
     + '<button type="button" class="ok" data-act="yes">削除</button>'
@@ -426,6 +428,7 @@ function askRemoveItem(id){
     }
     toast.classList.remove('show');
     toast.removeEventListener('click', onClick);
+    toastClickHandler = null;
     if (btn.dataset.act === 'yes'){
       removeItem(id);
     } else if (btn.dataset.act === 'add'){
@@ -434,6 +437,7 @@ function askRemoveItem(id){
       addPanelEl.classList.add('show');
     }
   };
+  toastClickHandler = onClick;
   toast.addEventListener('click', onClick);
 }
 function buildStamCard(it){
@@ -701,6 +705,7 @@ document.addEventListener('click', (e) => {
   const toastEl = document.getElementById('toast');
   if (toastEl && toastEl.classList.contains('show') && !toastEl.contains(e.target)){
     toastEl.classList.remove('show');
+    if (toastClickHandler){ toastEl.removeEventListener('click', toastClickHandler); toastClickHandler = null; }
   }
   // 作成パネルは枠外タップで閉じない（キーボード閉じでキャンセルされるのを防ぐ）
 }, true);
