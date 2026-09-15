@@ -67,12 +67,7 @@
   .card.group{grid-column:span 2; padding:4px;}
   .card.group.single{grid-column:span 1;}
   .group-namerow{margin-bottom:3px; gap:3px; padding:0 1px;}
-  .group-namerow .name{font-size:12px; padding:1px 0; font-weight:700; color:var(--accent); flex:0 1 50%; max-width:50%;}
-  .group-namerow .groupAddBtn{
-    flex:0 0 auto; width:20px; height:20px; line-height:18px; text-align:center;
-    padding:0; border-radius:6px; border:1px solid var(--line); background:transparent;
-    color:var(--accent); font-size:13px; font-weight:700;
-  }
+  .group-namerow .name{font-size:12px; padding:1px 0; font-weight:700; color:var(--accent); flex:0 1 65%; max-width:65%;}
   .group-body{display:grid; grid-template-columns:repeat(2,1fr); gap:6px; min-height:1px; align-items:end;}
   .group-body.one{grid-template-columns:1fr;}
   .group-body:empty{display:none;}
@@ -411,6 +406,49 @@ function askRemoveItem(id){
   };
   toast.addEventListener('click', onClick);
 }
+function askGroupMenu(it){
+  const toast = document.getElementById('toast');
+  if (!toast){ askRemoveItem(it.id); return; }
+  suppressNextClick = true;
+  const canAdd = it.children.length < 2;
+  toast.innerHTML = '<span>この枠を操作</span>'
+    + (canAdd ? '<button type="button" data-act="add">タイマー追加</button>' : '')
+    + '<button type="button" class="ok" data-act="del">削除</button>'
+    + '<button type="button" data-act="no">やめる</button>';
+  toast.classList.add('show');
+  const onClick = (e)=>{
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    toast.classList.remove('show');
+    toast.removeEventListener('click', onClick);
+    if (btn.dataset.act === 'del'){
+      removeItem(it.id);
+    } else if (btn.dataset.act === 'add'){
+      pendingAddGroupId = it.id;
+      addPanelEl.classList.add('group-mode');
+      addPanelEl.classList.add('show');
+    }
+  };
+  toast.addEventListener('click', onClick);
+}
+function bindLongPressMenu(el, onFire){
+  let timer = null;
+  const clear = ()=>{ if (timer){ clearTimeout(timer); timer = null; } };
+  const start = (e)=>{
+    if (e.target.closest('input,button,.rank,.stammax,.clockstack')) return;
+    clear();
+    timer = setTimeout(()=>{
+      timer = null;
+      pending40Id = null;
+      onFire();
+    }, 520);
+  };
+  el.addEventListener('pointerdown', start);
+  el.addEventListener('pointerup', clear);
+  el.addEventListener('pointercancel', clear);
+  el.addEventListener('pointerleave', clear);
+  el.addEventListener('touchmove', clear, { passive:true });
+}
 function buildStamCard(it){
   const wrap = document.createElement('div');
   wrap.className = 'card stam';
@@ -567,7 +605,6 @@ function buildGroupCard(it){
   wrap.innerHTML = `
     <div class="row namerow group-namerow">
       <input class="name" placeholder="アカウント名" value="${esc(it.name)}">
-      <button type="button" class="groupAddBtn" data-role="addBtn" title="タイマー追加">＋</button>
     </div>
     <div class="group-body" data-role="body"></div>
   `;
@@ -575,18 +612,11 @@ function buildGroupCard(it){
   nameEl.addEventListener('blur', ()=>{ it.name = nameEl.value; save(); });
   forceCursorToEnd(nameEl);
   const nameRowEl = wrap.querySelector('.group-namerow');
-  const addBtnEl2 = wrap.querySelector('[data-role="addBtn"]');
-  addBtnEl2.addEventListener('click', (e)=>{
-    e.stopPropagation();
-    if (it.children.length >= 2) return;
-    pendingAddGroupId = it.id;
-    addPanelEl.classList.add('group-mode');
-    addPanelEl.classList.add('show');
-  });
-  refs[it.id] = { el: wrap, nameEl, addBtnEl: addBtnEl2,
+  refs[it.id] = { el: wrap, nameEl,
     bodyEl: wrap.querySelector('[data-role="body"]'),
     childRefs: {} };
-  bindLongPressDelete(nameRowEl, it.id); // 枠全体の削除は名前欄を長押し
+  // 枠の名前欄を長押し →「タイマー追加 / 削除」を選べるメニュー
+  bindLongPressMenu(nameRowEl, ()=> askGroupMenu(it));
   renderGroupBody(it);
   return wrap;
 }
@@ -606,7 +636,6 @@ function renderGroupBody(it){
       r.bodyEl.appendChild(el);
     }
   }
-  r.addBtnEl.style.display = it.children.length < 2 ? '' : 'none';
 }
 function buildRuleCard(it){
   const wrap = document.createElement('div');
