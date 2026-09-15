@@ -62,15 +62,16 @@
   }
   /* アカウント枠：通常カード2枚分の横幅 */
   .card.group{grid-column:span 2; padding:8px;}
-  .group-namerow{margin-bottom:6px;}
-  .group-namerow .name{font-size:13px; font-weight:700; color:var(--accent);}
-  .group-body{display:grid; grid-template-columns:repeat(2,1fr); gap:6px;}
-  .group-body.one{grid-template-columns:1fr;}
-  .group-add{margin-top:6px;}
-  .group-add button{
-    width:100%; padding:8px; border-radius:8px; border:1px dashed var(--line);
-    background:transparent; color:var(--sub); font-size:12px; font-weight:600;
+  .group-namerow{margin-bottom:6px; gap:6px;}
+  .group-namerow .name{font-size:13px; font-weight:700; color:var(--accent); flex:1 1 auto;}
+  .group-namerow .groupAddBtn{
+    flex:0 0 auto; width:24px; height:24px; line-height:22px; text-align:center;
+    padding:0; border-radius:7px; border:1px solid var(--line); background:transparent;
+    color:var(--accent); font-size:15px; font-weight:700;
   }
+  .group-body{display:grid; grid-template-columns:repeat(2,1fr); gap:6px; min-height:1px;}
+  .group-body.one{grid-template-columns:1fr;}
+  .group-body:empty{display:none;}
   .stammax{
     display:inline-block; width:28px; height:20px; line-height:20px; box-sizing:border-box;
     color:var(--blue); font-size:14px; font-weight:700; text-align:center; padding:0;
@@ -562,17 +563,24 @@ function buildGroupCard(it){
   wrap.innerHTML = `
     <div class="row namerow group-namerow">
       <input class="name" placeholder="アカウント名" value="${esc(it.name)}">
+      <button type="button" class="groupAddBtn" data-role="addBtn" title="タイマー追加">＋</button>
     </div>
     <div class="group-body" data-role="body"></div>
-    <div class="group-add" data-role="addRow"></div>
   `;
   const nameEl = wrap.querySelector('.name');
   nameEl.addEventListener('blur', ()=>{ it.name = nameEl.value; save(); });
   forceCursorToEnd(nameEl);
   const nameRowEl = wrap.querySelector('.group-namerow');
-  refs[it.id] = { el: wrap, nameEl,
+  const addBtnEl2 = wrap.querySelector('[data-role="addBtn"]');
+  addBtnEl2.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    if (it.children.length >= 2) return;
+    pendingAddGroupId = it.id;
+    addPanelEl.classList.add('group-mode');
+    addPanelEl.classList.add('show');
+  });
+  refs[it.id] = { el: wrap, nameEl, addBtnEl: addBtnEl2,
     bodyEl: wrap.querySelector('[data-role="body"]'),
-    addRowEl: wrap.querySelector('[data-role="addRow"]'),
     childRefs: {} };
   bindLongPressDelete(nameRowEl, it.id); // 枠全体の削除は名前欄を長押し
   renderGroupBody(it);
@@ -592,22 +600,7 @@ function renderGroupBody(it){
       r.bodyEl.appendChild(el);
     }
   }
-  const wantAdd = it.children.length < 2;
-  if (r.addRowEl.dataset.has !== String(wantAdd)){
-    r.addRowEl.dataset.has = String(wantAdd);
-    r.addRowEl.innerHTML = '';
-    if (wantAdd){
-      const btn = document.createElement('button');
-      btn.textContent = '＋ このアカウント枠にタイマー追加';
-      btn.addEventListener('click', (e)=>{
-        e.stopPropagation();
-        pendingAddGroupId = it.id;
-        addPanelEl.classList.add('group-mode');
-        addPanelEl.classList.add('show');
-      });
-      r.addRowEl.appendChild(btn);
-    }
-  }
+  r.addBtnEl.style.display = it.children.length < 2 ? '' : 'none';
 }
 function buildRuleCard(it){
   const wrap = document.createElement('div');
@@ -729,8 +722,18 @@ function renderClock(el, remainMs, isFull){
 
 
 // 40計算プレビュー/確定は当該Abyssカードだけ触る（全renderしない）
+function findItemById(id){
+  for (const it of state.items){
+    if (it.id === id) return it;
+    if (it.type === 'group'){
+      const c = it.children.find(ch=>ch.id===id);
+      if (c) return c;
+    }
+  }
+  return null;
+}
 function paintAbyssFortyPreview(id){
-  const it = state.items.find(x=>x.id===id);
+  const it = findItemById(id);
   const r = refs[id];
   if (!it || !r || it.type!=='abyss') return;
   syncAbyssMax(it);
