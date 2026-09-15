@@ -110,8 +110,12 @@
   /* ルナビィ下線と同系の太い仕切り。色は item.color */
   .rule-line{
     grid-column:1 / -1; position:relative;
-    height:0; margin:4px 2px; padding:8px 0;
+    height:0; margin:8px 2px 4px; padding:0;
     border:0; border-top:2px solid #52617a;
+  }
+  .rule-line::before{
+    /* レイアウトを押し広げずに長押し判定だけ広げる透明ヒットエリア */
+    content:''; position:absolute; left:0; right:0; top:-10px; bottom:-10px;
   }
   #toast{
     position:fixed; left:50%; bottom:calc(24px + env(safe-area-inset-bottom));
