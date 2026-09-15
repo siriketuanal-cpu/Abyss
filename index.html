@@ -110,7 +110,7 @@
   /* ルナビィ下線と同系の太い仕切り。色は item.color */
   .rule-line{
     grid-column:1 / -1; position:relative;
-    height:0; margin:8px 2px 4px; padding:0;
+    height:0; margin:4px 2px; padding:8px 0;
     border:0; border-top:2px solid #52617a;
   }
   #toast{
@@ -392,28 +392,14 @@ function bindLongPressDelete(el, id){
   el.addEventListener('touchmove', clear, { passive:true });
 }
 function askRemoveItem(id){
+  const it = findItemById(id);
   const toast = document.getElementById('toast');
   if (!toast){ removeItem(id); return; }
   suppressNextClick = true; // 長押し確定→指を離した瞬間のclickでバーが即閉じないようにする
-  toast.innerHTML = '<span>削除する？</span><button type="button" class="ok" data-act="yes">削除</button><button type="button" data-act="no">やめる</button>';
-  toast.classList.add('show');
-  const onClick = (e)=>{
-    const btn = e.target.closest('button');
-    if (!btn) return;
-    toast.classList.remove('show');
-    toast.removeEventListener('click', onClick);
-    if (btn.dataset.act === 'yes') removeItem(id);
-  };
-  toast.addEventListener('click', onClick);
-}
-function askGroupMenu(it){
-  const toast = document.getElementById('toast');
-  if (!toast){ askRemoveItem(it.id); return; }
-  suppressNextClick = true;
-  const canAdd = it.children.length < 2;
-  toast.innerHTML = '<span>この枠を操作</span>'
+  const canAdd = it && it.type === 'group' && it.children.length < 2;
+  toast.innerHTML = '<span>削除する？</span>'
     + (canAdd ? '<button type="button" data-act="add">タイマー追加</button>' : '')
-    + '<button type="button" class="ok" data-act="del">削除</button>'
+    + '<button type="button" class="ok" data-act="yes">削除</button>'
     + '<button type="button" data-act="no">やめる</button>';
   toast.classList.add('show');
   const onClick = (e)=>{
@@ -421,33 +407,15 @@ function askGroupMenu(it){
     if (!btn) return;
     toast.classList.remove('show');
     toast.removeEventListener('click', onClick);
-    if (btn.dataset.act === 'del'){
-      removeItem(it.id);
+    if (btn.dataset.act === 'yes'){
+      removeItem(id);
     } else if (btn.dataset.act === 'add'){
-      pendingAddGroupId = it.id;
+      pendingAddGroupId = id;
       addPanelEl.classList.add('group-mode');
       addPanelEl.classList.add('show');
     }
   };
   toast.addEventListener('click', onClick);
-}
-function bindLongPressMenu(el, onFire){
-  let timer = null;
-  const clear = ()=>{ if (timer){ clearTimeout(timer); timer = null; } };
-  const start = (e)=>{
-    if (e.target.closest('input,button,.rank,.stammax,.clockstack')) return;
-    clear();
-    timer = setTimeout(()=>{
-      timer = null;
-      pending40Id = null;
-      onFire();
-    }, 520);
-  };
-  el.addEventListener('pointerdown', start);
-  el.addEventListener('pointerup', clear);
-  el.addEventListener('pointercancel', clear);
-  el.addEventListener('pointerleave', clear);
-  el.addEventListener('touchmove', clear, { passive:true });
 }
 function buildStamCard(it){
   const wrap = document.createElement('div');
@@ -615,8 +583,8 @@ function buildGroupCard(it){
   refs[it.id] = { el: wrap, nameEl,
     bodyEl: wrap.querySelector('[data-role="body"]'),
     childRefs: {} };
-  // 枠の名前欄を長押し →「タイマー追加 / 削除」を選べるメニュー
-  bindLongPressMenu(nameRowEl, ()=> askGroupMenu(it));
+  // 枠の名前欄を長押し →「タイマー追加(空きがあれば) / 削除」を選べるメニュー
+  bindLongPressDelete(nameRowEl, it.id);
   renderGroupBody(it);
   return wrap;
 }
