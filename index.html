@@ -404,6 +404,25 @@ function bindLongPressDelete(el, id){
   el.addEventListener('pointerleave', clear);
   el.addEventListener('touchmove', clear, { passive:true });
 }
+// 入力欄そのものの長押し用：短いタップは普通に編集できるように残しつつ、
+// 長押しだけフォーカスを外して削除/追加メニューを開く。
+function bindLongPressOnNameInput(inputEl, id){
+  let timer = null;
+  const clear = ()=>{ if (timer){ clearTimeout(timer); timer = null; } };
+  inputEl.addEventListener('pointerdown', ()=>{
+    clear();
+    timer = setTimeout(()=>{
+      timer = null;
+      pending40Id = null;
+      inputEl.blur();
+      askRemoveItem(id);
+    }, 520);
+  });
+  inputEl.addEventListener('pointerup', clear);
+  inputEl.addEventListener('pointercancel', clear);
+  inputEl.addEventListener('pointerleave', clear);
+  inputEl.addEventListener('touchmove', clear, { passive:true });
+}
 let toastClickHandler = null;
 function askRemoveItem(id){
   const it = findItemById(id);
@@ -419,19 +438,24 @@ function askRemoveItem(id){
   let armed = false;
   const onClick = (e)=>{
     const btn = e.target.closest('button');
-    if (!btn) return;
-    if (btn.dataset.act === 'yes' && !armed){
-      // 1回目のタップ：即削除せず、破線で「確定待ち」を分かるようにする
+    if (!btn || armed) return;
+    if (btn.dataset.act === 'yes'){
+      // 破線で「削除確定」を見せてから実際に消す（一瞬で消えて分からなくならないように）
       armed = true;
       btn.classList.add('armed');
+      toast.removeEventListener('click', onClick);
+      toastClickHandler = null;
+      setTimeout(()=>{
+        toast.classList.remove('show');
+        removeItem(id);
+      }, 260);
       return;
     }
+    armed = true;
     toast.classList.remove('show');
     toast.removeEventListener('click', onClick);
     toastClickHandler = null;
-    if (btn.dataset.act === 'yes'){
-      removeItem(id);
-    } else if (btn.dataset.act === 'add'){
+    if (btn.dataset.act === 'add'){
       pendingAddGroupId = id;
       addPanelEl.classList.add('group-mode');
       addPanelEl.classList.add('show');
@@ -595,7 +619,7 @@ function buildGroupCard(it){
   wrap.className = 'card group';
   wrap.innerHTML = `
     <div class="row namerow group-namerow">
-      <input class="name" placeholder="アカウント名" value="${esc(it.name)}">
+      <input class="name" placeholder="アカウント" value="${esc(it.name)}">
     </div>
     <div class="group-body" data-role="body"></div>
   `;
@@ -608,6 +632,7 @@ function buildGroupCard(it){
     childRefs: {} };
   // 枠の名前欄を長押し →「タイマー追加(空きがあれば) / 削除」を選べるメニュー
   bindLongPressDelete(nameRowEl, it.id);
+  bindLongPressOnNameInput(nameEl, it.id); // 入力欄自体を長押しした場合も同じメニューを開く
   renderGroupBody(it);
   return wrap;
 }
