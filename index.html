@@ -42,6 +42,20 @@
     background:var(--card); border:1px solid var(--line); border-radius:10px;
     padding:6px 6px; position:relative; min-width:0;
   }
+  /* タイマー枠：種類ごとに細線で色分け。放置の通常色は受取待機の緑と非重複。 */
+  .card.stam{border:1px solid #5aa9ff;}
+  .card.abyss{border:1px solid #b48cff;}
+  .card.idle{border:1px solid #f0a85a;}
+  /* 長押しで削除確認中の対象を赤い破線で囲む。 */
+  .longpress-target{
+    outline:2px dashed var(--danger);
+    outline-offset:3px;
+  }
+  .rule-line.longpress-target{
+    outline:none;
+    border-top-color:var(--danger) !important;
+  }
+
   .card.claim{border-color:var(--ok);}
   .card.full{border-color:var(--orange);}
   .row{display:flex; align-items:center; gap:3px; min-width:0;}
@@ -64,7 +78,7 @@
     -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
   }
   /* アカウント枠：通常カード2枚分の横幅 */
-  .card.group{grid-column:span 2; padding:4px;}
+  .card.group{grid-column:span 2; padding:4px; border:3px solid #a88bd8;}
   .card.group.single{grid-column:span 1;}
   .group-namerow{margin-bottom:3px; gap:3px; padding:0 1px;}
   .group-namerow .name{font-size:12px; padding:1px 0; font-weight:700; color:var(--accent); flex:0 1 65%; max-width:65%;}
@@ -104,29 +118,20 @@
   .valrow-idle .clockstack{ margin-left:auto; }
   .divider{
     grid-column:1 / -1; display:flex; align-items:center; gap:6px;
-    padding:8px 2px 2px; border-bottom:1px solid var(--line); position:relative;
+    padding:3px 2px; border-bottom:1px solid var(--line); position:relative;
   }
   .divider .name{
-    width:65%; max-width:260px; flex:0 1 auto; font-size:13px; font-weight:700; color:var(--accent); padding:0 0 4px;
+    width:65%; max-width:260px; flex:0 1 auto; font-size:13px; font-weight:700; color:var(--accent); padding:0 0 2px;
   }
   /* ルナビィ下線と同系の太い仕切り。色は item.color */
   .rule-line{
     grid-column:1 / -1; position:relative;
-    height:0; margin:8px 2px 4px; padding:0;
+    height:0; margin:3px 2px; padding:0;
     border:0; border-top:2px solid #52617a;
   }
   .rule-line::before{
     /* レイアウトを押し広げずに長押し判定だけ広げる透明ヒットエリア */
     content:''; position:absolute; left:0; right:0; top:-10px; bottom:-10px;
-  }
-  /* 長押しで削除メニューを開いている対象を赤い破線で明示 */
-  .longpress-target{
-    outline:2px dashed var(--danger);
-    outline-offset:3px;
-  }
-  .rule-line.longpress-target{
-    outline:none;
-    border-top-color:var(--danger) !important;
   }
   #toast{
     position:fixed; left:50%; bottom:calc(24px + env(safe-area-inset-bottom));
@@ -444,14 +449,13 @@ function bindLongPressOnNameInput(inputEl, id){
   inputEl.addEventListener('touchmove', clear, { passive:true });
 }
 let toastClickHandler = null;
-let longPressTargetEl = null;
-function clearLongPressTarget(){
-  if (longPressTargetEl){
-    longPressTargetEl.classList.remove('longpress-target');
-    longPressTargetEl = null;
-  }
-}
 function askRemoveItem(id){
+  clearLongPressTarget();
+  const targetRef = refs[id];
+  if (targetRef && targetRef.el){
+    targetRef.el.classList.add('longpress-target');
+    longPressTargetEl = targetRef.el;
+  }
   const it = findItemById(id);
   const toast = document.getElementById('toast');
   if (!toast){ removeItem(id); return; }
@@ -468,6 +472,7 @@ function askRemoveItem(id){
     const act = btn.dataset.act;
     if (act === 'no'){
       // やめるは即閉じ
+      clearLongPressTarget();
       toast.classList.remove('show');
       toast.removeEventListener('click', onClick);
       toastClickHandler = null;
@@ -481,6 +486,7 @@ function askRemoveItem(id){
         return;
       }
       // 2回目: 実行
+      clearLongPressTarget();
       toast.classList.remove('show');
       toast.removeEventListener('click', onClick);
       toastClickHandler = null;
@@ -762,6 +768,7 @@ document.addEventListener('click', (e) => {
   }
   const toastEl = document.getElementById('toast');
   if (toastEl && toastEl.classList.contains('show') && !toastEl.contains(e.target)){
+    clearLongPressTarget();
     toastEl.classList.remove('show');
     if (toastClickHandler){ toastEl.removeEventListener('click', toastClickHandler); toastClickHandler = null; }
   }
