@@ -119,6 +119,15 @@
     /* レイアウトを押し広げずに長押し判定だけ広げる透明ヒットエリア */
     content:''; position:absolute; left:0; right:0; top:-10px; bottom:-10px;
   }
+  /* 長押しで削除メニューを開いている対象を赤い破線で明示 */
+  .longpress-target{
+    outline:2px dashed var(--danger);
+    outline-offset:3px;
+  }
+  .rule-line.longpress-target{
+    outline:none;
+    border-top-color:var(--danger) !important;
+  }
   #toast{
     position:fixed; left:50%; bottom:calc(24px + env(safe-area-inset-bottom));
     transform:translateX(-50%); max-width:90%;
@@ -435,6 +444,13 @@ function bindLongPressOnNameInput(inputEl, id){
   inputEl.addEventListener('touchmove', clear, { passive:true });
 }
 let toastClickHandler = null;
+let longPressTargetEl = null;
+function clearLongPressTarget(){
+  if (longPressTargetEl){
+    longPressTargetEl.classList.remove('longpress-target');
+    longPressTargetEl = null;
+  }
+}
 function askRemoveItem(id){
   const it = findItemById(id);
   const toast = document.getElementById('toast');
