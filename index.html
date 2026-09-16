@@ -26,7 +26,7 @@
     padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     user-select:none; overscroll-behavior:none;
   }
-  input{ caret-color:transparent; }
+  input{ caret-color:transparent; }\n  /* アカウント名入力のフォーカス枠を出さない（長押し削除の赤破線とは別）。 */\n  .group .name:focus{ outline:none !important; box-shadow:none !important; }\n  .group .name{ -webkit-tap-highlight-color:transparent; }
   header{
     display:flex; align-items:center; gap:8px; padding:10px 12px 6px;
     position:sticky; top:0; background:var(--bg); z-index:5;
@@ -78,7 +78,7 @@
     -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
   }
   /* アカウント枠：通常カード2枚分の横幅 */
-  .card.group{grid-column:span 2; padding:4px; border:3px solid #a88bd8;}
+  .card.group{grid-column:span 2; padding:4px; border:1px solid #f2f2f2;}
   .card.group.single{grid-column:span 1;}
   .group-namerow{margin-bottom:3px; gap:3px; padding:0 1px;}
   .group-namerow .name{font-size:12px; padding:1px 0; font-weight:700; color:var(--accent); flex:0 1 65%; max-width:65%;}
@@ -214,18 +214,6 @@ let refs = {};
 let tickId = null;
 let tickGen = 0;
 let pending40Id = null;
-let suppressNextClick = false; // 長押し確定直後の指離しclickを1回だけ無視する
-let suppressClearTimer = null;
-function setSuppressNextClick(){
-  suppressNextClick = true;
-  if (suppressClearTimer) clearTimeout(suppressClearTimer);
-  // 長押し後にブラウザがclickを出さない端末があるため、一定時間でフラグを落とす
-  // （出た場合はdocumentのclickハンドラ側で即落とす）
-  suppressClearTimer = setTimeout(()=>{
-    suppressNextClick = false;
-    suppressClearTimer = null;
-  }, 450);
-}
 
 // DOM参照は一度だけ取得して使い回す(毎分ティックや毎クリックで検索し直さない)。
 const cardsEl = document.getElementById('cards');
@@ -291,11 +279,21 @@ function saveAfterPaint(){
 }
 function uid(){ return 'x' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 
+// アプリ内のタップ操作は pointerdown に統一。ネイティブ入力の編集開始だけは、
+// 長押しでキーボードを出さないため短い指離し時にfocusする。
+function bindTapDown(el, handler){
+  el.addEventListener('pointerdown', (e)=>{
+    if (e.isPrimary === false) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    handler(e);
+  });
+}
+
 // 入力欄フォーカス時は常に末尾へカーソルを固定する。
 function forceCursorToEnd(input){
   const place = () => { try{ input.setSelectionRange(input.value.length, input.value.length); }catch(e){} };
   input.addEventListener('focus', () => { place(); setTimeout(place, 0); });
-  input.addEventListener('click', place);
+  input.addEventListener('pointerdown', place);
 }
 // スタミナ現在値/上限値はフォーカス時に空にして、そのまま打ち直せるようにする。
 function clearOnFocus(input){
@@ -433,22 +431,72 @@ function bindLongPressDelete(el, id){
 // 長押しだけフォーカスを外して削除/追加メニューを開く。
 function bindLongPressOnNameInput(inputEl, id){
   let timer = null;
-  const clear = ()=>{ if (timer){ clearTimeout(timer); timer = null; } };
-  inputEl.addEventListener('pointerdown', ()=>{
+  let longFired = false;
+  let moved = false;
+  let sx = 0, sy = 0;
+
+  const clear = ()=>{
+    if (timer){ clearTimeout(timer); timer = null; }
+  };
+
+  inputEl.addEventListener('pointerdown', (e)=>{
+    if (e.isPrimary === false) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+
     clear();
+    longFired = false;
+    moved = false;
+    sx = e.clientX; sy = e.clientY;
+
+    // ブラウザの標準focusを止める。これで長押し中にキーボードが出ない。
+    inputEl.setAttribute('readonly', '');
+    e.preventDefault();
+
     timer = setTimeout(()=>{
       timer = null;
+      longFired = true;
       pending40Id = null;
       inputEl.blur();
       askRemoveItem(id);
     }, 520);
+  }, {passive:false});
+
+  inputEl.addEventListener('pointermove', (e)=>{
+    if (Math.hypot(e.clientX-sx, e.clientY-sy) > 10){
+      moved = true;
+      clear();
+      inputEl.removeAttribute('readonly');
+    }
+  }, {passive:true});
+
+  inputEl.addEventListener('pointerup', (e)=>{
+    clear();
+    if (!longFired && !moved){
+      // 短いタップだけ編集開始。長押しではここに来ない。
+      inputEl.removeAttribute('readonly');
+      inputEl.focus({preventScroll:true});
+      try{ inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length); }catch(err){}
+    } else if (longFired){
+      // 長押し確定後の元入力へのclick/focusを完全に抑える。
+      e.preventDefault();
+      inputEl.blur();
+      inputEl.setAttribute('readonly', '');
+    }
+    longFired = false;
+  }, {passive:false});
+
+  inputEl.addEventListener('pointercancel', ()=>{
+    clear();
+    if (!longFired) inputEl.removeAttribute('readonly');
+    longFired = false;
   });
-  inputEl.addEventListener('pointerup', clear);
-  inputEl.addEventListener('pointercancel', clear);
-  inputEl.addEventListener('pointerleave', clear);
-  inputEl.addEventListener('touchmove', clear, { passive:true });
+
+  inputEl.addEventListener('pointerleave', ()=>{
+    clear();
+  });
 }
-let toastClickHandler = null;
+
+let toastTapDownHandler = null;
 function askRemoveItem(id){
   clearLongPressTarget();
   const targetRef = refs[id];
@@ -459,8 +507,7 @@ function askRemoveItem(id){
   const it = findItemById(id);
   const toast = document.getElementById('toast');
   if (!toast){ removeItem(id); return; }
-  setSuppressNextClick(); // 長押し確定→指を離した瞬間のclickでバーが即閉じないようにする
-  if (toastClickHandler){ toast.removeEventListener('click', toastClickHandler); toastClickHandler = null; }
+  if (toastTapDownHandler){ toast.removeEventListener('click', toastTapDownHandler); toastTapDownHandler = null; }
   const canAdd = it && it.type === 'group' && it.children.length < 2;
   toast.innerHTML = (canAdd ? '<button type="button" data-act="add">タイマー追加</button>' : '')
     + '<button type="button" class="ok" data-act="yes">削除</button>'
@@ -474,8 +521,8 @@ function askRemoveItem(id){
       // やめるは即閉じ
       clearLongPressTarget();
       toast.classList.remove('show');
-      toast.removeEventListener('click', onClick);
-      toastClickHandler = null;
+      toast.removeEventListener('pointerdown', onClick);
+      toastTapDownHandler = null;
       return;
     }
     if (act === 'yes' || act === 'add'){
@@ -488,8 +535,8 @@ function askRemoveItem(id){
       // 2回目: 実行
       clearLongPressTarget();
       toast.classList.remove('show');
-      toast.removeEventListener('click', onClick);
-      toastClickHandler = null;
+      toast.removeEventListener('pointerdown', onClick);
+      toastTapDownHandler = null;
       if (act === 'yes'){
         removeItem(id);
       } else {
@@ -499,8 +546,8 @@ function askRemoveItem(id){
       }
     }
   };
-  toastClickHandler = onClick;
-  toast.addEventListener('click', onClick);
+  toastTapDownHandler = onClick;
+  bindTapDown(toast, onClick);
 }
 function buildStamCard(it){
   const wrap = document.createElement('div');
@@ -618,8 +665,8 @@ function buildAbyssCard(it){
       paintAbyssFortyPreview(it.id);
     }
   };
-  maxLabel.addEventListener('click', onForty);
-  clockEl.addEventListener('click', onForty);
+  bindTapDown(maxLabel, onForty);
+  bindTapDown(clockEl, onForty);
   // 初回から数字を出しておく（更新直後の空表示防止）
   const info0 = stamInfo(it, Date.now());
   curInput.value = String(info0.cur);
@@ -639,7 +686,7 @@ function buildIdleCard(it){
       <div class="clockstack" data-role="clock"></div>
     </div>
   `;
-  wrap.addEventListener('click', ()=>{
+  bindTapDown(wrap, ()=>{
     toggleIdle(it);
   });
   refs[it.id] = { el: wrap,
@@ -738,14 +785,7 @@ function cancelClaim(it){
 // ×タップ→確認状態(赤)→もう一度タップで削除。ネイティブconfirm()はPWA環境で
 // 動作しないことがあるため使わない。
 
-document.addEventListener('click', (e) => {
-  if (suppressNextClick){
-    suppressNextClick = false;
-    if (suppressClearTimer){ clearTimeout(suppressClearTimer); suppressClearTimer = null; }
-    e.stopPropagation();
-    e.preventDefault();
-    return;
-  }
+document.addEventListener('pointerdown', (e) => {
   for (const it of state.items){
     const list = it.type === 'group' ? it.children : [it];
     for (const t of list){
@@ -770,7 +810,7 @@ document.addEventListener('click', (e) => {
   if (toastEl && toastEl.classList.contains('show') && !toastEl.contains(e.target)){
     clearLongPressTarget();
     toastEl.classList.remove('show');
-    if (toastClickHandler){ toastEl.removeEventListener('click', toastClickHandler); toastClickHandler = null; }
+    if (toastTapDownHandler){ toastEl.removeEventListener('click', toastTapDownHandler); toastTapDownHandler = null; }
   }
   // 作成パネルは枠外タップで閉じない（キーボード閉じでキャンセルされるのを防ぐ）
 }, true);
@@ -926,12 +966,12 @@ function updateTimerCard(it, r, now){
 }
 
 let pendingAddGroupId = null;
-addBtnEl.addEventListener('click', ()=>{
+bindTapDown(addBtnEl, ()=>{
   pendingAddGroupId = null;
   addPanelEl.classList.remove('group-mode');
   addPanelEl.classList.toggle('show');
 });
-addPanelEl.addEventListener('click', (e)=>{
+bindTapDown(addPanelEl, (e)=>{
   const btn = e.target.closest('button[data-type]');
   if (!btn) return;
   const type = btn.dataset.type;
@@ -1003,7 +1043,7 @@ function pushNewTimer(item){
   pendingAddGroupId = null;
   addPanelEl.classList.remove('group-mode');
 }
-setupConfirmEl.addEventListener('click', (e)=>{
+bindTapDown(setupConfirmEl, (e)=>{
   e.stopPropagation();
   if (setupType === 'stam'){
     const interval = clampInt(setupFieldsEl.querySelector('#setupInterval').value, 1, 999, 5);
@@ -1042,7 +1082,7 @@ document.addEventListener('dragstart', (e)=> e.preventDefault());
 document.addEventListener('selectstart', (e)=> e.preventDefault());
 document.addEventListener('paste', (e)=> e.preventDefault());
 
-document.getElementById('updateBtn').addEventListener('click', ()=>{
+bindTapDown(document.getElementById('updateBtn'), ()=>{
   // クエリ付きで update.html 自体のキャッシュも避ける
   location.href = 'update.html?r=' + Date.now().toString(36);
 });
