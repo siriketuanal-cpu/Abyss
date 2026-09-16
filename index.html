@@ -6,12 +6,9 @@
 <meta content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" name="viewport"/>
 <meta content="#0b0b14" name="theme-color"/>
 <meta content="yes" name="mobile-web-app-capable"/>
-<meta content="yes" name="apple-mobile-web-app-capable"/>
-<meta content="black-translucent" name="apple-mobile-web-app-status-bar-style"/>
 <title>タイマー</title>
 <link href="manifest.json" rel="manifest"/>
 <link href="icon-192.png" rel="icon"/>
-<link href="icon-192.png" rel="apple-touch-icon"/>
 <style>
   :root{
     --bg:#0b0b14; --card:#15151f; --card2:#1b1b28; --line:#2a2a3a;
@@ -31,6 +28,9 @@
   /* アカウント名：編集対象が分かるよう、通常のフォーカス枠を復活。 */
   .group .name:focus{ outline:1px solid #d8d8d8 !important; outline-offset:1px; box-shadow:none !important; }
   .group .name{ -webkit-tap-highlight-color:transparent; -webkit-touch-callout:none; touch-action:manipulation; user-select:text; }
+  /* TWA復帰時の一瞬の再構築を視覚的に隠す。通常起動・通常操作では非表示。 */
+  #resumeVeil{position:fixed;inset:0;background:var(--bg);opacity:0;pointer-events:none;z-index:100;transition:opacity 90ms linear;}
+  #resumeVeil.show{opacity:1;}
   header{
     display:flex; align-items:center; gap:8px; padding:10px 12px 6px;
     position:sticky; top:0; background:var(--bg); z-index:5;
@@ -189,6 +189,7 @@
 </style>
 </head>
 <body>
+<div id="resumeVeil" aria-hidden="true"></div>
 <header>
 <button aria-label="アプリを更新" class="iconbtn" id="updateBtn" title="アプリを更新">↻</button>
 <span aria-hidden="true" class="spacer"></span>
@@ -213,10 +214,31 @@
 <script>
 const STORAGE_KEY = 'freetimer:v1';
 let state = load();
+// 旧版で存在し得た「アカウント外タイマー」を起動時にアカウントへ移行。
+// 現行UIではタイマーはアカウント枠の子としてのみ作成する。
+function migrateOrphanTimers(){
+  if (!state || !Array.isArray(state.items)) return false;
+  const orphan = state.items.filter(it => it && (it.type==='stam' || it.type==='abyss' || it.type==='idle'));
+  if (!orphan.length) return false;
+  const keep = state.items.filter(it => !orphan.includes(it));
+  const groups = [];
+  for (let i=0; i<orphan.length; i+=2){
+    groups.push({ id:'g' + Date.now().toString(36) + Math.random().toString(36).slice(2,7), type:'group', name:'', children:orphan.slice(i,i+2) });
+  }
+  // 最初の孤立タイマーがあった位置に移行後のアカウント枠を挿入し、
+  // それ以外の既存項目の順序はなるべく維持する。
+  const firstIndex = state.items.findIndex(it => orphan.includes(it));
+  const beforeCount = state.items.slice(0, firstIndex).filter(it => !orphan.includes(it)).length;
+  state.items = keep.slice(0,beforeCount).concat(groups, keep.slice(beforeCount));
+  saveNow();
+  return true;
+}
+if (migrateOrphanTimers()) { /* 旧データの一度きりの移行 */ }
 let refs = {};
 let tickId = null;
 let tickGen = 0;
 let pending40Id = null;
+let claimId = null;
 
 // DOM参照は一度だけ取得して使い回す(毎分ティックや毎クリックで検索し直さない)。
 const cardsEl = document.getElementById('cards');
@@ -328,8 +350,8 @@ function newGroupItem(){
 }
 
 // 残り時間ではなく「何時何分に完了するか」を時刻表記で返す(スタミナ用)。
-function fmtClockAt(remainMs){
-  const d = new Date(Date.now() + Math.max(0, remainMs));
+function fmtClockAt(remainMs, now){
+  const d = new Date((now || Date.now()) + Math.max(0, remainMs));
   const p = n => String(n).padStart(2,'0');
   return { h: p(d.getHours()), m: p(d.getMinutes()) };
 }
@@ -398,6 +420,18 @@ function needsTicking(now){
     return timerNeedsTick(it, now);
   });
 }
+function tickRender(now){
+  now = now || Date.now();
+  for (const it of state.items){
+    const r = refs[it.id];
+    if (!r) continue;
+    if (it.type==='group'){
+      for (const child of it.children) updateTimerCard(child, r.childRefs[child.id], now);
+    } else if (it.type==='stam' || it.type==='abyss' || it.type==='idle'){
+      updateTimerCard(it, r, now);
+    }
+  }
+}
 function scheduleTick(gen){
   if (gen !== tickGen || !needsTicking()) return;
   const unit = 60000;
@@ -405,12 +439,14 @@ function scheduleTick(gen){
   tickId = setTimeout(()=>{
     tickId = null;
     if (gen !== tickGen) return;
-    render();
+    // 毎分はDOM構造を再構築せず、既存ノードの表示だけ差分更新。
+    tickRender(Date.now());
     if (needsTicking()) scheduleTick(gen);
   }, delay);
 }
 function startTicking(force){
   if (force){ tickGen++; if (tickId) clearTimeout(tickId); tickId=null; }
+  if (document.hidden) return;
   if (!tickId && needsTicking()) scheduleTick(tickGen);
 }
 
@@ -481,7 +517,11 @@ function bindLongPressDelete(el, id, shortAction){
       e.stopPropagation();
     } else if (!wasMoved && typeof shortAction === 'function'){
       // 短押しは各カード本来の操作へ渡す。
-      shortAction(e);
+      // アカウント名行では、入力欄そのものをタップした時だけ編集開始。
+      // 行の余白タップでは名前欄へフォーカスしない。
+      if (!el.classList.contains('group-namerow') || input){
+        shortAction(e);
+      }
       if (input) e.stopPropagation();
     }
     cleanup();
@@ -734,11 +774,6 @@ function buildGroupCard(it){
   nameEl.addEventListener('blur', ()=>{ it.name = nameEl.value; save(); });
   placeCursorOnFocus(nameEl);
   const nameRowEl = wrap.querySelector('.group-namerow');
-  // 名前入力欄そのもの以外の余白をタップしても、入力欄へフォーカスを移さない。
-  // Android/PWAで余白タップ時にキーボードが開閉する挙動を防ぐ。
-  nameRowEl.addEventListener('pointerdown', e=>{
-    if (e.target !== nameEl && !e.target.closest('.group .name')) e.preventDefault();
-  }, {capture:true, passive:false});
   refs[it.id] = { el: wrap, nameEl,
     bodyEl: wrap.querySelector('[data-role="body"]'),
     childRefs: {} };
@@ -795,23 +830,37 @@ function buildHeaderCard(it){
   return wrap;
 }
 
+// 構造を変えない操作は対象カードだけを更新する。
+function getTimerRef(id){
+  const direct = refs[id];
+  if (direct) return direct;
+  for (const it of state.items){
+    if (it.type==='group' && it.children.some(c=>c.id===id)) return refs[it.id]?.childRefs[id] || null;
+  }
+  return null;
+}
+function updateOneTimer(it){
+  updateTimerCard(it, getTimerRef(it.id), Date.now());
+}
 // タップで「受取」表示に切替。内部の実時間は止めない(表示だけの上書き)。
 // もう一度タップ＝受取確定→フル時間で再開。
 function toggleIdle(it){
   if (it.state === 'claim'){
     it.state = 'running';
     it.start = Date.now();
+    if (claimId === it.id) claimId = null;
   } else {
     it.state = 'claim';
+    claimId = it.id;
   }
-  // 先に描画、永続化は次フレーム以降（復帰直後のタップでも重くなりにくい）
-  render();
+  updateOneTimer(it);
   startTicking(true);
   saveAfterPaint();
 }
 function cancelClaim(it){
   it.state = 'running';
-  render();
+  if (claimId === it.id) claimId = null;
+  updateOneTimer(it);
   startTicking(true);
   saveAfterPaint();
 }
@@ -821,14 +870,10 @@ function cancelClaim(it){
 
 document.addEventListener('pointerdown', (e) => {
   try { if (document.activeElement !== e.target && window.getSelection) window.getSelection().removeAllRanges(); } catch(err){}
-  for (const it of state.items){
-    const list = it.type === 'group' ? it.children : [it];
-    for (const t of list){
-      if (t.type === 'idle' && t.state === 'claim'){
-        const r = refs[t.id];
-        if (r && !r.el.contains(e.target)) cancelClaim(t);
-      }
-    }
+  if (claimId != null){
+    const claimed = findItemById(claimId);
+    const r = claimed ? getTimerRef(claimId) : null;
+    if (!claimed || !r || !r.el.contains(e.target)) cancelClaim(claimed || {id:claimId});
   }
   if (pending40Id != null){
     const r = refs[pending40Id];
@@ -878,14 +923,14 @@ function removeItem(id){
 }
 
 // 04/20のようなデジタル時計表示を組み立てる共通処理(スタミナ・放置報酬で共用)。
-function renderClock(el, remainMs, isFull){
+function renderClock(el, remainMs, isFull, now){
   if (!el) return;
-  const key = isFull ? 'full' : (()=>{ const c = fmtClockAt(remainMs); return c.h+c.m; })();
+  const key = isFull ? 'full' : (()=>{ const c = fmtClockAt(remainMs, now); return c.h+c.m; })();
   if (el.dataset.clk === key) return;
   el.dataset.clk = key;
   if (isFull) el.innerHTML = '<span class="ok">✓</span>';
   else {
-    const c = fmtClockAt(remainMs);
+    const c = fmtClockAt(remainMs, now);
     el.innerHTML = `<span>${c.h}</span><span>${c.m}</span>`;
   }
 }
@@ -907,14 +952,15 @@ function paintAbyssFortyPreview(id){
   const r = refs[id];
   if (!it || !r || it.type!=='abyss') return;
   syncAbyssMax(it);
-  const info = stamInfo(it, Date.now());
+  const now = Date.now();
+  const info = stamInfo(it, now);
   const wait = pending40Id === id;
   r.el.classList.toggle('claim', wait);
   if (document.activeElement !== r.curInput){
     r.curInput.value = wait ? remainingAfter40(info.cur) : info.cur;
   }
   if (r.maxLabel) r.maxLabel.textContent = String(it.max);
-  renderClock(r.clockEl, info.remainMs, info.isFull);
+  renderClock(r.clockEl, info.remainMs, info.isFull, now);
 }
 function render(){
   const now = Date.now();
@@ -961,7 +1007,7 @@ function updateTimerCard(it, r, now){
   if (it.type==='stam'){
     const info = stamInfo(it, now);
     r.el.classList.toggle('full', info.isFull);
-    renderClock(r.clockEl, info.remainMs, info.isFull);
+    renderClock(r.clockEl, info.remainMs, info.isFull, now);
     if (document.activeElement !== r.curInput){
       const v = String(info.cur);
       if (r.curInput.value !== v) r.curInput.value = v;
@@ -977,7 +1023,7 @@ function updateTimerCard(it, r, now){
     const wait40 = pending40Id === it.id;
     r.el.classList.toggle('full', info.isFull);
     r.el.classList.toggle('claim', wait40);
-    renderClock(r.clockEl, info.remainMs, info.isFull);
+    renderClock(r.clockEl, info.remainMs, info.isFull, now);
     if (r.rankInput && document.activeElement !== r.rankInput){
       const v = 'Lv.' + (it.rank || 1);
       if (r.rankInput.value !== v) r.rankInput.value = v;
@@ -996,7 +1042,7 @@ function updateTimerCard(it, r, now){
     r.el.classList.toggle('full', info.isFull && it.state!=='claim');
     const label = it.state==='claim' ? '受取' : (info.isFull ? fmtHM(info.fullAt) : fmtCountdown(info.remainMs));
     if (r.curEl.textContent !== label) r.curEl.textContent = label;
-    renderClock(r.clockEl, info.remainMs, info.isFull);
+    renderClock(r.clockEl, info.remainMs, info.isFull, now);
   }
 }
 
@@ -1071,22 +1117,24 @@ function closeSetup(){
 }
 function pushNewTimer(item){
   const group = pendingAddGroupId ? state.items.find(g=>g.id===pendingAddGroupId && g.type==='group') : null;
-  if (group && group.children.length < 2){
-    group.children.push(item);
-  } else {
-    state.items.push(item);
+  if (!group || group.children.length >= 2){
+    pendingAddGroupId = null;
+    addPanelEl.classList.remove('group-mode');
+    return false;
   }
+  group.children.push(item);
   pendingAddGroupId = null;
   addPanelEl.classList.remove('group-mode');
+  return true;
 }
 bindTapDown(setupConfirmEl, (e)=>{
   e.stopPropagation();
   if (setupType === 'stam'){
     const interval = clampInt(setupFieldsEl.querySelector('#setupInterval').value, 1, 999, 5);
-    pushNewTimer(newStamItem(interval));
+    if (!pushNewTimer(newStamItem(interval))) return;
   } else if (setupType === 'abyss'){
     const interval = clampInt(setupFieldsEl.querySelector('#setupInterval').value, 1, 999, 3);
-    pushNewTimer(newAbyssItem(interval));
+    if (!pushNewTimer(newAbyssItem(interval))) return;
   } else if (setupType === 'rule'){
     let color = (setupFieldsEl.querySelector('#setupColor')||{}).value || '#52617a';
     color = String(color).trim();
@@ -1095,18 +1143,40 @@ bindTapDown(setupConfirmEl, (e)=>{
   } else if (setupType === 'idle'){
     const h = clampInt(setupFieldsEl.querySelector('#setupH').value, 0, 999, 12);
     const m = clampInt(setupFieldsEl.querySelector('#setupM').value, 0, 59, 0);
-    pushNewTimer(newIdleItem(h*60+m));
+    if (!pushNewTimer(newIdleItem(h*60+m))) return;
   }
   closeSetup();
   save(); render(); startTicking(true);
 });
 
-document.addEventListener('visibilitychange', ()=>{
-  if (!document.hidden){
-    // 復帰時も差分スキップ付き render のみ。force 連打でメインタスクを膨らませない
-    render();
+const resumeVeilEl = document.getElementById('resumeVeil');
+let resumeTimer = null;
+function resumeFromBackground(){
+  if (resumeTimer) clearTimeout(resumeTimer);
+  // TWA/Android復帰直後はWebViewの合成・レイアウトが安定するまで短時間だけ覆う。
+  resumeVeilEl.classList.add('show');
+  requestAnimationFrame(()=>{
+    // DOM構造は既に残っているため、復帰時は全体renderではなく表示値だけ再同期。
+    tickRender(Date.now());
     startTicking(true);
+    requestAnimationFrame(()=>{
+      resumeTimer = setTimeout(()=>{
+        resumeTimer = null;
+        resumeVeilEl.classList.remove('show');
+      }, 180);
+    });
+  });
+}
+document.addEventListener('visibilitychange', ()=>{
+  if (document.hidden){
+    tickGen++;
+    if (tickId){ clearTimeout(tickId); tickId=null; }
+    return;
   }
+  resumeFromBackground();
+});
+window.addEventListener('pageshow', (e)=>{
+  if (e.persisted) resumeFromBackground();
 });
 
 render();

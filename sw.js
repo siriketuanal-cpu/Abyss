@@ -1,5 +1,5 @@
 // キャッシュ名固定。中身の差し替えは update.html（SW解除＋Cache削除＋no-store取得）で行う。
-const CACHE_NAME = 'freetimer-cache-v4';
+const CACHE_NAME = 'freetimer-cache-v7';
 const ASSETS = [
   './',
   './index.html',
@@ -22,7 +22,6 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((keys) =>
       Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
     ).then(() => self.clients.claim())
-      .then(() => self.registration.navigationPreload ? self.registration.navigationPreload.enable() : undefined)
   );
 });
 
@@ -34,15 +33,13 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(fetch(event.request, { cache: 'no-store' }));
     return;
   }
-  // 通常はキャッシュ優先（オフライン用）。TWAの初回/キャッシュ欠落時だけ
-  // navigation preload を使い、ネットワーク待ちを短縮する。
+  // 通常はキャッシュ優先。TWA起動時の不要なネットワーク待ち・通信を避ける。
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
-      const preload = event.preloadResponse ? event.preloadResponse : Promise.resolve(null);
-      // クエリ付き index.html は index.html 本体にもフォールバック
+      // クエリ付き index.html / TWAナビゲーションは本体キャッシュへフォールバック。
       if (url.pathname.endsWith('/index.html') || url.pathname.endsWith('index.html') || event.request.mode === 'navigate') {
-        return preload.then((r) => r || caches.match('./index.html')).then((c) => c || fetch(event.request)).catch(() => caches.match('./index.html'));
+        return caches.match('./index.html').then((c) => c || fetch(event.request)).catch(() => caches.match('./index.html'));
       }
       return fetch(event.request).catch(() => cached);
     })
