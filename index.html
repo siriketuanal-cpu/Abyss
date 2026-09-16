@@ -125,22 +125,38 @@
   /* Abyss「40使い切り」プレビュー中：押した所が分かるよう点線で囲む */
   .clockstack{ justify-content:center; }
   .main{font-size:16px; line-height:1.1; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:.01em;}
-  .valrow-stam{ margin-top:0 !important; align-items:center; min-height:22px; height:22px; position:absolute; left:6px; right:6px; bottom:5px; display:grid; grid-template-columns:28px 6px 28px; justify-content:center; gap:0; }
-  .stamval{
-    color:var(--text); font-size:15px; font-weight:700; text-align:center;
-    font-variant-numeric:tabular-nums; width:28px; min-width:28px; max-width:28px; overflow:hidden;
-    height:22px; line-height:22px; display:inline-block;
+  /* 数字列は固定幅にせず、現在値を「/」の直前へ自然に右寄せ。
+     22/100 のような2桁でも余白が残らず、100/100 でも同じ基準で揃う。 */
+  .valrow-stam{
+    margin-top:0 !important; align-items:center; min-height:22px; height:22px;
+    position:absolute; left:6px; right:6px; bottom:5px;
+    display:flex; justify-content:center; gap:0;
   }
-  .inline-number{width:28px; min-width:28px; max-width:28px; overflow:hidden;}
-  .inline-number-text{width:100%; min-width:0; text-align:center; overflow:hidden;}
-  .inline-edit-input{width:28px; min-width:28px; max-width:28px;}
-  /* 「/」は数字の幅計算に参加させず、2つの数字の中央へ固定。
-     フォントのベースライン差で下へ落ちて見えるのを避ける。 */
+  .stamval{
+    color:var(--text); font-size:15px; font-weight:700; text-align:right;
+    font-variant-numeric:tabular-nums; width:auto; min-width:0; max-width:none;
+    overflow:visible; height:22px; line-height:22px; display:inline-block;
+    flex:0 0 auto;
+  }
+  .inline-number{
+    position:relative; display:inline-block; width:auto; min-width:0; max-width:none;
+    height:22px; line-height:22px; overflow:visible;
+  }
+  .inline-number-text{
+    display:inline-block; width:auto; min-width:0; max-width:none;
+    height:22px; line-height:22px; text-align:right; overflow:visible;
+  }
+  .inline-edit-input{
+    left:0; width:100%; min-width:0; max-width:none;
+    transform:none;
+  }
+  /* / は通常のレイアウトに戻し、左右の数字の間に自然に配置。
+     絶対配置を使わないので、桁数が変わっても重ならない。 */
   .slash{
-    position:absolute; left:50%; top:0; z-index:1;
-    width:6px; height:22px; color:#777d8a;
+    position:static; flex:0 0 auto; width:auto; height:22px;
+    margin:0 4px; color:#777d8a;
     font-size:13px; font-weight:600; line-height:18px;
-    text-align:center; transform:translateX(-50%);
+    text-align:center; transform:none;
     overflow:visible; pointer-events:none;
   }
   .clockstack{
