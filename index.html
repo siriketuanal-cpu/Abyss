@@ -24,7 +24,18 @@
     padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     user-select:none; overscroll-behavior:none;
   }
-  input{ caret-color:auto; }
+  /* アプリ内の編集キャレットは一括で非表示。編集自体はそのまま可能。 */
+  input{ caret-color:transparent; }
+  /* 数字のインライン編集は表示幅を変えず、編集欄を数字の真上に重ねる。 */
+  .inline-number{ position:relative; display:inline-block; height:22px; line-height:22px; min-width:0; }
+  .inline-number-text{ display:inline-block; height:22px; line-height:22px; font-variant-numeric:tabular-nums; }
+  .inline-edit-input{
+    position:absolute; inset:0; width:100%; height:100%; box-sizing:border-box;
+    border:0; outline:0; background:transparent; color:inherit;
+    font:inherit; font-variant-numeric:tabular-nums; text-align:center;
+    padding:0; margin:0; border-radius:0; appearance:none; -webkit-appearance:none;
+    -webkit-user-select:text; user-select:text;
+  }
   /* アカウント名：編集対象が分かるよう、通常のフォーカス枠を復活。 */
   .group .name:focus{ outline:1px solid #d8d8d8 !important; outline-offset:1px; box-shadow:none !important; }
   .group .name{ -webkit-tap-highlight-color:transparent; -webkit-touch-callout:none; touch-action:manipulation; user-select:text; }
@@ -66,13 +77,16 @@
   .row{display:flex; align-items:center; gap:3px; min-width:0;}
   .row + .row{margin-top:3px;}
   .namerow{margin-bottom:4px;}
-  .card.abyss{padding:5px 6px 6px;}
+  /* タイマーカードは種類に関係なく同じ外寸に揃える。中身だけ配置を変える。 */
+  .card.stam, .card.abyss, .card.idle{height:56px; min-height:56px;} 
+  .card.abyss{padding:6px 6px;}
   /* Abyssはカード全体を1つのタップ領域にする。入力欄以外はどこを押しても40使い切り。 */
   .card.abyss .clockstack, .card.abyss .stammax, .card.abyss .slash{pointer-events:none;}
-  .card.abyss .abyss-head{justify-content:flex-end; min-height:18px; margin-bottom:2px;}
-  .card.abyss .rank{position:static; width:4.5em; max-width:none; text-align:right; padding:1px 2px; z-index:auto;}
+  .card.abyss .abyss-head{justify-content:space-between; min-height:18px; height:18px; margin-bottom:2px;}
+  .card.abyss .abyss-clock{margin-left:0; margin-right:auto; min-width:0; font-size:9.5px; line-height:18px;}
+  .card.abyss .rank{position:static; flex:0 0 4.5em; width:4.5em; max-width:none; text-align:right; padding:0 2px; z-index:auto; height:18px; line-height:18px;}
   .card.stam, .card.idle{
-    padding:8px 6px 6px; display:flex; flex-direction:column; justify-content:flex-end;
+    padding:6px; display:flex; flex-direction:column; justify-content:center;
   }
   .name{
     width:100%; background:transparent; border:none; color:var(--text);
@@ -95,31 +109,33 @@
   .group-body.one{grid-template-columns:1fr;}
   .group-body:empty{display:none;}
   .stammax{
-    display:inline-block; width:28px; height:22px; line-height:22px; box-sizing:border-box;
-    color:var(--blue); font-size:15px; font-weight:700; text-align:center; padding:0;
-    font-variant-numeric:tabular-nums; border-bottom:1px dashed var(--line); vertical-align:middle;
-    border-radius:4px;
+    color:var(--blue); font-size:15px; font-weight:700; text-align:center;
+    font-variant-numeric:tabular-nums; vertical-align:middle;
   }
   /* Abyss「40使い切り」プレビュー中：押した所が分かるよう点線で囲む */
   .clockstack{ justify-content:center; }
   .main{font-size:16px; line-height:1.1; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:.01em;}
-  .valrow-stam{ margin-top:1px !important; align-items:center; min-height:26px; }
+  .valrow-stam{ margin-top:0 !important; align-items:center; min-height:22px; height:22px; }
   .stamval{
-    width:28px; height:22px; line-height:22px; box-sizing:border-box;
-    background:transparent; border:none; border-bottom:1px solid var(--line);
-    color:var(--text); font-size:15px; font-weight:700; text-align:center; padding:0;
+    color:var(--text); font-size:15px; font-weight:700; text-align:center;
     font-variant-numeric:tabular-nums;
   }
-  .slash{color:var(--sub); font-size:14px; line-height:1; transform:translateY(-.5px);}
+  .slash{flex:0 0 auto; color:var(--sub); font-size:14px; line-height:22px; height:22px; transform:none;}
   .clockstack{
-    margin-left:auto; display:flex; flex-direction:column; align-items:center;
-    font-size:9.5px; font-weight:700; line-height:1; color:var(--accent);
-    transform:translateY(-1px);
+    margin-left:auto; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:0; font-size:9.5px; font-weight:700; line-height:1; color:var(--accent);
+    transform:none; white-space:nowrap;
   }
-  .clockstack .ok{color:var(--ok); font-size:14px; line-height:1;}
-  /* 放置もスタミナ系と同じ：左に本体、右に予定時刻 */
+  .clockstack .ok{color:var(--ok); font-size:14px; line-height:18px;}
+  /* Abyssだけ予定時刻をランクと同じ行に、左寄せの小さな横並び表示にする。 */
+  .card.abyss .abyss-clock{
+    margin-left:0; margin-right:auto; flex-direction:row; align-items:center; justify-content:flex-start;
+    gap:0; font-size:9.5px; line-height:18px; letter-spacing:.01em;
+  }
+  .card.abyss .abyss-clock span + span::before{content:':'; margin:0 .05em;}
+  /* 放置もスタミナ系と同じ高さ。左に本体、右に予定時刻。 */
   .valrow-idle{
-    margin-top:1px !important; align-items:center; min-height:26px;
+    margin-top:0 !important; align-items:center; min-height:22px; height:22px;
     justify-content:flex-start; gap:6px;
   }
   .valrow-idle .main{
@@ -328,9 +344,58 @@ function placeCursorOnFocus(input){
   const place = () => { try{ input.setSelectionRange(input.value.length, input.value.length); }catch(e){} };
   input.addEventListener('focus', () => { place(); setTimeout(place, 0); });
 }
-// スタミナ現在値/上限値はフォーカス時に空にして、そのまま打ち直せるようにする。
+// 数字入力の共通処理。インライン編集側ではキャレット自体を非表示にする。
 function clearOnFocus(input){
   input.addEventListener('focus', () => { input.value = ''; });
+}
+// 数字は通常の文字として表示し、タップ時だけ数字の真上に入力欄を重ねる。
+// 入力欄はレイアウトから外してあるので、編集開始/終了で周囲の数字や「/」がズレない。
+function createInlineNumber(initialValue, onCommit){
+  const wrap = document.createElement('span');
+  wrap.className = 'inline-number';
+  const text = document.createElement('span');
+  text.className = 'inline-number-text';
+  text.textContent = String(initialValue);
+  wrap.appendChild(text);
+
+  let editor = null;
+  const setText = v => { text.textContent = String(v); };
+  const isEditing = () => !!editor;
+  const open = () => {
+    if (editor) return;
+    editor = document.createElement('input');
+    editor.type = 'text';
+    editor.inputMode = 'numeric';
+    editor.pattern = '[0-9]*';
+    editor.className = 'inline-edit-input';
+    editor.autocomplete = 'off';
+    editor.autocapitalize = 'off';
+    editor.autocorrect = 'off';
+    editor.spellcheck = false;
+    editor.value = text.textContent;
+    wrap.appendChild(editor);
+
+    const finish = () => {
+      if (!editor) return;
+      const value = editor.value;
+      const old = editor;
+      editor = null;
+      old.remove();
+      onCommit(value);
+    };
+    editor.addEventListener('input', () => {
+      const v = editor.value.replace(/\D/g, '');
+      if (editor.value !== v) editor.value = v;
+    });
+    editor.addEventListener('blur', finish, {once:true});
+    editor.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); editor.blur(); }
+      else if (e.key === 'Escape') { e.preventDefault(); editor.value = text.textContent; editor.blur(); }
+    });
+    editor.focus({preventScroll:true});
+    editor.select();
+  };
+  return {wrap, text, open, setText, isEditing};
 }
 
 function newStamItem(intervalMin){
@@ -478,6 +543,7 @@ function bindLongPressDelete(el, id, shortAction){
   };
 
   el.addEventListener('pointerdown', e=>{
+    if (e.target && e.target.closest && e.target.closest('.inline-edit-input')) return;
     if (!isPrimary(e) || active) return;
     active = true; moved = false; longFired = false;
     sx = e.clientX; sy = e.clientY; pid = e.pointerId;
@@ -608,44 +674,44 @@ function buildStamCard(it){
   wrap.className = 'card stam';
   wrap.innerHTML = `
     <div class="row valrow-stam">
-      <input type="text" inputmode="numeric" pattern="[0-9]*" class="stamval" data-role="curInput">
+      <span class="stamval" data-role="curWrap"></span>
       <span class="slash">/</span>
-      <input type="text" inputmode="numeric" pattern="[0-9]*" class="stamval" data-role="maxInput">
+      <span class="stammax" data-role="maxWrap"></span>
       <div class="clockstack" data-role="clock"></div>
     </div>
   `;
-  const curInput = wrap.querySelector('[data-role="curInput"]');
-  const maxInput = wrap.querySelector('[data-role="maxInput"]');
-  [curInput, maxInput].forEach(clearOnFocus);
-  curInput.addEventListener('blur', ()=>{
+  const curWrap = wrap.querySelector('[data-role="curWrap"]');
+  const maxWrap = wrap.querySelector('[data-role="maxWrap"]');
+  const curEditor = createInlineNumber(stamInfo(it, Date.now()).cur, value => {
     const now = Date.now();
     const info = stamInfo(it, now);
-    const newCur = clampInt(curInput.value, 0, it.max, info.cur);
+    const newCur = clampInt(value, 0, it.max, info.cur);
     preserveCycle(it, now);
     it.current = newCur;
     save(); render();
   });
-  maxInput.addEventListener('blur', ()=>{
+  const maxEditor = createInlineNumber(it.max, value => {
     const now = Date.now();
     const curNow = stamInfo(it, now).cur;
-    const newMax = clampInt(maxInput.value,1,999,it.max);
+    const newMax = clampInt(value, 1, 999, it.max);
     preserveCycle(it, now);
     it.max = newMax;
     it.current = Math.min(curNow, newMax);
     save(); render();
   });
-  refs[it.id] = { el: wrap, curInput, maxInput,
+  curWrap.appendChild(curEditor.wrap);
+  maxWrap.appendChild(maxEditor.wrap);
+
+  refs[it.id] = { el: wrap, curEl: curEditor, maxEl: maxEditor,
     clockEl: wrap.querySelector('[data-role="clock"]') };
   bindLongPressDelete(wrap, it.id, (e)=>{
-    const target=e.target;
-    if (target === curInput || target === maxInput || target.closest('input')) {
-      const input = target.closest('input');
-      if(input){ input.focus(); try{ input.setSelectionRange(input.value.length,input.value.length); }catch(err){} }
-    }
+    const target = e.target;
+    if (target.closest && target.closest('.inline-edit-input')) return;
+    if (target.closest && target.closest('[data-role="curWrap"]')) { curEditor.open(); return; }
+    if (target.closest && target.closest('[data-role="maxWrap"]')) { maxEditor.open(); return; }
   });
   return wrap;
 }
-
 
 function buildAbyssCard(it){
   syncAbyssMax(it);
@@ -653,20 +719,31 @@ function buildAbyssCard(it){
   wrap.className = 'card abyss';
   wrap.innerHTML = `
     <div class="row abyss-head">
+      <div class="clockstack abyss-clock" data-role="clock"></div>
       <input class="rank" data-role="rankInput" inputmode="numeric" pattern="[0-9]*" title="ランク">
     </div>
     <div class="row valrow-stam">
-      <input type="text" inputmode="numeric" pattern="[0-9]*" class="stamval" data-role="curInput">
+      <span class="stamval" data-role="curWrap"></span>
       <span class="slash">/</span>
       <span class="stammax" data-role="maxLabel"></span>
-      <div class="clockstack" data-role="clock"></div>
     </div>
   `;
   const rankInput = wrap.querySelector('[data-role="rankInput"]');
-  const curInput = wrap.querySelector('[data-role="curInput"]');
+  const curWrap = wrap.querySelector('[data-role="curWrap"]');
   const maxLabel = wrap.querySelector('[data-role="maxLabel"]');
-  clearOnFocus(curInput);
-  clearOnFocus(rankInput); // フォーカスで空欄
+  const curEditor = createInlineNumber(stamInfo(it, Date.now()).cur, value => {
+    const now = Date.now();
+    syncAbyssMax(it);
+    const info = stamInfo(it, now);
+    const newCur = clampInt(value, 0, it.max, info.cur);
+    preserveCycle(it, now);
+    it.current = newCur;
+    pending40Id = null;
+    save(); render();
+  });
+  curWrap.appendChild(curEditor.wrap);
+  // ランク欄は従来どおりネイティブ入力。フォーカス時だけ空欄にする。
+  clearOnFocus(rankInput);
   // 長押しの貼り付けメニュー等を出さない
   ['paste','copy','cut','contextmenu','selectstart'].forEach(ev=>{
     rankInput.addEventListener(ev, e=>{ e.preventDefault(); });
@@ -675,9 +752,6 @@ function buildAbyssCard(it){
   rankInput.setAttribute('autocapitalize','off');
   rankInput.setAttribute('autocorrect','off');
   rankInput.setAttribute('spellcheck','false');
-  curInput.addEventListener('focus', ()=>{
-    if (pending40Id === it.id){ pending40Id = null; paintAbyssFortyPreview(it.id); }
-  });
   rankInput.addEventListener('focus', ()=>{
     if (pending40Id === it.id){ pending40Id = null; paintAbyssFortyPreview(it.id); }
   });
@@ -690,16 +764,6 @@ function buildAbyssCard(it){
     it.current = Math.min(live, it.max);
     pending40Id = null;
     save(); render(); startTicking(true);
-  });
-  curInput.addEventListener('blur', ()=>{
-    const now = Date.now();
-    syncAbyssMax(it);
-    const info = stamInfo(it, now);
-    const newCur = clampInt(curInput.value, 0, it.max, info.cur);
-    preserveCycle(it, now);
-    it.current = newCur;
-    pending40Id = null;
-    save(); render();
   });
   const clockEl = wrap.querySelector('[data-role="clock"]');
   // 最大 or 予定時刻タップ → 40使い切りプレビュー/確定（ルナビィに近い）
@@ -734,15 +798,19 @@ function buildAbyssCard(it){
   // 原因になっていた。二重登録はしない。
   // 初回から数字を出しておく（更新直後の空表示防止）
   const info0 = stamInfo(it, Date.now());
-  curInput.value = String(info0.cur);
+  curEditor.setText(info0.cur);
   maxLabel.textContent = String(it.max);
   rankInput.value = 'Lv.' + (it.rank || 1);
-  refs[it.id] = { el: wrap, rankInput, curInput, maxLabel, clockEl };
+  refs[it.id] = { el: wrap, rankInput, curEl: curEditor, maxLabel, clockEl };
   bindLongPressDelete(wrap, it.id, (e)=>{
     const input = e.target && e.target.closest ? e.target.closest('input') : null;
-    if (input === rankInput || input === curInput){
+    if (input === rankInput){
       input.focus();
       try{ input.setSelectionRange(input.value.length,input.value.length); }catch(err){}
+      return;
+    }
+    if (e.target.closest && e.target.closest('[data-role="curWrap"]')){
+      curEditor.open();
       return;
     }
     // 入力欄以外はカード全体が同じ40使い切り操作。
@@ -966,9 +1034,7 @@ function paintAbyssFortyPreview(id){
   const info = stamInfo(it, now);
   const wait = pending40Id === id;
   r.el.classList.toggle('claim', wait);
-  if (document.activeElement !== r.curInput){
-    r.curInput.value = wait ? remainingAfter40(info.cur) : info.cur;
-  }
+  if (r.curEl && !r.curEl.isEditing()) r.curEl.setText(wait ? remainingAfter40(info.cur) : info.cur);
   if (r.maxLabel) r.maxLabel.textContent = String(it.max);
   renderClock(r.clockEl, info.remainMs, info.isFull, now);
 }
@@ -1018,14 +1084,8 @@ function updateTimerCard(it, r, now){
     const info = stamInfo(it, now);
     r.el.classList.toggle('full', info.isFull);
     renderClock(r.clockEl, info.remainMs, info.isFull, now);
-    if (document.activeElement !== r.curInput){
-      const v = String(info.cur);
-      if (r.curInput.value !== v) r.curInput.value = v;
-    }
-    if (document.activeElement !== r.maxInput){
-      const v = String(it.max);
-      if (r.maxInput.value !== v) r.maxInput.value = v;
-    }
+    if (r.curEl && !r.curEl.isEditing()) r.curEl.setText(info.cur);
+    if (r.maxEl && !r.maxEl.isEditing()) r.maxEl.setText(it.max);
   } else if (it.type==='abyss'){
     // maxはランク変更時だけ変わる。毎分のsyncは不要だが安価なので維持
     if (it.max !== abyssMaxFor(it.rank||1)) syncAbyssMax(it);
@@ -1038,10 +1098,7 @@ function updateTimerCard(it, r, now){
       const v = 'Lv.' + (it.rank || 1);
       if (r.rankInput.value !== v) r.rankInput.value = v;
     }
-    if (document.activeElement !== r.curInput){
-      const v = String(wait40 ? remainingAfter40(info.cur) : info.cur);
-      if (r.curInput.value !== v) r.curInput.value = v;
-    }
+    if (r.curEl && !r.curEl.isEditing()) r.curEl.setText(wait40 ? remainingAfter40(info.cur) : info.cur);
     if (r.maxLabel){
       const v = String(it.max);
       if (r.maxLabel.textContent !== v) r.maxLabel.textContent = v;
