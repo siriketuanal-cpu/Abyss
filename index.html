@@ -86,7 +86,7 @@
   .card.group{grid-column:span 2; padding:4px; border:1px solid #555b68; box-shadow:none; border-radius:8px;}
   .card.group.single{grid-column:span 1;}
   .group-namerow{margin-bottom:3px; gap:3px; padding:0 1px;}
-  .group-namerow .name{font-size:12px; padding:1px 0; font-weight:700; color:var(--accent); flex:0 1 65%; max-width:65%;}
+  .group-namerow .name{font-size:12px; padding:1px 0; font-weight:700; color:var(--accent); flex:0 1 50%; max-width:50%;}
   .group-body{display:grid; grid-template-columns:repeat(2,1fr); gap:6px; min-height:1px; align-items:end;}
   .group-body.one{grid-template-columns:1fr;}
   .group-body:empty{display:none;}
@@ -186,7 +186,7 @@
     padding:12px; border-radius:12px; border:none;
     background:var(--accent); color:#100c26; font-size:14px; font-weight:700;
   }
-  #saveStamp{font-size:10px; color:var(--sub); text-align:center; padding-bottom:6px;}
+  #saveStamp{display:none;}
 </style>
 </head>
 <body>
@@ -440,11 +440,6 @@ function bindLongPressDelete(el, id, shortAction){
   };
   const cleanup = ()=>{
     if (timer !== null){ clearTimeout(timer); timer = null; }
-    if (nameInput){
-      nameInput.removeAttribute('readonly');
-      nameInput.style.userSelect = '';
-      nameInput.style.webkitUserSelect = '';
-    }
     active = false; moved = false; longFired = false; pid = null; nameInput = null;
   };
 
@@ -453,14 +448,12 @@ function bindLongPressDelete(el, id, shortAction){
     active = true; moved = false; longFired = false;
     sx = e.clientX; sy = e.clientY; pid = e.pointerId;
 
+    // 名前欄も、短押しは邪魔せずブラウザのネイティブなフォーカス/キーボード表示に
+    // 任せる（先回りしてreadonly/preventDefaultすると、短押しでも稀にフォーカスが
+    // 一瞬だけ入ってすぐ外れる＝キーボードが開いてすぐ閉じる、という副作用が出ていた）。
+    // 長押しが確定した時にだけ、この入力欄からフォーカスを外す。
     if (isGroupName(e.target)){
       nameInput = e.target.closest('.group .name');
-      // 名前欄は長押し中だけ編集・文字選択を止める。短押しはpointerupでfocusする。
-      nameInput.setAttribute('readonly','');
-      nameInput.style.userSelect = 'none';
-      nameInput.style.webkitUserSelect = 'none';
-      e.preventDefault();
-      clearSelection();
     }
 
     timer = setTimeout(()=>{
