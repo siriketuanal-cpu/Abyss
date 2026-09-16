@@ -846,7 +846,7 @@ document.addEventListener('pointerdown', (e) => {
   if (toastEl && toastEl.classList.contains('show') && !toastEl.contains(e.target)){
     clearLongPressTarget();
     toastEl.classList.remove('show');
-    if (toastTapDownHandler){ toastEl.removeEventListener('click', toastTapDownHandler); toastTapDownHandler = null; }
+    if (toastTapDownHandler){ toastEl.removeEventListener('pointerdown', toastTapDownHandler); toastTapDownHandler = null; }
   }
   // 作成パネルは枠外タップで閉じない（キーボード閉じでキャンセルされるのを防ぐ）
 }, true);
@@ -1027,6 +1027,8 @@ bindTapDown(addPanelEl, (e)=>{
     openSetup('rule');
     return;
   }
+  // stam / abyss / idle（アカウント枠の中の「タイマー追加」で出てくる選択肢）
+  openSetup(type);
 });
 
 // 追加種別ごとの設定ダイアログ(回復間隔 / 満タンまでの時間をここで固定する)。
