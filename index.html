@@ -411,46 +411,102 @@ function startTicking(force){
   if (!tickId && needsTicking()) scheduleTick(tickGen);
 }
 
-// 長押し削除を全カードで一本化。pointerdownでジェスチャーを開始し、
-// 短いpointerupだけ各カード固有のタップ処理を実行する。
-function bindLongPressDelete(el, id, onTap){
+// 長押し削除は全カードで共通化。
+// 重要：pointerdown では通常のクリックを潰さない。短押しはブラウザ/既存の click 処理へ渡し、
+// 長押しだけ削除トーストを開いて直後の click を1回だけ抑止する。
+let suppressNextClick = false;
+let suppressClearTimer = null;
+
+function bindLongPressDelete(el, id){
   const HOLD_MS = 520, MOVE_PX = 12;
-  let timer=null, active=false, moved=false, longFired=false, sx=0, sy=0, pid=null;
+  let timer = null, active = false, moved = false, longFired = false;
+  let sx = 0, sy = 0, pid = null, nameInput = null;
+
   const isPrimary = e => e.isPrimary !== false && !(e.pointerType==='mouse' && e.button!==0);
   const clearSelection = ()=>{ try{ window.getSelection()?.removeAllRanges(); }catch(e){} };
-  const cleanup = ()=>{ if(timer!==null){ clearTimeout(timer); timer=null; } active=false; moved=false; longFired=false; pid=null; };
+  const isGroupName = target => {
+    const n = target && target.closest ? target.closest('.group .name') : null;
+    return !!n && el.contains(n);
+  };
+  const cleanup = ()=>{
+    if (timer !== null){ clearTimeout(timer); timer = null; }
+    if (nameInput){
+      nameInput.removeAttribute('readonly');
+      nameInput.style.userSelect = '';
+      nameInput.style.webkitUserSelect = '';
+    }
+    active = false; moved = false; longFired = false; pid = null; nameInput = null;
+  };
+
   el.addEventListener('pointerdown', e=>{
-    if(!isPrimary(e)) return;
-    active=true; moved=false; longFired=false; sx=e.clientX; sy=e.clientY; pid=e.pointerId;
-    clearSelection();
-    e.preventDefault();
-    e.stopPropagation();
-    try{ el.setPointerCapture(e.pointerId); }catch(err){}
-    timer=setTimeout(()=>{
-      if(!active || moved) return;
-      timer=null; longFired=true;
+    if (!isPrimary(e) || active) return;
+    active = true; moved = false; longFired = false;
+    sx = e.clientX; sy = e.clientY; pid = e.pointerId;
+
+    if (isGroupName(e.target)){
+      nameInput = e.target.closest('.group .name');
+      // 長押し中だけ編集・文字選択を止める。短押しはpointerupで手動focus。
+      nameInput.setAttribute('readonly','');
+      nameInput.style.userSelect = 'none';
+      nameInput.style.webkitUserSelect = 'none';
+      e.preventDefault();
       clearSelection();
+    }
+
+    timer = setTimeout(()=>{
+      if (!active || moved) return;
+      timer = null;
+      longFired = true;
+      clearSelection();
+      if (nameInput) nameInput.blur();
+      suppressNextClick = true;
+      if (suppressClearTimer) clearTimeout(suppressClearTimer);
+      suppressClearTimer = setTimeout(()=>{ suppressNextClick=false; suppressClearTimer=null; }, 1000);
       askRemoveItem(id);
     }, HOLD_MS);
   }, {capture:true, passive:false});
+
   el.addEventListener('pointermove', e=>{
-    if(!active || e.pointerId!==pid) return;
-    if(Math.hypot(e.clientX-sx,e.clientY-sy)>MOVE_PX){ moved=true; if(timer!==null){ clearTimeout(timer); timer=null; } }
+    if (!active || e.pointerId !== pid) return;
+    if (Math.hypot(e.clientX-sx, e.clientY-sy) > MOVE_PX){
+      moved = true;
+      if (timer !== null){ clearTimeout(timer); timer = null; }
+    }
   }, {capture:true, passive:true});
+
   el.addEventListener('pointerup', e=>{
-    if(!active || e.pointerId!==pid) return;
-    const wasLong=longFired, wasMoved=moved;
-    if(timer!==null){ clearTimeout(timer); timer=null; }
-    try{ el.releasePointerCapture(e.pointerId); }catch(err){}
-    e.preventDefault();
-    e.stopPropagation();
-    if(!wasLong && !wasMoved && typeof onTap==='function') onTap(e);
+    if (!active || e.pointerId !== pid) return;
+    const wasLong = longFired, wasMoved = moved, input = nameInput;
+    if (timer !== null){ clearTimeout(timer); timer = null; }
+
+    if (wasLong){
+      // 長押し後のclickはdocument側で1回だけ抑止する。
+      e.preventDefault();
+      e.stopPropagation();
+    } else if (!wasMoved && input){
+      // アカウント名の短押しだけ編集を開始。
+      e.preventDefault();
+      e.stopPropagation();
+      input.removeAttribute('readonly');
+      input.style.userSelect = 'text';
+      input.style.webkitUserSelect = 'text';
+      input.focus();
+      try{ input.setSelectionRange(input.value.length, input.value.length); }catch(err){}
+    }
     cleanup();
   }, {capture:true, passive:false});
-  el.addEventListener('pointercancel', e=>{ if(active && e.pointerId===pid){ e.preventDefault(); e.stopPropagation(); cleanup(); } }, {capture:true, passive:false});
-  el.addEventListener('contextmenu', e=>{ e.preventDefault(); e.stopPropagation(); clearSelection(); });
-  el.addEventListener('selectstart', e=>{ e.preventDefault(); e.stopPropagation(); clearSelection(); });
-  el.addEventListener('dragstart', e=>{ e.preventDefault(); e.stopPropagation(); });
+
+  el.addEventListener('pointercancel', e=>{
+    if (!active || e.pointerId !== pid) return;
+    cleanup();
+  }, {capture:true, passive:true});
+
+  // Androidのテキスト選択/コンテキストメニューを長押し操作として奪われないようにする。
+  el.addEventListener('contextmenu', e=>{
+    if (e.target.closest && e.target.closest('.group .name')){
+      e.preventDefault(); e.stopPropagation(); clearSelection();
+    }
+  });
 }
 let toastTapDownHandler = null;
 function askRemoveItem(id){
