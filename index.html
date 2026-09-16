@@ -26,7 +26,10 @@
     padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     user-select:none; overscroll-behavior:none;
   }
-  input{ caret-color:transparent; }\n  /* アカウント名入力のフォーカス枠を出さない（長押し削除の赤破線とは別）。 */\n  .group .name:focus{ outline:none !important; box-shadow:none !important; }\n  .group .name{ -webkit-tap-highlight-color:transparent; }
+  input{ caret-color:transparent; }
+  /* アカウント名入力のフォーカス枠を出さない（長押し削除の赤破線とは別）。 */
+  .group .name:focus{ outline:none !important; box-shadow:none !important; }
+  .group .name{ -webkit-tap-highlight-color:transparent; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; touch-action:manipulation; }
   header{
     display:flex; align-items:center; gap:8px; padding:10px 12px 6px;
     position:sticky; top:0; background:var(--bg); z-index:5;
@@ -78,7 +81,7 @@
     -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
   }
   /* アカウント枠：通常カード2枚分の横幅 */
-  .card.group{grid-column:span 2; padding:4px; border:1px solid #f2f2f2;}
+  .card.group{grid-column:span 2; padding:4px; border:1px solid #555b68; box-shadow:none;}
   .card.group.single{grid-column:span 1;}
   .group-namerow{margin-bottom:3px; gap:3px; padding:0 1px;}
   .group-namerow .name{font-size:12px; padding:1px 0; font-weight:700; color:var(--accent); flex:0 1 65%; max-width:65%;}
@@ -433,35 +436,47 @@ function bindLongPressOnNameInput(inputEl, id){
   let timer = null;
   let longFired = false;
   let moved = false;
+  let active = false;
   let sx = 0, sy = 0;
 
   const clear = ()=>{
     if (timer){ clearTimeout(timer); timer = null; }
   };
+  const reset = ()=>{
+    clear();
+    active = false;
+    moved = false;
+    longFired = false;
+    inputEl.removeAttribute('readonly');
+  };
 
+  // Androidのテキスト選択・コピーUIを出さず、アカウント名の長押しを
+  // アプリ側の削除メニューに一本化する。
   inputEl.addEventListener('pointerdown', (e)=>{
     if (e.isPrimary === false) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
-
-    clear();
+    active = true;
     longFired = false;
     moved = false;
     sx = e.clientX; sy = e.clientY;
-
-    // ブラウザの標準focusを止める。これで長押し中にキーボードが出ない。
-    inputEl.setAttribute('readonly', '');
+    clear();
+    inputEl.setAttribute('readonly','');
+    try { window.getSelection()?.removeAllRanges(); } catch(err){}
     e.preventDefault();
-
+    e.stopPropagation();
     timer = setTimeout(()=>{
+      if (!active || moved) return;
       timer = null;
       longFired = true;
       pending40Id = null;
       inputEl.blur();
+      try { window.getSelection()?.removeAllRanges(); } catch(err){}
       askRemoveItem(id);
     }, 520);
-  }, {passive:false});
+  }, {passive:false, capture:true});
 
   inputEl.addEventListener('pointermove', (e)=>{
+    if (!active) return;
     if (Math.hypot(e.clientX-sx, e.clientY-sy) > 10){
       moved = true;
       clear();
@@ -470,30 +485,41 @@ function bindLongPressOnNameInput(inputEl, id){
   }, {passive:true});
 
   inputEl.addEventListener('pointerup', (e)=>{
+    if (!active) return;
+    const wasLong = longFired;
     clear();
-    if (!longFired && !moved){
-      // 短いタップだけ編集開始。長押しではここに来ない。
+    active = false;
+    if (wasLong){
+      e.preventDefault();
+      e.stopPropagation();
+      inputEl.blur();
+      inputEl.setAttribute('readonly','');
+      try { window.getSelection()?.removeAllRanges(); } catch(err){}
+    } else if (!moved){
+      e.preventDefault();
+      e.stopPropagation();
       inputEl.removeAttribute('readonly');
       inputEl.focus({preventScroll:true});
-      try{ inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length); }catch(err){}
-    } else if (longFired){
-      // 長押し確定後の元入力へのclick/focusを完全に抑える。
-      e.preventDefault();
-      inputEl.blur();
-      inputEl.setAttribute('readonly', '');
+      try { inputEl.setSelectionRange(inputEl.value.length,inputEl.value.length); } catch(err){}
+    } else {
+      inputEl.removeAttribute('readonly');
     }
     longFired = false;
-  }, {passive:false});
+    moved = false;
+  }, {passive:false, capture:true});
 
   inputEl.addEventListener('pointercancel', ()=>{
-    clear();
-    if (!longFired) inputEl.removeAttribute('readonly');
-    longFired = false;
-  });
+    reset();
+  }, {passive:true, capture:true});
 
-  inputEl.addEventListener('pointerleave', ()=>{
-    clear();
-  });
+  inputEl.addEventListener('selectstart', (e)=>{
+    e.preventDefault();
+    e.stopPropagation();
+  }, {passive:false});
+  inputEl.addEventListener('contextmenu', (e)=>{
+    e.preventDefault();
+    e.stopPropagation();
+  }, {passive:false});
 }
 
 let toastTapDownHandler = null;
@@ -786,6 +812,7 @@ function cancelClaim(it){
 // 動作しないことがあるため使わない。
 
 document.addEventListener('pointerdown', (e) => {
+  try { if (document.activeElement !== e.target && window.getSelection) window.getSelection().removeAllRanges(); } catch(err){}
   for (const it of state.items){
     const list = it.type === 'group' ? it.children : [it];
     for (const t of list){
