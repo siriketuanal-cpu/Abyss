@@ -61,7 +61,7 @@
     border-top-color:var(--danger) !important;
   }
 
-  .card.claim{border-width:2px; border-color:var(--ok);}
+  .card.claim{border-style:dashed; border-color:var(--ok);}
   .card.full{border-color:var(--orange);}
   .row{display:flex; align-items:center; gap:3px; min-width:0;}
   .row + .row{margin-top:3px;}
@@ -299,6 +299,14 @@ function forceCursorToEnd(input){
   const place = () => { try{ input.setSelectionRange(input.value.length, input.value.length); }catch(e){} };
   input.addEventListener('focus', () => { place(); setTimeout(place, 0); });
   input.addEventListener('pointerdown', place);
+}
+// アカウント枠の名前欄専用：長押し判定(bindLongPressDelete)が同じ入力欄の
+// pointerdown で readonly の付け外しを行っているため、forceCursorToEnd の
+// pointerdown リスナーまで重ねると早押し時にフォーカスの取り合いになり、
+// キーボードが開いてすぐ閉じる現象が起きていた。focus起点の処理だけに絞る。
+function placeCursorOnFocus(input){
+  const place = () => { try{ input.setSelectionRange(input.value.length, input.value.length); }catch(e){} };
+  input.addEventListener('focus', () => { place(); setTimeout(place, 0); });
 }
 // スタミナ現在値/上限値はフォーカス時に空にして、そのまま打ち直せるようにする。
 function clearOnFocus(input){
@@ -738,7 +746,7 @@ function buildGroupCard(it){
   `;
   const nameEl = wrap.querySelector('.name');
   nameEl.addEventListener('blur', ()=>{ it.name = nameEl.value; save(); });
-  forceCursorToEnd(nameEl);
+  placeCursorOnFocus(nameEl);
   const nameRowEl = wrap.querySelector('.group-namerow');
   refs[it.id] = { el: wrap, nameEl,
     bodyEl: wrap.querySelector('[data-role="body"]'),
