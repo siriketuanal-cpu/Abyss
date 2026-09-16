@@ -1,5 +1,5 @@
 // キャッシュ名固定。中身の差し替えは update.html（SW解除＋Cache削除＋no-store取得）で行う。
-const CACHE_NAME = 'freetimer-cache-v7';
+const CACHE_NAME = 'freetimer-cache-v8';
 const ASSETS = [
   './',
   './index.html',

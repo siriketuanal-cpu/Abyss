@@ -66,7 +66,11 @@
   .row{display:flex; align-items:center; gap:3px; min-width:0;}
   .row + .row{margin-top:3px;}
   .namerow{margin-bottom:4px;}
-  .card.abyss{padding-top:18px;}
+  .card.abyss{padding-top:6px;}
+  /* Abyssはカード全体を1つのタップ領域にする。入力欄以外はどこを押しても40使い切り。 */
+  .card.abyss .clockstack, .card.abyss .stammax, .card.abyss .slash{pointer-events:none;}
+  .card.abyss .abyss-head{justify-content:flex-end; min-height:18px; margin-bottom:2px;}
+  .card.abyss .rank{position:static; width:4.5em; max-width:none; text-align:right; padding:1px 2px; z-index:auto;}
   .card.stam, .card.idle{
     padding-top:18px; display:flex; flex-direction:column; justify-content:flex-end;
   }
@@ -647,11 +651,13 @@ function buildAbyssCard(it){
   const wrap = document.createElement('div');
   wrap.className = 'card abyss';
   wrap.innerHTML = `
-    <input class="rank" data-role="rankInput" inputmode="numeric" pattern="[0-9]*" title="ランク">
+    <div class="row abyss-head">
+      <input class="rank" data-role="rankInput" inputmode="numeric" pattern="[0-9]*" title="ランク">
+    </div>
     <div class="row valrow-stam">
       <input type="text" inputmode="numeric" pattern="[0-9]*" class="stamval" data-role="curInput">
       <span class="slash">/</span>
-      <span class="stammax" data-role="maxLabel" title="タップで40使い切り"></span>
+      <span class="stammax" data-role="maxLabel"></span>
       <div class="clockstack" data-role="clock"></div>
     </div>
   `;
@@ -732,12 +738,15 @@ function buildAbyssCard(it){
   rankInput.value = 'Lv.' + (it.rank || 1);
   refs[it.id] = { el: wrap, rankInput, curInput, maxLabel, clockEl };
   bindLongPressDelete(wrap, it.id, (e)=>{
-    const target=e.target;
-    if (target===maxLabel || target===clockEl || target.closest('.clockstack')) onForty(e);
-    else if (target===rankInput || target===curInput || target.closest('input')) {
-      const input=target.closest('input');
-      if(input){ input.focus(); try{ input.setSelectionRange(input.value.length,input.value.length); }catch(err){} }
+    const input = e.target && e.target.closest ? e.target.closest('input') : null;
+    if (input === rankInput || input === curInput){
+      input.focus();
+      try{ input.setSelectionRange(input.value.length,input.value.length); }catch(err){}
+      return;
     }
+    // 入力欄以外はカード全体が同じ40使い切り操作。
+    // max/時刻/余白/枠の間でタップ判定が分かれないようにする。
+    onForty(e);
   });
   return wrap;
 }
