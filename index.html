@@ -43,6 +43,8 @@
     font:inherit; font-variant-numeric:tabular-nums; text-align:center;
     padding:0; margin:0; border-radius:0; appearance:none; -webkit-appearance:none;
     -webkit-user-select:text; user-select:text; overflow:visible;
+    /* curWrap の広い疑似ヒット領域より必ず手前に出し、編集時のフォーカスを守る。 */
+    z-index:3;
   }
   /* アカウント名：編集対象が分かるよう、通常のフォーカス枠を復活。 */
   .group .name:focus{ outline:1px solid #d8d8d8 !important; outline-offset:1px; box-shadow:none !important; }
@@ -132,7 +134,15 @@
   .inline-number{width:28px; min-width:28px; max-width:28px; overflow:hidden;}
   .inline-number-text{width:100%; min-width:0; text-align:center; overflow:hidden;}
   .inline-edit-input{width:28px; min-width:28px; max-width:28px;}
-  .slash{display:block; width:6px; color:var(--text); font-size:13px; font-weight:800; line-height:22px; height:22px; text-align:center; transform:none; overflow:visible;}
+  /* 「/」は数字の幅計算に参加させず、2つの数字の中央へ固定。
+     フォントのベースライン差で下へ落ちて見えるのを避ける。 */
+  .slash{
+    position:absolute; left:50%; top:0; z-index:1;
+    width:6px; height:22px; color:#777d8a;
+    font-size:13px; font-weight:600; line-height:18px;
+    text-align:center; transform:translateX(-50%);
+    overflow:visible; pointer-events:none;
+  }
   .clockstack{
     margin-left:0; margin-right:auto; display:flex; flex-direction:row; align-items:center; justify-content:flex-start;
     gap:0; font-size:9.5px; font-weight:700; line-height:18px; color:var(--accent);
@@ -167,7 +177,10 @@
      原因になっていた。） */
   [data-role="curWrap"]{ position:relative; }
   [data-role="curWrap"]::before{
-    content:''; position:absolute; top:-6px; bottom:-6px; left:-18px; right:-3px; z-index:2;
+    content:''; position:absolute; top:-6px; bottom:-6px; left:-18px; right:-3px;
+    /* 編集欄より下に置く。通常時は従来どおり広いタップ範囲を維持し、
+       編集中は実際のinputがタップを受け取れるようにする。 */
+    z-index:1;
   }
   .divider{
     grid-column:1 / -1; display:flex; align-items:center; gap:6px;
