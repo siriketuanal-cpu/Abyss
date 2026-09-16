@@ -27,15 +27,16 @@
   /* アプリ内の編集キャレットは一括で非表示。編集自体はそのまま可能。 */
   input{ caret-color:transparent; }
   /* 数字のインライン編集は表示幅を変えず、編集欄を数字の真上に重ねる。 */
-  .inline-number{ position:relative; display:inline-block; height:22px; line-height:22px; min-width:0; }
+  .inline-number{ position:relative; display:inline-block; height:22px; line-height:22px; min-width:0; overflow:visible; }
   .inline-number-text{ display:inline-block; height:22px; line-height:22px; font-variant-numeric:tabular-nums; }
   .inline-number.editing .inline-number-text{visibility:hidden;}
   .inline-edit-input{
-    position:absolute; inset:0; width:100%; height:100%; box-sizing:border-box;
+    position:absolute; top:0; left:50%; width:3ch; max-width:none; height:100%; box-sizing:border-box;
+    transform:translateX(-50%);
     border:0; outline:0; background:transparent; color:inherit;
     font:inherit; font-variant-numeric:tabular-nums; text-align:center;
     padding:0; margin:0; border-radius:0; appearance:none; -webkit-appearance:none;
-    -webkit-user-select:text; user-select:text;
+    -webkit-user-select:text; user-select:text; overflow:visible;
   }
   /* アカウント名：編集対象が分かるよう、通常のフォーカス枠を復活。 */
   .group .name:focus{ outline:1px solid #d8d8d8 !important; outline-offset:1px; box-shadow:none !important; }
@@ -139,7 +140,6 @@
     margin:0; flex-direction:row; align-items:center; justify-content:flex-start;
     gap:0; font-size:9.5px; line-height:18px; letter-spacing:.01em; transform:translateY(-2px);
   }
-  .card.abyss .abyss-clock span + span::before{content:':'; margin:0 .05em;}
   .card.abyss .valrow-stam{bottom:5px;}
   /* 放置タイマー本体も下段中央。予定時刻だけ左上へ配置。 */
   .valrow-idle{
@@ -379,6 +379,7 @@ function createInlineNumber(initialValue, onCommit){
     editor.autocapitalize = 'off';
     editor.autocorrect = 'off';
     editor.spellcheck = false;
+    editor.maxLength = 3;
     const originalValue = text.textContent;
     editor.value = '';
     wrap.classList.add('editing');
@@ -394,7 +395,7 @@ function createInlineNumber(initialValue, onCommit){
       onCommit(value);
     };
     editor.addEventListener('input', () => {
-      const v = editor.value.replace(/\D/g, '');
+      const v = editor.value.replace(/\D/g, '').slice(0,3);
       if (editor.value !== v) editor.value = v;
     });
     editor.addEventListener('blur', finish, {once:true});
@@ -736,6 +737,7 @@ function buildAbyssCard(it){
       <div class="clockstack abyss-clock" data-role="clock"></div>
       <input class="rank" data-role="rankInput" inputmode="numeric" pattern="[0-9]*" title="ランク">
     </div>
+    <div class="abyss-cur-hit" data-role="curHit"></div>
     <div class="row valrow-stam">
       <span class="stamval" data-role="curWrap"></span>
       <span class="slash">/</span>
@@ -744,6 +746,7 @@ function buildAbyssCard(it){
   `;
   const rankInput = wrap.querySelector('[data-role="rankInput"]');
   const curWrap = wrap.querySelector('[data-role="curWrap"]');
+  const curHit = wrap.querySelector('[data-role="curHit"]');
   const maxLabel = wrap.querySelector('[data-role="maxLabel"]');
   const curEditor = createInlineNumber(stamInfo(it, Date.now()).cur, value => {
     const now = Date.now();
@@ -815,7 +818,7 @@ function buildAbyssCard(it){
   curEditor.setText(info0.cur);
   maxLabel.textContent = String(it.max);
   rankInput.value = 'Lv.' + (it.rank || 1);
-  refs[it.id] = { el: wrap, rankInput, curEl: curEditor, maxLabel, clockEl };
+  refs[it.id] = { el: wrap, rankInput, curEl: curEditor, maxLabel, clockEl, curHit };
   bindLongPressDelete(wrap, it.id, (e)=>{
     const input = e.target && e.target.closest ? e.target.closest('input') : null;
     if (input === rankInput){
@@ -823,7 +826,7 @@ function buildAbyssCard(it){
       try{ input.setSelectionRange(input.value.length,input.value.length); }catch(err){}
       return;
     }
-    if (e.target.closest && e.target.closest('[data-role="curWrap"]')){
+    if (e.target.closest && (e.target.closest('[data-role="curWrap"]') || e.target.closest('[data-role="curHit"]'))){
       curEditor.open();
       return;
     }
@@ -1021,10 +1024,7 @@ function renderClock(el, remainMs, isFull, now, fullAt){
   if (el.dataset.clk === key) return;
   el.dataset.clk = key;
   if (isFull) el.innerHTML = `<span class="full-at">${fmtHM(fullAt || now)}</span>`;
-  else {
-    const c = fmtClockAt(remainMs, now);
-    el.innerHTML = `<span>${c.h}</span><span>${c.m}</span>`;
-  }
+  else el.textContent = fmtHM((now || Date.now()) + Math.max(0, remainMs));
 }
 
 
