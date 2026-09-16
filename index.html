@@ -84,9 +84,9 @@
   .card.abyss{padding:6px 6px;}
   /* Abyssはカード全体を1つのタップ領域にする。入力欄以外はどこを押しても40使い切り。 */
   .card.abyss .clockstack, .card.abyss .stammax, .card.abyss .slash{pointer-events:none;}
-  .card.abyss .abyss-head{justify-content:space-between; min-height:18px; height:18px; margin-bottom:2px;}
+  .card.abyss .abyss-head{justify-content:space-between; min-height:18px; height:18px; margin-bottom:2px; position:static;}
   .card.abyss .abyss-clock{margin-left:0; margin-right:auto; min-width:0; font-size:9.5px; line-height:18px; transform:translateY(-2px);}
-  .card.abyss .rank{position:static; flex:0 0 4.5em; width:4.5em; max-width:none; text-align:right; padding:0 2px; z-index:auto; height:18px; line-height:18px; transform:translateY(-2px);}
+  .card.abyss .rank{position:absolute; top:0; right:6px; flex:0 0 4.5em; width:4.5em; max-width:none; text-align:right; padding:0 2px; z-index:2; height:18px; line-height:18px; transform:none;}
   .card.stam, .card.idle{
     padding:6px; display:flex; flex-direction:column; justify-content:center;
   }
@@ -117,12 +117,15 @@
   /* Abyss「40使い切り」プレビュー中：押した所が分かるよう点線で囲む */
   .clockstack{ justify-content:center; }
   .main{font-size:16px; line-height:1.1; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:.01em;}
-  .valrow-stam{ margin-top:0 !important; align-items:center; min-height:22px; height:22px; justify-content:center; position:absolute; left:6px; right:6px; bottom:5px; }
+  .valrow-stam{ margin-top:0 !important; align-items:center; min-height:22px; height:22px; position:absolute; left:6px; right:6px; bottom:5px; display:grid; grid-template-columns:3.4em 1em 3.4em; justify-content:center; gap:0; }
   .stamval{
     color:var(--text); font-size:15px; font-weight:700; text-align:center;
-    font-variant-numeric:tabular-nums;
+    font-variant-numeric:tabular-nums; width:3.4em; min-width:3.4em; max-width:3.4em; overflow:hidden;
   }
-  .slash{flex:0 0 auto; color:var(--sub); font-size:14px; line-height:22px; height:22px; transform:none;}
+  .inline-number{width:3.4em; min-width:3.4em; max-width:3.4em; overflow:hidden;}
+  .inline-number-text{width:100%; min-width:0; text-align:center; overflow:hidden;}
+  .inline-edit-input{width:100%; min-width:0; max-width:100%;}
+  .slash{display:block; width:1em; color:var(--sub); font-size:14px; line-height:22px; height:22px; text-align:center; transform:none;}
   .clockstack{
     margin-left:0; margin-right:auto; display:flex; flex-direction:row; align-items:center; justify-content:flex-start;
     gap:0; font-size:9.5px; font-weight:700; line-height:18px; color:var(--accent);
@@ -133,12 +136,13 @@
   /* 予定時刻は全タイマーカードで左上に統一。Abyssと同じ基準位置に揃える。 */
   .card.stam > .stam-clock,
   .card.idle > .idle-clock{
-    position:absolute; left:6px; top:3px; margin:0; transform:translateY(-1px);
+    position:absolute; left:6px; top:0; margin:0; transform:none; height:18px; line-height:18px;
   }
   /* Abyssも左上。ランクは右上、数値は下段中央。 */
   .card.abyss .abyss-clock{
     margin:0; flex-direction:row; align-items:center; justify-content:flex-start;
-    gap:0; font-size:9.5px; line-height:18px; letter-spacing:.01em; transform:translateY(-2px);
+    gap:0; font-size:9.5px; line-height:18px; letter-spacing:.01em; transform:none;
+    position:absolute; left:6px; top:0; height:18px;
   }
   .card.abyss .valrow-stam{bottom:5px;}
   /* 放置タイマー本体も下段中央。予定時刻だけ左上へ配置。 */
@@ -149,6 +153,8 @@
   .valrow-idle .main{min-width:2.6em; text-align:center; padding-left:0;}
   .valrow-idle .clockstack{margin:0; position:absolute; left:0; top:auto;}
   .card.idle .valrow-idle .clockstack{position:absolute; left:0; bottom:22px; top:auto;}
+  /* Abyss現在値の編集ヒット領域：下段左側を広く確保し、/ と最大値の位置は固定。 */
+  .abyss-cur-hit{position:absolute; left:6px; bottom:5px; width:calc(50% - 6px); height:22px; z-index:3; touch-action:manipulation;}
   .divider{
     grid-column:1 / -1; display:flex; align-items:center; gap:6px;
     padding:3px 2px; border-bottom:1px solid var(--line); position:relative;
