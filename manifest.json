@@ -1,8 +1,11 @@
 {
   "name": "タイマー",
   "short_name": "タイマー",
+  "id": "./index.html",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
+  "lang": "ja",
   "background_color": "#0b0b14",
   "theme_color": "#0b0b14",
   "orientation": "portrait",

@@ -61,7 +61,7 @@
     border-top-color:var(--danger) !important;
   }
 
-  .card.claim{border-color:var(--ok);}
+  .card.claim{border-width:2px; border-color:var(--ok);}
   .card.full{border-color:var(--orange);}
   .row{display:flex; align-items:center; gap:3px; min-width:0;}
   .row + .row{margin-top:3px;}
@@ -420,7 +420,7 @@ let suppressNextClick = false;
 let suppressClearTimer = null;
 
 function bindLongPressDelete(el, id, shortAction){
-  const HOLD_MS = 520, MOVE_PX = 12;
+  const HOLD_MS = 520, MOVE_PX = 24; // 指の震え等で長押しが途中キャンセルされにくいよう少し広めに
   let timer = null, active = false, moved = false, longFired = false;
   let sx = 0, sy = 0, pid = null, nameInput = null;
 
