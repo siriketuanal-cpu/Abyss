@@ -28,12 +28,12 @@
     margin:0; background:var(--bg); color:var(--text);
     font-family:Roboto,"Noto Sans JP",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
     padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-    user-select:none; overscroll-behavior:none;
+    user-select:none;
   }
   /* アプリ内の編集キャレットは一括で非表示。編集自体はそのまま可能。 */
   input{ caret-color:transparent; }
   /* 数字のインライン編集は表示幅を変えず、編集欄を数字の真上に重ねる。 */
-  .inline-number{ position:relative; display:inline-block; height:22px; line-height:22px; min-width:0; overflow:visible; }
+  .inline-number{position:relative;display:inline-block;min-width:0;height:22px;line-height:22px;overflow:visible;}
   .inline-number-text{ display:inline-block; width:auto; min-width:0; max-width:none; height:22px; line-height:22px; text-align:right; overflow:visible; font-variant-numeric:tabular-nums; }
   .inline-number.editing .inline-number-text{visibility:hidden;}
   .inline-edit-input{
@@ -92,7 +92,6 @@
   /* Abyssはカード全体を1つのタップ領域にする。入力欄以外はどこを押しても40使い切り。 */
   .card.abyss .clockstack, .card.abyss .stammax, .card.abyss .slash{pointer-events:none;}
   .card.abyss .abyss-head{justify-content:space-between; min-height:18px; height:18px; margin-bottom:2px; position:static;}
-  .card.abyss .abyss-clock{margin-left:0; margin-right:auto; min-width:0; font-size:9.5px; line-height:18px; transform:translateY(-2px);}
   .card.abyss .rank{position:absolute; top:0; left:6px; right:auto; flex:0 0 4.5em; width:4.5em; max-width:none; text-align:left; padding:0 2px; z-index:2; height:18px; line-height:18px; transform:none;}
   .card.stam, .card.idle{
     padding:6px; display:flex; flex-direction:column; justify-content:center;
@@ -122,7 +121,6 @@
     font-variant-numeric:tabular-nums; height:22px; line-height:22px;
   }
   /* Abyss「40使い切り」プレビュー中：押した所が分かるよう点線で囲む */
-  .clockstack{ justify-content:center; }
   .main{font-size:16px; line-height:1.1; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:.01em;}
   /* 数字列は固定幅にせず、現在値を「/」の直前へ自然に右寄せ。
      22/100 のような2桁でも余白が残らず、100/100 でも同じ基準で揃う。 */
@@ -133,13 +131,9 @@
   }
   .stamval{
     color:var(--text); font-size:18px; font-weight:700; text-align:right;
-    font-variant-numeric:tabular-nums; width:auto; min-width:0; max-width:none;
+    font-variant-numeric:tabular-nums; width:auto; min-width:0;
     overflow:visible; height:22px; line-height:22px; display:inline-block;
     flex:0 0 auto;
-  }
-  .inline-number{
-    position:relative; display:inline-block; width:auto; min-width:0; max-width:none;
-    height:22px; line-height:22px; overflow:visible;
   }
   /* / は通常のレイアウトに戻し、左右の数字の間に自然に配置。
      絶対配置を使わないので、桁数が変わっても重ならない。 */
@@ -164,7 +158,7 @@
   }
   /* Abyssも右上。ランクは左上、数値は下段中央。 */
   .card.abyss .abyss-clock{
-    margin:0; flex-direction:row; align-items:center; justify-content:flex-start;
+    margin:0; min-width:0; flex-direction:row; align-items:center; justify-content:flex-start;
     gap:0; font-size:9.5px; line-height:18px; letter-spacing:.01em; transform:none;
     position:absolute; right:6px; left:auto; top:0; height:18px;
   }
@@ -1191,8 +1185,6 @@ function updateTimerCard(it, r, now){
     if (r.curEl && !r.curEl.isEditing()) r.curEl.setText(info.cur);
     if (r.maxEl && !r.maxEl.isEditing()) r.maxEl.setText(it.max);
   } else if (it.type==='abyss'){
-    // maxはランク変更時だけ変わる。毎分のsyncは不要だが安価なので維持
-    if (it.max !== abyssMaxFor(it.rank||1)) syncAbyssMax(it);
     const info = stamInfo(it, now);
     const wait40 = pending40Id === it.id;
     r.el.classList.toggle('full', info.isFull);
