@@ -32,7 +32,9 @@
   }
   /* アプリ内の編集キャレットは一括で非表示。編集自体はそのまま可能。 */
   input{ caret-color:transparent; }
-  /* 数字のインライン編集は表示幅を変えず、編集欄を数字の真上に重ねる。 */
+  /* 数字のインライン編集は表示幅を変えず、編集欄を数字の真上に重ねる。
+     通常時は固定幅を持たせず「/」直前に自然に右寄せ（余白を作らない）。
+     編集開始時だけ JS で現在幅をロックして、最大値側がガクッと動くのを防ぐ。 */
   .inline-number{position:relative;display:inline-block;min-width:0;height:22px;line-height:22px;overflow:visible;}
   .inline-number-text{ display:inline-block; width:auto; min-width:0; max-width:none; height:22px; line-height:22px; text-align:right; overflow:visible; font-variant-numeric:tabular-nums; }
   .inline-number.editing .inline-number-text{visibility:hidden;}
@@ -81,14 +83,27 @@
     border-top-color:var(--danger) !important;
   }
 
-  .card.claim{border-style:dashed; border-color:var(--ok);}
-  .card.full{border-color:var(--orange);}
   .row{display:flex; align-items:center; gap:3px; min-width:0;}
   .row + .row{margin-top:3px;}
   .namerow{margin-bottom:4px;}
   /* タイマーカードは種類に関係なく同じ外寸に揃える。中身だけ配置を変える。 */
   .card.stam, .card.abyss, .card.idle{height:56px; min-height:56px;} 
   .card.abyss{border:1px solid #b48cff; padding:6px 6px;}
+  /* claim / full は種類別 border より後に書き、特異性を上げて破線・色が消えないようにする。
+     （.card.abyss の border 短縮記法が後勝ちで破線を潰していた） */
+  .card.claim,
+  .card.stam.claim,
+  .card.abyss.claim,
+  .card.idle.claim{
+    border-style:dashed !important;
+    border-color:var(--ok) !important;
+  }
+  .card.full,
+  .card.stam.full,
+  .card.abyss.full,
+  .card.idle.full{
+    border-color:var(--orange) !important;
+  }
   /* Abyssはカード全体を1つのタップ領域にする。入力欄以外はどこを押しても40使い切り。 */
   .card.abyss .clockstack, .card.abyss .stammax, .card.abyss .slash{pointer-events:none;}
   .card.abyss .abyss-head{justify-content:space-between; min-height:18px; height:18px; margin-bottom:2px; position:static;}
@@ -151,6 +166,9 @@
   }
   .clockstack .ok{color:var(--ok); font-size:14px; line-height:18px;}
   .clockstack .full-at{color:var(--danger); font-size:9.5px; font-weight:800; line-height:18px;}
+  /* 満タンまで2時間未満で予定時刻・カウントダウンを赤くする */
+  .clockstack.near{color:var(--danger);}
+  .main.near{color:var(--danger);}
   /* 予定時刻は全タイマーカードで右上に統一。Abyssと同じ基準位置に揃える。 */
   .card.stam > .stam-clock,
   .card.idle > .idle-clock{
@@ -417,6 +435,10 @@ function createInlineNumber(initialValue, onCommit){
   const isEditing = () => editor !== null;
   const open = () => {
     if (editor) return;
+    // 編集開始直前の実幅をロック。通常表示は固定幅なしで「/」に自然に右寄せしつつ、
+    // 編集中だけ最大値側が動かないようにする。
+    const lockW = wrap.offsetWidth || text.offsetWidth;
+    if (lockW > 0) wrap.style.minWidth = lockW + 'px';
     const input = document.createElement('input');
     input.type = 'text';
     input.inputMode = 'numeric';
@@ -438,6 +460,7 @@ function createInlineNumber(initialValue, onCommit){
       editor = null;
       input.remove();
       wrap.classList.remove('editing');
+      wrap.style.minWidth = '';
       onCommit(value);
     };
     input.addEventListener('input', () => {
@@ -448,6 +471,11 @@ function createInlineNumber(initialValue, onCommit){
     input.addEventListener('keydown', e => {
       if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
       else if (e.key === 'Escape') { e.preventDefault(); input.value = originalValue; input.blur(); }
+    });
+    // 編集中の pointer イベントを親カードの長押し判定へ漏らさない。
+    // 境界タップでフォーカスが外れてキーボードが即閉じる競合をさらに抑える。
+    ['pointerdown','pointerup','click'].forEach(ev => {
+      input.addEventListener(ev, e => { e.stopPropagation(); }, {capture:true});
     });
     // inputは生成直後から空欄。focus時に空欄へ戻すリスナーは不要で、
     // キーボード表示時のイベント競合も避けられる。
@@ -605,7 +633,10 @@ function bindLongPressDelete(el, id, shortAction){
   };
 
   el.addEventListener('pointerdown', e=>{
+    // インライン数字編集中はカード側の長押し/短押しを一切動かさない。
+    // 境界付近や ::before ヒット領域を触ってもフォーカスが外れてキーボードが即閉じるのを防ぐ。
     if (e.target && e.target.closest && e.target.closest('.inline-edit-input')) return;
+    if (el.querySelector && el.querySelector('.inline-edit-input')) return;
     if (!isPrimary(e) || active) return;
     active = true; moved = false; longFired = false;
     sx = e.clientX; sy = e.clientY; pid = e.pointerId;
@@ -984,7 +1015,8 @@ function buildHeaderCard(it){
   const nameEl = wrap.querySelector('.name');
   nameEl.style.color = it.color || 'var(--accent)';
   nameEl.addEventListener('blur', ()=>{ it.name = nameEl.value; save(); });
-  forceCursorToEnd(nameEl);
+  // 長押し削除と pointerdown が重なるため、focus起点だけにする（グループ名と同じ方針）
+  placeCursorOnFocus(nameEl);
   refs[it.id] = { el: wrap, nameEl };
   bindLongPressDelete(wrap, it.id);
   return wrap;
@@ -1098,11 +1130,14 @@ function removeItem(id){
 }
 
 // 04/20のようなデジタル時計表示を組み立てる共通処理(スタミナ・放置報酬で共用)。
+// 満タンまで2時間未満なら .near を付けて赤表示。
 function renderClock(el, remainMs, isFull, now, fullAt){
   if (!el) return;
-  const key = isFull ? 'full:' + fmtHM(fullAt || now) : (()=>{ const c = fmtClockAt(remainMs, now); return c.h+c.m; })();
+  const near = !isFull && remainMs > 0 && remainMs < 7200000; // 2h
+  const key = (isFull ? 'full:' + fmtHM(fullAt || now) : (()=>{ const c = fmtClockAt(remainMs, now); return c.h+c.m; })()) + (near ? ':n' : '');
   if (el.dataset.clk === key) return;
   el.dataset.clk = key;
+  el.classList.toggle('near', near);
   if (isFull) el.innerHTML = `<span class="full-at">${fmtHM(fullAt || now)}</span>`;
   else el.textContent = fmtHM((now || Date.now()) + Math.max(0, remainMs));
 }
@@ -1205,6 +1240,9 @@ function updateTimerCard(it, r, now){
     r.el.classList.toggle('full', info.isFull && it.state!=='claim');
     const label = it.state==='claim' ? '受取' : (info.isFull ? fmtHM(info.fullAt) : fmtCountdown(info.remainMs));
     if (r.curEl.textContent !== label) r.curEl.textContent = label;
+    // カウントダウン表示中かつ2時間未満なら赤
+    const near = it.state!=='claim' && !info.isFull && info.remainMs > 0 && info.remainMs < 7200000;
+    r.curEl.classList.toggle('near', near);
     renderClock(r.clockEl, info.remainMs, info.isFull, now, info.fullAt);
   }
 }
@@ -1247,11 +1285,13 @@ function openSetup(type){
     const colors = ['#9b8bff','#b48cff','#6fc7ff','#70d6b0','#ffd166','#ff9f68','#ff7b9c','#d7dbe7'];
     const current = '#9b8bff';
     setupFieldsEl.innerHTML = `<div class="header-palette">${colors.map(c=>`<button type="button" class="header-swatch${c===current?' selected':''}" data-color="${c}" style="background:${c}" aria-label="${c}"></button>`).join('')}</div>`;
-    setupFieldsEl.querySelectorAll('.header-swatch').forEach(btn=>btn.addEventListener('click', ()=>{
-      setupFieldsEl.querySelectorAll('.header-swatch').forEach(b=>b.classList.remove('selected'));
-      btn.classList.add('selected');
-      setupFieldsEl.dataset.color = btn.dataset.color;
-    }));
+    setupFieldsEl.querySelectorAll('.header-swatch').forEach(btn=>{
+      bindTapDown(btn, ()=>{
+        setupFieldsEl.querySelectorAll('.header-swatch').forEach(b=>b.classList.remove('selected'));
+        btn.classList.add('selected');
+        setupFieldsEl.dataset.color = btn.dataset.color;
+      });
+    });
     setupFieldsEl.dataset.color = current;
   } else if (type === 'stam' || type === 'abyss'){
     setupLabelEl.textContent = type === 'abyss' ? 'Abyssスタミナ回復間隔' : 'スタミナ回復間隔';
