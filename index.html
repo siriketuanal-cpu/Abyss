@@ -505,6 +505,13 @@ function bindLongPressDelete(el, id, shortAction){
   });
 }
 let toastTapDownHandler = null;
+let longPressTargetEl = null;
+function clearLongPressTarget(){
+  if (longPressTargetEl){
+    longPressTargetEl.classList.remove('longpress-target');
+    longPressTargetEl = null;
+  }
+}
 function askRemoveItem(id){
   clearLongPressTarget();
   const targetRef = refs[id];
