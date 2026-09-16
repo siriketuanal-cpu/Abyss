@@ -34,11 +34,11 @@
   input{ caret-color:transparent; }
   /* 数字のインライン編集は表示幅を変えず、編集欄を数字の真上に重ねる。 */
   .inline-number{ position:relative; display:inline-block; height:22px; line-height:22px; min-width:0; overflow:visible; }
-  .inline-number-text{ display:inline-block; height:22px; line-height:22px; font-variant-numeric:tabular-nums; }
+  .inline-number-text{ display:inline-block; width:auto; min-width:0; max-width:none; height:22px; line-height:22px; text-align:right; overflow:visible; font-variant-numeric:tabular-nums; }
   .inline-number.editing .inline-number-text{visibility:hidden;}
   .inline-edit-input{
-    position:absolute; top:0; left:50%; width:28px; max-width:none; height:100%; box-sizing:border-box;
-    transform:translateX(-50%);
+    position:absolute; top:0; left:0; width:100%; max-width:none; height:100%; box-sizing:border-box;
+    transform:none;
     border:0; outline:0; background:transparent; color:inherit;
     font:inherit; font-variant-numeric:tabular-nums; text-align:center;
     padding:0; margin:0; border-radius:0; appearance:none; -webkit-appearance:none;
@@ -70,7 +70,6 @@
   }
   /* タイマー枠：種類ごとに細線で色分け。放置の通常色は受取待機の緑と非重複。 */
   .card.stam{border:1px solid #5aa9ff;}
-  .card.abyss{border:1px solid #b48cff;}
   .card.idle{border:1px solid #f0a85a;}
   /* 長押しで削除確認中の対象を赤い破線で囲む。 */
   .longpress-target{
@@ -89,7 +88,7 @@
   .namerow{margin-bottom:4px;}
   /* タイマーカードは種類に関係なく同じ外寸に揃える。中身だけ配置を変える。 */
   .card.stam, .card.abyss, .card.idle{height:56px; min-height:56px;} 
-  .card.abyss{padding:6px 6px;}
+  .card.abyss{border:1px solid #b48cff; padding:6px 6px;}
   /* Abyssはカード全体を1つのタップ領域にする。入力欄以外はどこを押しても40使い切り。 */
   .card.abyss .clockstack, .card.abyss .stammax, .card.abyss .slash{pointer-events:none;}
   .card.abyss .abyss-head{justify-content:space-between; min-height:18px; height:18px; margin-bottom:2px; position:static;}
@@ -114,7 +113,7 @@
   .card.group{grid-column:span 2; padding:4px; border:1px solid #555b68; box-shadow:none; border-radius:8px;}
   .card.group.single{grid-column:span 1;}
   .group-namerow{margin-bottom:3px; gap:3px; padding:0 1px;}
-  .group-namerow .name{font-size:12px; padding:1px 0; font-weight:700; color:var(--accent); flex:0 0 5em; width:5em; max-width:5em; box-sizing:border-box;}
+  .group-namerow .name{font-size:12px; padding:1px 0; font-weight:700; color:var(--account); flex:0 0 5em; width:5em; max-width:5em; box-sizing:border-box;}
   .group-body{display:grid; grid-template-columns:repeat(2,1fr); gap:6px; min-height:1px; align-items:end;}
   .group-body.one{grid-template-columns:1fr;}
   .group-body:empty{display:none;}
@@ -141,14 +140,6 @@
   .inline-number{
     position:relative; display:inline-block; width:auto; min-width:0; max-width:none;
     height:22px; line-height:22px; overflow:visible;
-  }
-  .inline-number-text{
-    display:inline-block; width:auto; min-width:0; max-width:none;
-    height:22px; line-height:22px; text-align:right; overflow:visible;
-  }
-  .inline-edit-input{
-    left:0; width:100%; min-width:0; max-width:none;
-    transform:none;
   }
   /* / は通常のレイアウトに戻し、左右の数字の間に自然に配置。
      絶対配置を使わないので、桁数が変わっても重ならない。 */
@@ -207,7 +198,6 @@
     width:65%; max-width:260px; flex:0 1 auto; font-size:13px; font-weight:700; color:var(--accent); padding:0 0 2px;
   }
   .header-palette{display:flex; gap:5px; flex-wrap:wrap; justify-content:center; margin:4px 0 2px;}
-  .header-color{width:28px; height:22px; flex:0 0 28px; padding:1px; border:1px solid var(--line); border-radius:6px; background:transparent;}
   .header-swatch{width:26px; height:26px; padding:0; border-radius:50%; border:2px solid var(--line); box-shadow:none;}
   .header-swatch.selected{border-color:#fff; outline:1px solid var(--accent);}
 
@@ -237,6 +227,8 @@
   #toast button.ok{background:var(--danger); border-color:transparent; color:#fff;}
   /* 1回目タップで破線（確定待ち）。2回目で実行 */
   #toast button.armed{outline:2px dashed #fff; outline-offset:2px;}
+  #toast .toast-color{display:inline-flex;align-items:center;gap:5px;color:var(--text);font-size:12px;}
+  #toast .toast-color input{width:28px;height:24px;padding:1px;border:1px solid var(--line);border-radius:6px;background:transparent;}
   #empty{color:var(--sub); font-size:13px; text-align:center; padding:40px 0;}
   #addPanel{
     position:fixed; left:0; right:0; bottom:0; background:var(--card);
@@ -705,9 +697,20 @@ function askRemoveItem(id){
   if (!toast){ removeItem(id); return; }
   if (toastTapDownHandler){ toast.removeEventListener('pointerdown', toastTapDownHandler); toastTapDownHandler = null; }
   const canAdd = it && it.type === 'group' && it.children.length < 2;
-  toast.innerHTML = (canAdd ? '<button type="button" data-act="add">タイマー追加</button>' : '')
+  const isHeader = it && it.type === 'header';
+  toast.innerHTML = (isHeader ? `<label class="toast-color">色<input type="color" value="${it.color || '#9b8bff'}" aria-label="ゲーム名の色"></label>` : '')
+    + (canAdd ? '<button type="button" data-act="add">タイマー追加</button>' : '')
     + '<button type="button" class="ok" data-act="yes">削除</button>'
     + '<button type="button" data-act="no">やめる</button>';
+  if (isHeader){
+    const colorEl = toast.querySelector('.toast-color input');
+    colorEl.addEventListener('input', ()=>{
+      it.color = colorEl.value;
+      if (refs[id]?.nameEl) refs[id].nameEl.style.color = it.color;
+      save();
+    });
+    colorEl.addEventListener('pointerdown', e=>e.stopPropagation());
+  }
   toast.classList.add('show');
   const onClick = (e)=>{
     const btn = e.target.closest('button');
@@ -983,19 +986,12 @@ function buildHeaderCard(it){
   wrap.className = 'divider';
   wrap.innerHTML = `
     <input class="name" placeholder="見出し(ゲーム名など)" value="${esc(it.name)}">
-    <input class="header-color" type="color" value="${it.color || '#9b8bff'}" aria-label="見出しの文字色">
   `;
   const nameEl = wrap.querySelector('.name');
-  const colorEl = wrap.querySelector('.header-color');
   nameEl.style.color = it.color || 'var(--accent)';
-  colorEl.addEventListener('input', ()=>{
-    it.color = colorEl.value;
-    nameEl.style.color = it.color;
-    save();
-  });
   nameEl.addEventListener('blur', ()=>{ it.name = nameEl.value; save(); });
   forceCursorToEnd(nameEl);
-  refs[it.id] = { el: wrap, nameEl, colorEl };
+  refs[it.id] = { el: wrap, nameEl };
   bindLongPressDelete(wrap, it.id);
   return wrap;
 }
@@ -1176,7 +1172,6 @@ function render(){
     if (it.type==='header' && r.nameEl){
       const c = it.color || '#9b8bff';
       if (r.nameEl.style.color !== c) r.nameEl.style.color = c;
-      if (r.colorEl && r.colorEl.value !== c) r.colorEl.value = c;
     }
     if (it.type==='group'){
       if (document.activeElement !== r.nameEl && r.nameEl.value !== it.name) r.nameEl.value = it.name;
