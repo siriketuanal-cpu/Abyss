@@ -153,10 +153,10 @@
   /* / は通常のレイアウトに戻し、左右の数字の間に自然に配置。
      絶対配置を使わないので、桁数が変わっても重ならない。 */
   .slash{
-    position:static; flex:0 0 auto; width:auto; height:22px;
+    position:relative; flex:0 0 auto; width:auto; height:22px;
     margin:0 4px; color:#7f8da3;
-    font-size:15px; font-weight:700; line-height:22px;
-    text-align:center; transform:none;
+    font-size:15px; font-weight:700; line-height:20px;
+    text-align:center; top:-1px; transform:none;
     overflow:visible; pointer-events:none;
   }
   .clockstack{
@@ -206,6 +206,11 @@
   .divider .name{
     width:65%; max-width:260px; flex:0 1 auto; font-size:13px; font-weight:700; color:var(--accent); padding:0 0 2px;
   }
+  .header-palette{display:flex; gap:5px; flex-wrap:wrap; justify-content:center; margin:4px 0 2px;}
+  .header-color{width:28px; height:22px; flex:0 0 28px; padding:1px; border:1px solid var(--line); border-radius:6px; background:transparent;}
+  .header-swatch{width:26px; height:26px; padding:0; border-radius:50%; border:2px solid var(--line); box-shadow:none;}
+  .header-swatch.selected{border-color:#fff; outline:1px solid var(--accent);}
+
   /* ルナビィ下線と同系の太い仕切り。色は item.color */
   .rule-line{
     grid-column:1 / -1; position:relative;
@@ -326,6 +331,7 @@ const setupPanelEl = document.getElementById('setupPanel');
 const setupLabelEl = document.getElementById('setupLabel');
 const setupFieldsEl = document.getElementById('setupFields');
 const setupConfirmEl = document.getElementById('setupConfirm');
+const toastEl = document.getElementById('toast');
 
 function load(){
   try{
@@ -411,50 +417,55 @@ function createInlineNumber(initialValue, onCommit){
   wrap.className = 'inline-number';
   const text = document.createElement('span');
   text.className = 'inline-number-text';
-  text.textContent = String(initialValue);
+  let shownValue = String(initialValue);
+  text.textContent = shownValue;
   wrap.appendChild(text);
 
   let editor = null;
-  const setText = v => { text.textContent = String(v); };
-  const isEditing = () => !!editor;
+  const setText = v => {
+    v = String(v);
+    if (v === shownValue) return;
+    shownValue = v;
+    text.textContent = v;
+  };
+  const isEditing = () => editor !== null;
   const open = () => {
     if (editor) return;
-    editor = document.createElement('input');
-    editor.type = 'text';
-    editor.inputMode = 'numeric';
-    editor.pattern = '[0-9]*';
-    editor.className = 'inline-edit-input';
-    editor.autocomplete = 'off';
-    editor.autocapitalize = 'off';
-    editor.autocorrect = 'off';
-    editor.spellcheck = false;
-    editor.maxLength = 3;
-    const originalValue = text.textContent;
-    editor.value = '';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.inputMode = 'numeric';
+    input.pattern = '[0-9]*';
+    input.className = 'inline-edit-input';
+    input.autocomplete = 'off';
+    input.autocapitalize = 'off';
+    input.autocorrect = 'off';
+    input.spellcheck = false;
+    input.maxLength = 3;
+    const originalValue = shownValue;
+    editor = input;
     wrap.classList.add('editing');
-    wrap.appendChild(editor);
+    wrap.appendChild(input);
 
     const finish = () => {
-      if (!editor) return;
-      const value = editor.value;
-      const old = editor;
+      if (editor !== input) return;
+      const value = input.value;
       editor = null;
-      old.remove();
+      input.remove();
       wrap.classList.remove('editing');
       onCommit(value);
     };
-    editor.addEventListener('input', () => {
-      const v = editor.value.replace(/\D/g, '').slice(0,3);
-      if (editor.value !== v) editor.value = v;
+    input.addEventListener('input', () => {
+      const v = input.value.replace(/\D/g, '').slice(0,3);
+      if (input.value !== v) input.value = v;
     });
-    editor.addEventListener('blur', finish, {once:true});
-    editor.addEventListener('keydown', e => {
-      if (e.key === 'Enter') { e.preventDefault(); editor.blur(); }
-      else if (e.key === 'Escape') { e.preventDefault(); editor.value = originalValue; editor.blur(); }
+    input.addEventListener('blur', finish, {once:true});
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+      else if (e.key === 'Escape') { e.preventDefault(); input.value = originalValue; input.blur(); }
     });
-    // フォーカスした瞬間に空欄へ。元の数字は下の文字を隠しているので重なって見えない。
-    editor.addEventListener('focus', () => { editor.value = ''; }, {once:true});
-    editor.focus({preventScroll:true});
+    // inputは生成直後から空欄。focus時に空欄へ戻すリスナーは不要で、
+    // キーボード表示時のイベント競合も避けられる。
+    input.focus({preventScroll:true});
   };
   return {wrap, text, open, setText, isEditing};
 }
@@ -471,7 +482,7 @@ function newIdleItem(durationMin){
   return { id: uid(), type:'idle', name:'', durationMin, state:'running', start: Date.now() };
 }
 function newHeaderItem(){
-  return { id: uid(), type:'header', name:'' };
+  return { id: uid(), type:'header', name:'', color:'#9b8bff' };
 }
 function newRuleItem(color){
   return { id: uid(), type:'rule', color: color || '#52617a' };
@@ -544,7 +555,8 @@ function fmtHM(ts){
 
 function timerNeedsTick(it, now){
   if (it.type==='stam' || it.type==='abyss') return !stamInfo(it, now).isFull;
-  if (it.type==='idle') return !idleInfo(it, now).isFull;
+  // 受取待機中は表示が固定なので、毎分tickを止めて無駄なDOM更新をしない。
+  if (it.type==='idle') return it.state !== 'claim' && !idleInfo(it, now).isFull;
   return false;
 }
 function needsTicking(now){
@@ -752,7 +764,9 @@ function buildStamCard(it){
     const newCur = clampInt(value, 0, it.max, info.cur);
     preserveCycle(it, now);
     it.current = newCur;
-    save(); render();
+    updateOneTimer(it);
+    startTicking(true);
+    saveAfterPaint();
   });
   const maxEditor = createInlineNumber(it.max, value => {
     const now = Date.now();
@@ -761,7 +775,9 @@ function buildStamCard(it){
     preserveCycle(it, now);
     it.max = newMax;
     it.current = Math.min(curNow, newMax);
-    save(); render();
+    updateOneTimer(it);
+    startTicking(true);
+    saveAfterPaint();
   });
   curWrap.appendChild(curEditor.wrap);
   maxWrap.appendChild(maxEditor.wrap);
@@ -803,7 +819,9 @@ function buildAbyssCard(it){
     preserveCycle(it, now);
     it.current = newCur;
     pending40Id = null;
-    save(); render();
+    updateOneTimer(it);
+    startTicking(true);
+    saveAfterPaint();
   });
   curWrap.appendChild(curEditor.wrap);
   // ランク欄は従来どおりネイティブ入力。フォーカス時だけ空欄にする。
@@ -827,7 +845,9 @@ function buildAbyssCard(it){
     preserveCycle(it, now);
     it.current = Math.min(live, it.max);
     pending40Id = null;
-    save(); render(); startTicking(true);
+    updateOneTimer(it);
+    startTicking(true);
+    saveAfterPaint();
   });
   const clockEl = wrap.querySelector('[data-role="clock"]');
   // 最大 or 予定時刻タップ → 40使い切りプレビュー/確定（ルナビィに近い）
@@ -963,11 +983,19 @@ function buildHeaderCard(it){
   wrap.className = 'divider';
   wrap.innerHTML = `
     <input class="name" placeholder="見出し(ゲーム名など)" value="${esc(it.name)}">
+    <input class="header-color" type="color" value="${it.color || '#9b8bff'}" aria-label="見出しの文字色">
   `;
   const nameEl = wrap.querySelector('.name');
+  const colorEl = wrap.querySelector('.header-color');
+  nameEl.style.color = it.color || 'var(--accent)';
+  colorEl.addEventListener('input', ()=>{
+    it.color = colorEl.value;
+    nameEl.style.color = it.color;
+    save();
+  });
   nameEl.addEventListener('blur', ()=>{ it.name = nameEl.value; save(); });
   forceCursorToEnd(nameEl);
-  refs[it.id] = { el: wrap, nameEl };
+  refs[it.id] = { el: wrap, nameEl, colorEl };
   bindLongPressDelete(wrap, it.id);
   return wrap;
 }
@@ -988,15 +1016,20 @@ function updateOneTimer(it){
 // もう一度タップ＝受取確定→フル時間で再開。
 function toggleIdle(it){
   if (it.state === 'claim'){
+    // 確定時だけtickを再開。待機中に止めていたタイマーをここで1回だけ再始動する。
     it.state = 'running';
     it.start = Date.now();
     if (claimId === it.id) claimId = null;
+    updateOneTimer(it);
+    startTicking(true);
   } else {
+    // 「受取」待機中は表示が固定なので、tick自体を止める。
     it.state = 'claim';
     claimId = it.id;
+    updateOneTimer(it);
+    tickGen++;
+    if (tickId){ clearTimeout(tickId); tickId = null; }
   }
-  updateOneTimer(it);
-  startTicking(true);
   saveAfterPaint();
 }
 function cancelClaim(it){
@@ -1011,7 +1044,13 @@ function cancelClaim(it){
 // 動作しないことがあるため使わない。
 
 document.addEventListener('pointerdown', (e) => {
-  try { if (document.activeElement !== e.target && window.getSelection) window.getSelection().removeAllRanges(); } catch(err){}
+  // 実際に選択状態があるときだけ解除する。通常のカードタップでは不要な処理を省く。
+  try {
+    if (document.activeElement !== e.target && window.getSelection){
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount) sel.removeAllRanges();
+    }
+  } catch(err){}
   if (claimId != null){
     const claimed = findItemById(claimId);
     const r = claimed ? getTimerRef(claimId) : null;
@@ -1028,7 +1067,6 @@ document.addEventListener('pointerdown', (e) => {
   if (addPanelEl.classList.contains('show') && !addPanelEl.contains(e.target) && e.target !== addBtnEl){
     addPanelEl.classList.remove('show');
   }
-  const toastEl = document.getElementById('toast');
   if (toastEl && toastEl.classList.contains('show') && !toastEl.contains(e.target)){
     clearLongPressTarget();
     toastEl.classList.remove('show');
@@ -1135,6 +1173,11 @@ function render(){
   for (const it of state.items){
     const r = refs[it.id];
     if (it.type==='rule') r.el.style.borderTopColor = it.color || '#52617a';
+    if (it.type==='header' && r.nameEl){
+      const c = it.color || '#9b8bff';
+      if (r.nameEl.style.color !== c) r.nameEl.style.color = c;
+      if (r.colorEl && r.colorEl.value !== c) r.colorEl.value = c;
+    }
     if (it.type==='group'){
       if (document.activeElement !== r.nameEl && r.nameEl.value !== it.name) r.nameEl.value = it.name;
       for (const child of it.children) updateTimerCard(child, r.childRefs[child.id], now);
@@ -1196,9 +1239,7 @@ bindTapDown(addPanelEl, (e)=>{
     return;
   }
   if (type === 'header'){
-    state.items.push(newHeaderItem());
-    addPanelEl.classList.remove('show');
-    save(); render(); startTicking(true);
+    openSetup('header');
     return;
   }
   if (type === 'rule'){
@@ -1214,7 +1255,18 @@ let setupType = null;
 function openSetup(type){
   setupType = type;
   addPanelEl.classList.remove('show');
-  if (type === 'stam' || type === 'abyss'){
+  if (type === 'header'){
+    setupLabelEl.textContent = 'ゲーム名ヘッダーの文字色';
+    const colors = ['#9b8bff','#b48cff','#6fc7ff','#70d6b0','#ffd166','#ff9f68','#ff7b9c','#d7dbe7'];
+    const current = '#9b8bff';
+    setupFieldsEl.innerHTML = `<div class="header-palette">${colors.map(c=>`<button type="button" class="header-swatch${c===current?' selected':''}" data-color="${c}" style="background:${c}" aria-label="${c}"></button>`).join('')}</div>`;
+    setupFieldsEl.querySelectorAll('.header-swatch').forEach(btn=>btn.addEventListener('click', ()=>{
+      setupFieldsEl.querySelectorAll('.header-swatch').forEach(b=>b.classList.remove('selected'));
+      btn.classList.add('selected');
+      setupFieldsEl.dataset.color = btn.dataset.color;
+    }));
+    setupFieldsEl.dataset.color = current;
+  } else if (type === 'stam' || type === 'abyss'){
     setupLabelEl.textContent = type === 'abyss' ? 'Abyssスタミナ回復間隔' : 'スタミナ回復間隔';
     setupFieldsEl.innerHTML = `<input type="text" inputmode="numeric" pattern="[0-9]*" id="setupInterval" value="${type==='abyss'?'3':'5'}"><span>分で1回復</span>`;
   } else if (type === 'rule'){
@@ -1262,7 +1314,11 @@ function pushNewTimer(item){
 }
 bindTapDown(setupConfirmEl, (e)=>{
   e.stopPropagation();
-  if (setupType === 'stam'){
+  if (setupType === 'header'){
+    const item = newHeaderItem();
+    item.color = setupFieldsEl.dataset.color || '#9b8bff';
+    state.items.push(item);
+  } else if (setupType === 'stam'){
     const interval = clampInt(setupFieldsEl.querySelector('#setupInterval').value, 1, 999, 5);
     if (!pushNewTimer(newStamItem(interval))) return;
   } else if (setupType === 'abyss'){
