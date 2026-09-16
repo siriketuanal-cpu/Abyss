@@ -14,9 +14,15 @@
     --bg:#0b0b14; --card:#15151f; --card2:#1b1b28; --line:#2a2a3a;
     --text:#eceef2; --sub:#8a8ea3; --accent:#9b8bff; --blue:#4fa3ff; --orange:#ffab5c;
     --danger:#ff6b6b; --ok:#5cd68a;
+    /* タイマー・数字部分で共通使用するフォント指定 */
+    --timer-number-font: Roboto, system-ui, sans-serif;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; -webkit-touch-callout:none;
     -webkit-user-select:none; user-select:none;}
+  /* タイマー内の数字表示はすべてこのフォントで統一 */
+  .stamval, .stammax, .inline-number-text, .main, .clockstack, .rank{
+    font-family:var(--timer-number-font);
+  }
   html,body{height:100%; overscroll-behavior:none;}
   body{
     margin:0; background:var(--bg); color:var(--text);
@@ -112,7 +118,7 @@
   .group-body:empty{display:none;}
   .stammax{
     color:var(--blue); font-size:15px; font-weight:700; text-align:center;
-    font-variant-numeric:tabular-nums; vertical-align:middle;
+    font-variant-numeric:tabular-nums; height:22px; line-height:22px;
   }
   /* Abyss「40使い切り」プレビュー中：押した所が分かるよう点線で囲む */
   .clockstack{ justify-content:center; }
@@ -121,6 +127,7 @@
   .stamval{
     color:var(--text); font-size:15px; font-weight:700; text-align:center;
     font-variant-numeric:tabular-nums; width:28px; min-width:28px; max-width:28px; overflow:hidden;
+    height:22px; line-height:22px; display:inline-block;
   }
   .inline-number{width:28px; min-width:28px; max-width:28px; overflow:hidden;}
   .inline-number-text{width:100%; min-width:0; text-align:center; overflow:hidden;}
@@ -762,6 +769,7 @@ function buildAbyssCard(it){
     preserveCycle(it, now);
     it.current = newCur;
     pending40Id = null;
+    curHit.style.pointerEvents = ''; // 編集終了：拡大タップ領域を復活
     save(); render();
   });
   curWrap.appendChild(curEditor.wrap);
@@ -833,6 +841,7 @@ function buildAbyssCard(it){
       return;
     }
     if (e.target.closest && (e.target.closest('[data-role="curWrap"]') || e.target.closest('[data-role="curHit"]'))){
+      curHit.style.pointerEvents = 'none'; // 編集中は入力欄への以後のタップを邪魔しない
       curEditor.open();
       return;
     }
@@ -993,7 +1002,12 @@ document.addEventListener('pointerdown', (e) => {
     toastEl.classList.remove('show');
     if (toastTapDownHandler){ toastEl.removeEventListener('pointerdown', toastTapDownHandler); toastTapDownHandler = null; }
   }
-  // 作成パネルは枠外タップで閉じない（キーボード閉じでキャンセルされるのを防ぐ）
+  // 作成パネルは基本、枠外タップで閉じない（数字入力中にキーボードを閉じただけで
+  // 誤キャンセルされるのを防ぐため）。ただし仕切り線の色選択にはキャンセル手段が
+  // 他に無いので、そこだけ枠外タップで閉じられるようにする。
+  if (setupType === 'rule' && setupPanelEl.classList.contains('show') && !setupPanelEl.contains(e.target)){
+    closeSetup();
+  }
 }, true);
 
 function clampInt(v, min, max, fb){
