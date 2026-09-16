@@ -86,7 +86,7 @@
   .card.group{grid-column:span 2; padding:4px; border:1px solid #555b68; box-shadow:none; border-radius:8px;}
   .card.group.single{grid-column:span 1;}
   .group-namerow{margin-bottom:3px; gap:3px; padding:0 1px;}
-  .group-namerow .name{font-size:12px; padding:1px 0; font-weight:700; color:var(--accent); flex:0 1 50%; max-width:50%;}
+  .group-namerow .name{font-size:12px; padding:1px 0; font-weight:700; color:var(--accent); flex:0 0 5em; width:5em; max-width:5em; box-sizing:border-box;}
   .group-body{display:grid; grid-template-columns:repeat(2,1fr); gap:6px; min-height:1px; align-items:end;}
   .group-body.one{grid-template-columns:1fr;}
   .group-body:empty{display:none;}
@@ -186,7 +186,6 @@
     padding:12px; border-radius:12px; border:none;
     background:var(--accent); color:#100c26; font-size:14px; font-weight:700;
   }
-  #saveStamp{display:none;}
 </style>
 </head>
 <body>
@@ -197,7 +196,6 @@
 </header>
 <div id="cards"></div>
 <div id="empty">＋ でタイマーを追加</div>
-<div id="saveStamp"></div>
 <div id="toast" role="status"></div>
 <div id="addPanel">
 <button class="timerType" data-type="stam">スタミナ</button>
@@ -223,7 +221,6 @@ let pending40Id = null;
 // DOM参照は一度だけ取得して使い回す(毎分ティックや毎クリックで検索し直さない)。
 const cardsEl = document.getElementById('cards');
 const emptyEl = document.getElementById('empty');
-const saveStampEl = document.getElementById('saveStamp');
 const addPanelEl = document.getElementById('addPanel');
 const addBtnEl = document.getElementById('addBtn');
 const setupPanelEl = document.getElementById('setupPanel');
@@ -257,11 +254,7 @@ let saveTimer = null;
 function saveNow(){
   try{
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    const d = new Date();
-    const p = n => String(n).padStart(2,'0');
-    saveStampEl.textContent = '保存済み ' + p(d.getHours())+':'+p(d.getMinutes());
   }catch(e){
-    saveStampEl.textContent = '保存に失敗しました';
   }
 }
 function save(immediate){
@@ -741,6 +734,11 @@ function buildGroupCard(it){
   nameEl.addEventListener('blur', ()=>{ it.name = nameEl.value; save(); });
   placeCursorOnFocus(nameEl);
   const nameRowEl = wrap.querySelector('.group-namerow');
+  // 名前入力欄そのもの以外の余白をタップしても、入力欄へフォーカスを移さない。
+  // Android/PWAで余白タップ時にキーボードが開閉する挙動を防ぐ。
+  nameRowEl.addEventListener('pointerdown', e=>{
+    if (e.target !== nameEl && !e.target.closest('.group .name')) e.preventDefault();
+  }, {capture:true, passive:false});
   refs[it.id] = { el: wrap, nameEl,
     bodyEl: wrap.querySelector('[data-role="body"]'),
     childRefs: {} };
