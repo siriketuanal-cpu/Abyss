@@ -1,16 +1,17 @@
 <!DOCTYPE html>
+
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<meta name="theme-color" content="#0b0b14">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" name="viewport"/>
+<meta content="#0b0b14" name="theme-color"/>
+<meta content="yes" name="mobile-web-app-capable"/>
+<meta content="yes" name="apple-mobile-web-app-capable"/>
+<meta content="black-translucent" name="apple-mobile-web-app-status-bar-style"/>
 <title>タイマー</title>
-<link rel="manifest" href="manifest.json">
-<link rel="icon" href="icon-192.png">
-<link rel="apple-touch-icon" href="icon-192.png">
+<link href="manifest.json" rel="manifest"/>
+<link href="icon-192.png" rel="icon"/>
+<link href="icon-192.png" rel="apple-touch-icon"/>
 <style>
   :root{
     --bg:#0b0b14; --card:#15151f; --card2:#1b1b28; --line:#2a2a3a;
@@ -187,29 +188,27 @@
 </head>
 <body>
 <header>
-  <button class="iconbtn" id="updateBtn" title="アプリを更新" aria-label="アプリを更新">↻</button>
-  <span class="spacer" aria-hidden="true"></span>
-  <button class="iconbtn" id="addBtn">＋</button>
+<button aria-label="アプリを更新" class="iconbtn" id="updateBtn" title="アプリを更新">↻</button>
+<span aria-hidden="true" class="spacer"></span>
+<button class="iconbtn" id="addBtn">＋</button>
 </header>
 <div id="cards"></div>
 <div id="empty">＋ でタイマーを追加</div>
 <div id="saveStamp"></div>
 <div id="toast" role="status"></div>
-
 <div id="addPanel">
-  <button data-type="stam" class="timerType">スタミナ</button>
-  <button data-type="abyss" class="timerType">Abyssスタミナ</button>
-  <button data-type="idle" class="timerType">放置報酬</button>
-  <button data-type="group" class="onlyTop">アカウント枠</button>
-  <button data-type="header" class="onlyTop">見出し</button>
-  <button data-type="rule" class="onlyTop">仕切り線</button>
+<button class="timerType" data-type="stam">スタミナ</button>
+<button class="timerType" data-type="abyss">Abyssスタミナ</button>
+<button class="timerType" data-type="idle">放置報酬</button>
+<button class="onlyTop" data-type="group">アカウント枠</button>
+<button class="onlyTop" data-type="header">見出し</button>
+<button class="onlyTop" data-type="rule">仕切り線</button>
 </div>
 <div id="setupPanel">
-  <div class="setupLabel" id="setupLabel"></div>
-  <div id="setupFields"></div>
-  <button id="setupConfirm">追加</button>
+<div class="setupLabel" id="setupLabel"></div>
+<div id="setupFields"></div>
+<button id="setupConfirm">追加</button>
 </div>
-
 <script>
 const STORAGE_KEY = 'freetimer:v1';
 let state = load();
@@ -417,7 +416,7 @@ function startTicking(force){
 let suppressNextClick = false;
 let suppressClearTimer = null;
 
-function bindLongPressDelete(el, id){
+function bindLongPressDelete(el, id, shortAction){
   const HOLD_MS = 520, MOVE_PX = 12;
   let timer = null, active = false, moved = false, longFired = false;
   let sx = 0, sy = 0, pid = null, nameInput = null;
@@ -445,7 +444,7 @@ function bindLongPressDelete(el, id){
 
     if (isGroupName(e.target)){
       nameInput = e.target.closest('.group .name');
-      // 長押し中だけ編集・文字選択を止める。短押しはpointerupで手動focus。
+      // 名前欄は長押し中だけ編集・文字選択を止める。短押しはpointerupでfocusする。
       nameInput.setAttribute('readonly','');
       nameInput.style.userSelect = 'none';
       nameInput.style.webkitUserSelect = 'none';
@@ -480,18 +479,13 @@ function bindLongPressDelete(el, id){
     if (timer !== null){ clearTimeout(timer); timer = null; }
 
     if (wasLong){
-      // 長押し後のclickはdocument側で1回だけ抑止する。
+      // 長押し後に発生するclickだけを抑止する。
       e.preventDefault();
       e.stopPropagation();
-    } else if (!wasMoved && input){
-      // アカウント名の短押しだけ編集を開始。
-      e.preventDefault();
-      e.stopPropagation();
-      input.removeAttribute('readonly');
-      input.style.userSelect = 'text';
-      input.style.webkitUserSelect = 'text';
-      input.focus();
-      try{ input.setSelectionRange(input.value.length, input.value.length); }catch(err){}
+    } else if (!wasMoved && typeof shortAction === 'function'){
+      // 短押しは各カード本来の操作へ渡す。
+      shortAction(e);
+      if (input) e.stopPropagation();
     }
     cleanup();
   }, {capture:true, passive:false});
@@ -501,9 +495,8 @@ function bindLongPressDelete(el, id){
     cleanup();
   }, {capture:true, passive:true});
 
-  // Androidのテキスト選択/コンテキストメニューを長押し操作として奪われないようにする。
   el.addEventListener('contextmenu', e=>{
-    if (e.target.closest && e.target.closest('.group .name')){
+    if (isGroupName(e.target)){
       e.preventDefault(); e.stopPropagation(); clearSelection();
     }
   });
@@ -519,7 +512,7 @@ function askRemoveItem(id){
   const it = findItemById(id);
   const toast = document.getElementById('toast');
   if (!toast){ removeItem(id); return; }
-  if (toastTapDownHandler){ toast.removeEventListener('click', toastTapDownHandler); toastTapDownHandler = null; }
+  if (toastTapDownHandler){ toast.removeEventListener('pointerdown', toastTapDownHandler); toastTapDownHandler = null; }
   const canAdd = it && it.type === 'group' && it.children.length < 2;
   toast.innerHTML = (canAdd ? '<button type="button" data-act="add">タイマー追加</button>' : '')
     + '<button type="button" class="ok" data-act="yes">削除</button>'
@@ -559,7 +552,7 @@ function askRemoveItem(id){
     }
   };
   toastTapDownHandler = onClick;
-  bindTapDown(toast, onClick);
+  toast.addEventListener('pointerdown', onClick);
 }
 function buildStamCard(it){
   const wrap = document.createElement('div');
@@ -1018,7 +1011,6 @@ bindTapDown(addPanelEl, (e)=>{
     openSetup('rule');
     return;
   }
-  openSetup(type);
 });
 
 // 追加種別ごとの設定ダイアログ(回復間隔 / 満タンまでの時間をここで固定する)。
