@@ -726,11 +726,14 @@ function buildGroupCard(it){
   const nameEl = wrap.querySelector('.name');
   nameEl.addEventListener('blur', ()=>{ it.name = nameEl.value; save(); });
   forceCursorToEnd(nameEl);
+  const nameRowEl = wrap.querySelector('.group-namerow');
   refs[it.id] = { el: wrap, nameEl,
     bodyEl: wrap.querySelector('[data-role="body"]'),
     childRefs: {} };
-  // アカウント枠も同じ長押しジェスチャー処理を使用。短いタップだけ編集開始。
-  bindLongPressDelete(wrap, it.id, (e)=>{
+  // アカウント枠の長押しは「名前欄の行」だけに限定する。
+  // wrap(カード全体)に付けてしまうと、枠内の子タイマーを長押しした時に
+  // 子タイマー自身の長押し処理と二重に発火して競合し、動作がおかしくなるため。
+  bindLongPressDelete(nameRowEl, it.id, (e)=>{
     if(e.target===nameEl || e.target.closest('.group-namerow')){
       nameEl.removeAttribute('readonly');
       nameEl.focus();
