@@ -29,7 +29,7 @@
   input{ caret-color:auto; }
   /* アカウント名：編集対象が分かるよう、通常のフォーカス枠を復活。 */
   .group .name:focus{ outline:1px solid #d8d8d8 !important; outline-offset:1px; box-shadow:none !important; }
-  .group .name{ -webkit-tap-highlight-color:transparent; -webkit-touch-callout:none; touch-action:manipulation; }
+  .group .name{ -webkit-tap-highlight-color:transparent; -webkit-touch-callout:none; touch-action:manipulation; user-select:text; }
   header{
     display:flex; align-items:center; gap:8px; padding:10px 12px 6px;
     position:sticky; top:0; background:var(--bg); z-index:5;
@@ -81,7 +81,7 @@
     -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
   }
   /* アカウント枠：通常カード2枚分の横幅 */
-  .card.group{grid-column:span 2; padding:4px; border:1px solid #555b68; box-shadow:none; border-radius:9px;}
+  .card.group{grid-column:span 2; padding:4px; border:1px solid #555b68; box-shadow:none; border-radius:8px;}
   .card.group.single{grid-column:span 1;}
   .group-namerow{margin-bottom:3px; gap:3px; padding:0 1px;}
   .group-namerow .name{font-size:12px; padding:1px 0; font-weight:700; color:var(--accent); flex:0 1 65%; max-width:65%;}
@@ -411,130 +411,47 @@ function startTicking(force){
   if (!tickId && needsTicking()) scheduleTick(tickGen);
 }
 
-// 長押し → 簡易確認トースト → 削除（タイマー1本のみ）
-function bindLongPressDelete(el, id){
-  let timer = null;
-  const clear = ()=>{ if (timer){ clearTimeout(timer); timer = null; } };
-  const start = (e)=>{
-    if (e.target.closest('input,button,.rank,.stammax,.clockstack')) return;
-    clear();
-    timer = setTimeout(()=>{
-      timer = null;
-      pending40Id = null;
-      askRemoveItem(id);
-    }, 520);
-  };
-  el.addEventListener('pointerdown', start);
-  el.addEventListener('pointerup', clear);
-  el.addEventListener('pointercancel', clear);
-  el.addEventListener('pointerleave', clear);
-  el.addEventListener('touchmove', clear, { passive:true });
-}
-// アカウント名の長押し：入力欄のネイティブ選択UIと競合しない独立ブロック。
-// 短押しは編集、長押しは削除トースト。判定開始は pointerdown に統一する。
-function bindLongPressOnNameInput(inputEl, id){
-  const HOLD_MS = 520;
-  const MOVE_PX = 12;
-  let timer = null;
-  let active = false;
-  let moved = false;
-  let longFired = false;
-  let sx = 0, sy = 0;
-
-  const clear = ()=>{
-    if (timer !== null){ clearTimeout(timer); timer = null; }
-  };
-  const clearSelection = ()=>{
-    try { window.getSelection()?.removeAllRanges(); } catch(e){}
-  };
-  const finish = ()=>{
-    clear();
-    active = false;
-    moved = false;
-    longFired = false;
-  };
-
-  inputEl.addEventListener('pointerdown', (e)=>{
-    if (!e.isPrimary) return;
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
-
-    active = true;
-    moved = false;
-    longFired = false;
-    sx = e.clientX; sy = e.clientY;
-    clear();
+// 長押し削除を全カードで一本化。pointerdownでジェスチャーを開始し、
+// 短いpointerupだけ各カード固有のタップ処理を実行する。
+function bindLongPressDelete(el, id, onTap){
+  const HOLD_MS = 520, MOVE_PX = 12;
+  let timer=null, active=false, moved=false, longFired=false, sx=0, sy=0, pid=null;
+  const isPrimary = e => e.isPrimary !== false && !(e.pointerType==='mouse' && e.button!==0);
+  const clearSelection = ()=>{ try{ window.getSelection()?.removeAllRanges(); }catch(e){} };
+  const cleanup = ()=>{ if(timer!==null){ clearTimeout(timer); timer=null; } active=false; moved=false; longFired=false; pid=null; };
+  el.addEventListener('pointerdown', e=>{
+    if(!isPrimary(e)) return;
+    active=true; moved=false; longFired=false; sx=e.clientX; sy=e.clientY; pid=e.pointerId;
     clearSelection();
-
-    // この時点では readonly にして、Androidの文字選択UIを発生させない。
-    inputEl.setAttribute('readonly','');
     e.preventDefault();
     e.stopPropagation();
-
-    try { inputEl.setPointerCapture(e.pointerId); } catch(err){}
-
-    timer = setTimeout(()=>{
-      if (!active || moved) return;
-      timer = null;
-      longFired = true;
-      inputEl.setAttribute('readonly','');
-      inputEl.blur();
+    try{ el.setPointerCapture(e.pointerId); }catch(err){}
+    timer=setTimeout(()=>{
+      if(!active || moved) return;
+      timer=null; longFired=true;
       clearSelection();
       askRemoveItem(id);
     }, HOLD_MS);
   }, {capture:true, passive:false});
-
-  inputEl.addEventListener('pointermove', (e)=>{
-    if (!active) return;
-    if (Math.hypot(e.clientX-sx, e.clientY-sy) > MOVE_PX){
-      moved = true;
-      clear();
-    }
-  }, {passive:true, capture:true});
-
-  inputEl.addEventListener('pointerup', (e)=>{
-    if (!active) return;
-    const wasLong = longFired;
-    const wasMoved = moved;
-    clear();
-    active = false;
-    try { inputEl.releasePointerCapture(e.pointerId); } catch(err){}
-
-    if (wasLong){
-      e.preventDefault();
-      e.stopPropagation();
-      inputEl.blur();
-      inputEl.setAttribute('readonly','');
-      clearSelection();
-    } else if (!wasMoved){
-      // 短押しだけ編集開始。ここで初めてreadonlyを解除してフォーカスする。
-      e.preventDefault();
-      e.stopPropagation();
-      inputEl.removeAttribute('readonly');
-      inputEl.focus({preventScroll:true});
-      try { inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length); } catch(err){}
-    } else {
-      inputEl.removeAttribute('readonly');
-    }
-    moved = false;
-    longFired = false;
-  }, {capture:true, passive:false});
-
-  inputEl.addEventListener('pointercancel', ()=>{
-    finish();
-    inputEl.removeAttribute('readonly');
-    clearSelection();
+  el.addEventListener('pointermove', e=>{
+    if(!active || e.pointerId!==pid) return;
+    if(Math.hypot(e.clientX-sx,e.clientY-sy)>MOVE_PX){ moved=true; if(timer!==null){ clearTimeout(timer); timer=null; } }
   }, {capture:true, passive:true});
-
-  // Androidの文字選択・コンテキストメニューをアプリの操作から切り離す。
-  ['selectstart','contextmenu','dragstart'].forEach(type=>{
-    inputEl.addEventListener(type, e=>{
-      e.preventDefault();
-      e.stopPropagation();
-      clearSelection();
-    }, {capture:true, passive:false});
-  });
+  el.addEventListener('pointerup', e=>{
+    if(!active || e.pointerId!==pid) return;
+    const wasLong=longFired, wasMoved=moved;
+    if(timer!==null){ clearTimeout(timer); timer=null; }
+    try{ el.releasePointerCapture(e.pointerId); }catch(err){}
+    e.preventDefault();
+    e.stopPropagation();
+    if(!wasLong && !wasMoved && typeof onTap==='function') onTap(e);
+    cleanup();
+  }, {capture:true, passive:false});
+  el.addEventListener('pointercancel', e=>{ if(active && e.pointerId===pid){ e.preventDefault(); e.stopPropagation(); cleanup(); } }, {capture:true, passive:false});
+  el.addEventListener('contextmenu', e=>{ e.preventDefault(); e.stopPropagation(); clearSelection(); });
+  el.addEventListener('selectstart', e=>{ e.preventDefault(); e.stopPropagation(); clearSelection(); });
+  el.addEventListener('dragstart', e=>{ e.preventDefault(); e.stopPropagation(); });
 }
-
 let toastTapDownHandler = null;
 function askRemoveItem(id){
   clearLongPressTarget();
@@ -621,7 +538,13 @@ function buildStamCard(it){
   });
   refs[it.id] = { el: wrap, curInput, maxInput,
     clockEl: wrap.querySelector('[data-role="clock"]') };
-  bindLongPressDelete(wrap, it.id);
+  bindLongPressDelete(wrap, it.id, (e)=>{
+    const target=e.target;
+    if (target === curInput || target === maxInput || target.closest('input')) {
+      const input = target.closest('input');
+      if(input){ input.focus(); try{ input.setSelectionRange(input.value.length,input.value.length); }catch(err){} }
+    }
+  });
   return wrap;
 }
 
@@ -712,7 +635,14 @@ function buildAbyssCard(it){
   maxLabel.textContent = String(it.max);
   rankInput.value = 'Lv.' + (it.rank || 1);
   refs[it.id] = { el: wrap, rankInput, curInput, maxLabel, clockEl };
-  bindLongPressDelete(wrap, it.id);
+  bindLongPressDelete(wrap, it.id, (e)=>{
+    const target=e.target;
+    if (target===maxLabel || target===clockEl || target.closest('.clockstack')) onForty(e);
+    else if (target===rankInput || target===curInput || target.closest('input')) {
+      const input=target.closest('input');
+      if(input){ input.focus(); try{ input.setSelectionRange(input.value.length,input.value.length); }catch(err){} }
+    }
+  });
   return wrap;
 }
 
@@ -725,12 +655,9 @@ function buildIdleCard(it){
       <div class="clockstack" data-role="clock"></div>
     </div>
   `;
-  bindTapDown(wrap, ()=>{
-    toggleIdle(it);
-  });
   refs[it.id] = { el: wrap,
     curEl: wrap.querySelector('[data-role="cur"]'), clockEl: wrap.querySelector('[data-role="clock"]') };
-  bindLongPressDelete(wrap, it.id);
+  bindLongPressDelete(wrap, it.id, ()=>toggleIdle(it));
   return wrap;
 }
 
@@ -750,13 +677,17 @@ function buildGroupCard(it){
   const nameEl = wrap.querySelector('.name');
   nameEl.addEventListener('blur', ()=>{ it.name = nameEl.value; save(); });
   forceCursorToEnd(nameEl);
-  const nameRowEl = wrap.querySelector('.group-namerow');
   refs[it.id] = { el: wrap, nameEl,
     bodyEl: wrap.querySelector('[data-role="body"]'),
     childRefs: {} };
-  // 枠の名前欄を長押し →「タイマー追加(空きがあれば) / 削除」を選べるメニュー
-  bindLongPressDelete(nameRowEl, it.id);
-  bindLongPressOnNameInput(nameEl, it.id); // 入力欄自体を長押しした場合も同じメニューを開く
+  // アカウント枠も同じ長押しジェスチャー処理を使用。短いタップだけ編集開始。
+  bindLongPressDelete(wrap, it.id, (e)=>{
+    if(e.target===nameEl || e.target.closest('.group-namerow')){
+      nameEl.removeAttribute('readonly');
+      nameEl.focus();
+      try{ nameEl.setSelectionRange(nameEl.value.length,nameEl.value.length); }catch(err){}
+    }
+  });
   renderGroupBody(it);
   return wrap;
 }
