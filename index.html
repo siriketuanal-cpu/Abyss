@@ -51,18 +51,27 @@
   }
   .stamval .inline-edit-input{ text-align:right; }
   .stammax .inline-edit-input{ text-align:left; }
-  /* 名前・見出し・ランクはネイティブの簡易入力ダイアログで編集。
-     画面上に一時的なinputを重ねないので、タップ競合や選択ハンドルを残さない。 */
+  /* 名前・見出し：普段は span。編集中だけ input が載る */
   .name{
     position:relative; display:inline-block; min-width:0;
     -webkit-tap-highlight-color:transparent; -webkit-touch-callout:none; touch-action:manipulation;
     -webkit-user-select:none; user-select:none;
+    -webkit-user-drag:none;
   }
   .name-text{
     display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
     -webkit-user-select:none; user-select:none;
+    -webkit-touch-callout:none; -webkit-user-drag:none;
   }
-  /* 名前・ランクの編集用DOM inputは廃止。スタミナ数字のinline-edit-inputだけを残す。 */
+  .name-text.is-placeholder{ color:var(--sub); font-weight:600; }
+  .name-edit-input{
+    position:absolute; inset:0; width:100%; height:100%; box-sizing:border-box;
+    background:transparent; border:none; color:inherit; font:inherit; font-weight:inherit;
+    padding:0; margin:0; outline:1px solid #d8d8d8; outline-offset:1px;
+    caret-color:auto; -webkit-user-select:text; user-select:text;
+    appearance:none; -webkit-appearance:none; z-index:2;
+  }
+  .name-edit-input::placeholder{ color:var(--sub); }
   /* TWA復帰時の一瞬の再構築を視覚的に隠す。通常起動・通常操作では非表示。 */
   #resumeVeil{position:fixed;inset:0;background:var(--bg);opacity:0;pointer-events:none;z-index:100;transition:opacity 90ms linear;}
   #resumeVeil.show{opacity:1;}
@@ -133,7 +142,7 @@
     width:100%; background:transparent; border:none; color:var(--text);
     font-size:11px; font-weight:600; padding:2px 0; min-width:0;
   }
-  /* ランク：常時テキスト表示。編集時はネイティブ入力ダイアログ。 */
+  /* ランク：普段は span、編集時だけ input（名前と同じ方式） */
   .rank{
     position:absolute; top:2px; right:2px; width:4.5em; max-width:45%;
     height:18px; line-height:18px; min-height:0; max-height:18px;
@@ -145,7 +154,19 @@
     -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
     touch-action:manipulation; z-index:2; display:block;
   }
-  .rank-text{ display:block; overflow:hidden; white-space:nowrap; }
+  .rank-text{
+    display:block; overflow:hidden; white-space:nowrap;
+    -webkit-user-select:none; user-select:none;
+    -webkit-touch-callout:none; -webkit-user-drag:none;
+  }
+  .rank-edit-input{
+    position:absolute; inset:0; width:100%; height:100%; box-sizing:border-box;
+    background:transparent; border:none; outline:none; color:inherit;
+    font:inherit; font-weight:inherit; font-variant-numeric:tabular-nums;
+    text-align:left; padding:0; margin:0; caret-color:auto;
+    -webkit-user-select:text; user-select:text;
+    appearance:none; -webkit-appearance:none; z-index:3;
+  }
   /* アカウント枠：通常カード2枚分の横幅 */
   .card.group{grid-column:span 2; padding:4px; border:1px solid #555b68; box-shadow:none; border-radius:8px;}
   .card.group.single{grid-column:span 1;}
@@ -426,16 +447,13 @@ function placeCursorOnFocus(_input){ /* no-op */ }
 function clearOnFocus(input){
   input.addEventListener('focus', () => { input.value = ''; });
 }
-// 名前・見出し：表示中は完全にただの文字。
-// 編集時だけネイティブ prompt を開き、画面上に input を重ねない。
-// 頻繁に編集する項目ではないため、軽さとタップ競合の少なさを優先する。
+// 名前・見出し：普段は span、タップ時だけ input を生成して破棄（雫ハンドルの土台を消す）
 function createInlineText(initialValue, placeholder, onCommit){
   const wrap = document.createElement('span');
   wrap.className = 'name';
   const text = document.createElement('span');
   text.className = 'name-text';
   let shownValue = String(initialValue || '');
-  let editing = false;
   const paint = ()=>{
     if (shownValue){
       text.textContent = shownValue;
@@ -448,66 +466,122 @@ function createInlineText(initialValue, placeholder, onCommit){
   paint();
   wrap.appendChild(text);
 
+  let editor = null;
   const setText = v => {
     shownValue = String(v == null ? '' : v);
-    if (!editing) paint();
+    if (!editor) paint();
   };
   const setColor = c => { wrap.style.color = c || ''; };
   const open = ()=>{
-    if (editing) return;
-    editing = true;
-    try {
-      const value = window.prompt(placeholder || '入力', shownValue);
-      if (value !== null){
-        shownValue = value;
-        paint();
-        onCommit(value);
+    if (editor) return;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'name-edit-input';
+    input.placeholder = placeholder || '';
+    input.value = shownValue;
+    input.autocomplete = 'off';
+    input.spellcheck = false;
+    editor = input;
+    text.style.visibility = 'hidden';
+    wrap.appendChild(input);
+
+    let guardBlur = true;
+    setTimeout(()=>{ guardBlur = false; }, 350);
+
+    const finish = ()=>{
+      if (editor !== input) return;
+      if (guardBlur){
+        try { input.focus({preventScroll:true}); } catch (e) {}
+        return;
       }
-    } finally {
-      editing = false;
-    }
+      const value = input.value;
+      editor = null;
+      input.remove();
+      text.style.visibility = '';
+      shownValue = value;
+      paint();
+      try { window.getSelection()?.removeAllRanges(); } catch (e) {}
+      onCommit(value);
+    };
+    input.addEventListener('blur', finish);
+    input.addEventListener('keydown', e=>{
+      if (e.key === 'Enter'){ e.preventDefault(); guardBlur = false; input.blur(); }
+      else if (e.key === 'Escape'){ e.preventDefault(); input.value = shownValue; guardBlur = false; input.blur(); }
+    });
+    input.addEventListener('pointerdown', e=> e.stopPropagation(), {capture:true});
+    try {
+      input.focus({preventScroll:true});
+      // 編集中だけ末尾固定＋キャレット表示（生きている数秒だけ）
+      input.setSelectionRange(input.value.length, input.value.length);
+    } catch (e) {}
   };
   bindTapDown(wrap, ()=>{ open(); });
-  return { wrap, text, open, setText, setColor, isEditing: ()=> editing };
+  return { wrap, text, open, setText, setColor, isEditing: ()=> !!editor };
 }
-
-// ランク：表示は「Lv.n」。編集時はネイティブの数字入力ダイアログ。
+// ランク：表示は「Lv.n」、タップ時だけ数字 input
 function createInlineRank(initialRank, onOpen, onCommit){
   const wrap = document.createElement('span');
   wrap.className = 'rank';
   const text = document.createElement('span');
   text.className = 'rank-text';
   let rank = Math.max(1, Math.min(200, Math.floor(Number(initialRank) || 1)));
-  let editing = false;
   const paint = ()=>{ text.textContent = 'Lv.' + rank; };
   paint();
   wrap.appendChild(text);
 
+  let editor = null;
   const setRank = r => {
     rank = Math.max(1, Math.min(200, Math.floor(Number(r) || rank)));
-    if (!editing) paint();
+    if (!editor) paint();
   };
   const open = ()=>{
-    if (editing) return;
+    if (editor) return;
     if (typeof onOpen === 'function') onOpen();
-    editing = true;
-    try {
-      const raw = window.prompt('ランク (1〜200)', String(rank));
-      if (raw !== null){
-        const digits = raw.replace(/\D/g, '').slice(0, 3);
-        if (digits !== ''){
-          const next = Math.max(1, Math.min(200, Math.floor(Number(digits) || rank)));
-          rank = next;
-          paint();
-          onCommit(next);
-        }
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.inputMode = 'numeric';
+    input.pattern = '[0-9]*';
+    input.className = 'rank-edit-input';
+    input.value = '';
+    input.autocomplete = 'off';
+    input.spellcheck = false;
+    editor = input;
+    text.style.visibility = 'hidden';
+    wrap.appendChild(input);
+
+    let guardBlur = true;
+    setTimeout(()=>{ guardBlur = false; }, 350);
+
+    const finish = ()=>{
+      if (editor !== input) return;
+      if (guardBlur){
+        try { input.focus({preventScroll:true}); } catch (e) {}
+        return;
       }
-    } finally {
-      editing = false;
-    }
+      const raw = input.value;
+      editor = null;
+      input.remove();
+      text.style.visibility = '';
+      const next = raw === '' ? rank : Math.max(1, Math.min(200, Math.floor(Number(raw.replace(/\D/g, '')) || rank)));
+      rank = next;
+      paint();
+      try { window.getSelection()?.removeAllRanges(); } catch (e) {}
+      onCommit(next);
+    };
+    input.addEventListener('input', ()=>{
+      const v = input.value.replace(/\D/g, '').slice(0, 3);
+      if (input.value !== v) input.value = v;
+    });
+    input.addEventListener('blur', finish);
+    input.addEventListener('keydown', e=>{
+      if (e.key === 'Enter'){ e.preventDefault(); guardBlur = false; input.blur(); }
+      else if (e.key === 'Escape'){ e.preventDefault(); input.value = ''; guardBlur = false; input.blur(); }
+    });
+    input.addEventListener('pointerdown', e=> e.stopPropagation(), {capture:true});
+    try { input.focus({preventScroll:true}); } catch (e) {}
   };
   bindTapDown(wrap, ()=>{ open(); });
-  return { wrap, open, setRank, isEditing: ()=> editing };
+  return { wrap, open, setRank, isEditing: ()=> !!editor };
 }
 // 数字は通常の文字として表示し、タップ時だけ数字の真上に入力欄を重ねる。
 // 入力欄はレイアウトから外してあるので、編集開始/終了で周囲の数字や「/」がズレない。
@@ -751,12 +825,15 @@ function bindLongPressDelete(el, id, shortAction){
     active = false; moved = false; longFired = false; pid = null; nameInput = null;
   };
 
-  // スタミナの数字入力中、および名前・ランクの編集対象では長押し削除に入れない。
+  // 編集欄（数字・ランク・名前・編集中input）は長押し削除に入れない。
+  // ここに入ると「編集開始 → 直後に削除確認」が同時発火して壊れる。
   const isEditTarget = (target)=>{
     if (!target || !target.closest) return false;
     return !!(
       target.closest('.inline-edit-input') ||
+      target.closest('.name-edit-input') ||
       target.closest('.name-text') ||
+      target.closest('.rank-edit-input') ||
       target.closest('.rank-text') ||
       target.closest('[data-role="curWrap"]') ||
       target.closest('[data-role="maxWrap"]') ||
