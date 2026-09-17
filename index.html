@@ -32,8 +32,8 @@
     user-select:none;
     display:flex; flex-direction:column;
   }
-  /* アプリ内の編集キャレットは一括で非表示。編集自体はそのまま可能。 */
-  input{ caret-color:transparent; }
+  /* キャレットは通常表示。スタミナ系インライン数字編集だけ非表示。 */
+  .inline-edit-input{ caret-color:transparent; }
   /* インライン数字：親スロット幅いっぱいに置き、編集欄もその上に重ねる。
      「/」位置は valrow の左右均等フレックスで固定するため、幅ロックはしない。 */
   .inline-number{position:relative;display:block;width:100%;min-width:0;height:22px;line-height:22px;overflow:visible;}
@@ -47,7 +47,7 @@
     font:inherit; font-variant-numeric:tabular-nums; text-align:inherit;
     padding:0; margin:0; border-radius:0; appearance:none; -webkit-appearance:none;
     -webkit-user-select:text; user-select:text; overflow:visible;
-    z-index:3;
+    z-index:3; caret-color:transparent;
   }
   .stamval .inline-edit-input{ text-align:right; }
   .stammax .inline-edit-input{ text-align:left; }
@@ -924,17 +924,21 @@ function buildAbyssCard(it){
     if (pending40Id === it.id){ pending40Id = null; paintAbyssFortyPreview(it.id); }
   });
   rankInput.addEventListener('blur', ()=>{
-    const now = Date.now();
-    const live = stamInfo(it, now).cur;
-    it.rank = clampInt(rankInput.value, 1, 200, it.rank || 1);
-    syncAbyssMax(it);
-    preserveCycle(it, now);
-    it.current = Math.min(live, it.max);
-    freezeIfFull(it, now);
-    pending40Id = null;
-    updateOneTimer(it);
-    startTicking(true);
-    saveAfterPaint();
+    // キーボード／選択ハンドルが消えるのを待ってから再描画（同時更新で黒残り・二重描画しやすい）
+    const snap = rankInput.value;
+    setTimeout(()=>{
+      const now = Date.now();
+      const live = stamInfo(it, now).cur;
+      it.rank = clampInt(snap, 1, 200, it.rank || 1);
+      syncAbyssMax(it);
+      preserveCycle(it, now);
+      it.current = Math.min(live, it.max);
+      freezeIfFull(it, now);
+      pending40Id = null;
+      updateOneTimer(it);
+      startTicking(true);
+      saveAfterPaint();
+    }, 180);
   });
   const clockEl = wrap.querySelector('[data-role="clock"]');
   const onForty = (e)=>{
@@ -1487,22 +1491,30 @@ document.addEventListener('visibilitychange', ()=>{
 window.addEventListener('pageshow', (e)=>{
   if (e.persisted) resumePipeline();
 });
-// キーボード閉じ後の黒残り・二重描画を強制クリア
+// キーボード閉じ後の掃除。選択ハンドル中は触らない／遅らせる。
+let viewportFixTimer = null;
 function fixViewportAfterKeyboard(){
-  clearResumeVeil();
-  try { window.getSelection()?.removeAllRanges(); } catch (e) {}
-  try { window.scrollTo(0, 0); } catch (e) {}
-  // コンポジタのゴミレイヤを落とす
-  requestAnimationFrame(()=>{
-    document.body.style.transform = 'translateZ(0)';
-    requestAnimationFrame(()=>{ document.body.style.transform = ''; });
-  });
+  if (viewportFixTimer) clearTimeout(viewportFixTimer);
+  viewportFixTimer = setTimeout(()=>{
+    viewportFixTimer = null;
+    // まだ入力中なら何もしない（雫ハンドル表示中の再描画を避ける）
+    const ae = document.activeElement;
+    if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) return;
+    clearResumeVeil();
+    // removeAllRanges は入力外にフォーカスが移ったあとにだけ（ハンドルと競合しやすい）
+    try {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount && sel.isCollapsed === false) sel.removeAllRanges();
+      else if (sel && sel.rangeCount) sel.removeAllRanges();
+    } catch (e) {}
+    // scroll / transform は最終手段。短い遅延のあと1回だけ。
+    try { window.scrollTo(0, 0); } catch (e) {}
+  }, 220);
 }
 if (window.visualViewport){
   let lastH = window.visualViewport.height;
   window.visualViewport.addEventListener('resize', ()=>{
     const h = window.visualViewport.height;
-    // キーボードが閉じた（高さが戻った）ときだけ掃除
     if (h > lastH + 40) fixViewportAfterKeyboard();
     lastH = h;
   });
@@ -1510,15 +1522,20 @@ if (window.visualViewport){
 document.addEventListener('focusout', (e)=>{
   const t = e.target;
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')){
-    setTimeout(fixViewportAfterKeyboard, 50);
+    // すぐではなく、キーボード閉じとハンドル消えを待ってから
+    setTimeout(fixViewportAfterKeyboard, 200);
   }
 });
-// 操作開始時に残留ベール・選択を消す
+// ベールだけ即消す。選択解除は入力外タップ時のみ・遅延。
 document.addEventListener('pointerdown', (e)=>{
   clearResumeVeil();
   const t = e.target;
   if (!t || !t.closest || !t.closest('input, textarea, [contenteditable]')){
-    try { window.getSelection()?.removeAllRanges(); } catch (err) {}
+    setTimeout(()=>{
+      const ae = document.activeElement;
+      if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) return;
+      try { window.getSelection()?.removeAllRanges(); } catch (err) {}
+    }, 120);
   }
 }, true);
 
