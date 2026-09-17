@@ -67,6 +67,7 @@
     background:transparent; border:none; color:inherit; font:inherit; font-weight:inherit;
     padding:0; margin:0; outline:1px solid #d8d8d8; outline-offset:1px;
     caret-color:transparent; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+    touch-action:none;
     appearance:none; -webkit-appearance:none; z-index:2;
   }
   .name-edit-input::placeholder{ color:var(--sub); }
@@ -159,6 +160,7 @@
     font:inherit; font-weight:inherit; font-variant-numeric:tabular-nums;
     text-align:left; padding:0; margin:0; caret-color:transparent;
     -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+    touch-action:none;
     appearance:none; -webkit-appearance:none; z-index:3;
   }
   /* アカウント枠：通常カード2枚分の横幅 */
@@ -494,7 +496,12 @@ function createInlineText(initialValue, placeholder, onCommit){
       text.style.visibility = '';
       shownValue = value;
       paint();
-      try { window.getSelection()?.removeAllRanges(); } catch (e) {}
+      // 編集欄をDOMから外した直後にSelectionを明示的に破棄する。
+      // Android/TWA側に残る選択コンテキストを次のタップへ持ち越さない。
+      try {
+        const sel = window.getSelection();
+        if (sel) sel.removeAllRanges();
+      } catch (e) {}
       onCommit(value);
     };
     input.addEventListener('blur', finish);
@@ -507,7 +514,15 @@ function createInlineText(initialValue, placeholder, onCommit){
       input.focus({preventScroll:true});
     } catch (e) {}
   };
-  bindTapDown(wrap, ()=>{ open(); });
+  // 編集開始そのものをこの要素の pointerdown で完結させ、ブラウザの
+  // 「タップした文字を選択する」既定ジェスチャーを先に走らせない。
+  wrap.addEventListener('pointerdown', e=>{
+    if (e.isPrimary === false) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    open();
+  }, {capture:true});
   return { wrap, text, open, setText, setColor, isEditing: ()=> !!editor };
 }
 // ランク：表示は「Lv.n」、タップ時だけ数字 input
@@ -557,7 +572,11 @@ function createInlineRank(initialRank, onOpen, onCommit){
       const next = raw === '' ? rank : Math.max(1, Math.min(200, Math.floor(Number(raw.replace(/\D/g, '')) || rank)));
       rank = next;
       paint();
-      try { window.getSelection()?.removeAllRanges(); } catch (e) {}
+      // 編集終了時のSelectionを確実に破棄。
+      try {
+        const sel = window.getSelection();
+        if (sel) sel.removeAllRanges();
+      } catch (e) {}
       onCommit(next);
     };
     input.addEventListener('input', ()=>{
@@ -572,7 +591,14 @@ function createInlineRank(initialRank, onOpen, onCommit){
     input.addEventListener('pointerdown', e=> e.stopPropagation(), {capture:true});
     try { input.focus({preventScroll:true}); } catch (e) {}
   };
-  bindTapDown(wrap, ()=>{ open(); });
+  // ランク表示も編集開始前にブラウザの文字選択ジェスチャーを抑止する。
+  wrap.addEventListener('pointerdown', e=>{
+    if (e.isPrimary === false) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    open();
+  }, {capture:true});
   return { wrap, open, setRank, isEditing: ()=> !!editor };
 }
 // 数字は通常の文字として表示し、タップ時だけ数字の真上に入力欄を重ねる。
