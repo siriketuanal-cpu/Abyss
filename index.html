@@ -80,7 +80,8 @@
     flex:1 1 auto; min-height:0; overflow-x:hidden; overflow-y:auto;
     overscroll-behavior:none; -webkit-overflow-scrolling:touch;
     padding:6px 6px calc(20px + env(safe-area-inset-bottom));
-    display:grid; grid-template-columns:repeat(4,1fr); gap:6px; align-items:start;
+    display:grid; grid-template-columns:repeat(4,1fr); gap:6px;
+    align-items:start; align-content:start; /* 余白を行間に配らない＝コンパクト維持 */
   }
   .card{
     background:var(--card); border:1px solid var(--line); border-radius:10px;
