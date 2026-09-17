@@ -51,17 +51,25 @@
   }
   .stamval .inline-edit-input{ text-align:right; }
   .stammax .inline-edit-input{ text-align:left; }
-  /* アカウント名：編集対象が分かるよう、通常のフォーカス枠を復活。 */
-  .group .name:focus,
-  .divider .name:focus{ outline:1px solid #d8d8d8 !important; outline-offset:1px; box-shadow:none !important; }
-  .group .name:not(:focus),
-  .divider .name:not(:focus){ outline:none !important; box-shadow:none !important; }
-  /* 名前も選択不可のまま（キャレットは出る／雫ハンドルは出にくい） */
-  .group .name,
-  .divider .name{
+  /* 名前・見出し：普段は span。編集中だけ input が載る */
+  .name{
+    position:relative; display:inline-block; min-width:0;
     -webkit-tap-highlight-color:transparent; -webkit-touch-callout:none; touch-action:manipulation;
     -webkit-user-select:none; user-select:none;
   }
+  .name-text{
+    display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    -webkit-user-select:none; user-select:none;
+  }
+  .name-text.is-placeholder{ color:var(--sub); font-weight:600; }
+  .name-edit-input{
+    position:absolute; inset:0; width:100%; height:100%; box-sizing:border-box;
+    background:transparent; border:none; color:inherit; font:inherit; font-weight:inherit;
+    padding:0; margin:0; outline:1px solid #d8d8d8; outline-offset:1px;
+    caret-color:auto; -webkit-user-select:text; user-select:text;
+    appearance:none; -webkit-appearance:none; z-index:2;
+  }
+  .name-edit-input::placeholder{ color:var(--sub); }
   /* TWA復帰時の一瞬の再構築を視覚的に隠す。通常起動・通常操作では非表示。 */
   #resumeVeil{position:fixed;inset:0;background:var(--bg);opacity:0;pointer-events:none;z-index:100;transition:opacity 90ms linear;}
   #resumeVeil.show{opacity:1;}
@@ -132,25 +140,26 @@
     width:100%; background:transparent; border:none; color:var(--text);
     font-size:11px; font-weight:600; padding:2px 0; min-width:0;
   }
-  .name::placeholder{color:var(--sub);}
-  /* ランクは常にインライン（ネイティブの大きな入力ボックス化を抑止） */
+  /* ランク：普段は span、編集時だけ input（名前と同じ方式） */
   .rank{
     position:absolute; top:2px; right:2px; width:4.5em; max-width:45%;
     height:18px; line-height:18px; min-height:0; max-height:18px;
     margin:0; padding:0 2px; box-sizing:border-box;
-    background:transparent !important; border:none !important; outline:none;
-    border-radius:0; box-shadow:none;
+    background:transparent; border:none; outline:none;
     color:var(--orange);
     font-size:10px; font-weight:800; text-align:left;
     font-variant-numeric:tabular-nums;
-    -webkit-appearance:none; appearance:none;
     -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
-    z-index:2;
+    touch-action:manipulation; z-index:2; display:block;
   }
-  /* フォーカス時も user-select:none のまま → 雫ハンドル抑制、キャレットは表示 */
-  .rank:focus{
-    outline:none; background:transparent !important;
-    box-shadow:none;
+  .rank-text{ display:block; overflow:hidden; white-space:nowrap; }
+  .rank-edit-input{
+    position:absolute; inset:0; width:100%; height:100%; box-sizing:border-box;
+    background:transparent; border:none; outline:none; color:inherit;
+    font:inherit; font-weight:inherit; font-variant-numeric:tabular-nums;
+    text-align:left; padding:0; margin:0; caret-color:auto;
+    -webkit-user-select:text; user-select:text;
+    appearance:none; -webkit-appearance:none; z-index:3;
   }
   /* アカウント枠：通常カード2枚分の横幅 */
   .card.group{grid-column:span 2; padding:4px; border:1px solid #555b68; box-shadow:none; border-radius:8px;}
@@ -427,12 +436,146 @@ function bindTapDown(el, handler){
   });
 }
 
-// 末尾固定は雫ハンドル誘発の主因になりやすいため停止中。
-function forceCursorToEnd(_input){ /* no-op */ }
+function forceCursorToEnd(_input){ /* no-op: 常時inputには使わない */ }
 function placeCursorOnFocus(_input){ /* no-op */ }
-// 数字入力の共通処理。インライン編集側ではキャレット自体を非表示にする。
 function clearOnFocus(input){
   input.addEventListener('focus', () => { input.value = ''; });
+}
+// 名前・見出し：普段は span、タップ時だけ input を生成して破棄（雫ハンドルの土台を消す）
+function createInlineText(initialValue, placeholder, onCommit){
+  const wrap = document.createElement('span');
+  wrap.className = 'name';
+  const text = document.createElement('span');
+  text.className = 'name-text';
+  let shownValue = String(initialValue || '');
+  const paint = ()=>{
+    if (shownValue){
+      text.textContent = shownValue;
+      text.classList.remove('is-placeholder');
+    } else {
+      text.textContent = placeholder || '';
+      text.classList.add('is-placeholder');
+    }
+  };
+  paint();
+  wrap.appendChild(text);
+
+  let editor = null;
+  const setText = v => {
+    shownValue = String(v == null ? '' : v);
+    if (!editor) paint();
+  };
+  const setColor = c => { wrap.style.color = c || ''; };
+  const open = ()=>{
+    if (editor) return;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'name-edit-input';
+    input.placeholder = placeholder || '';
+    input.value = shownValue;
+    input.autocomplete = 'off';
+    input.spellcheck = false;
+    editor = input;
+    text.style.visibility = 'hidden';
+    wrap.appendChild(input);
+
+    let guardBlur = true;
+    setTimeout(()=>{ guardBlur = false; }, 350);
+
+    const finish = ()=>{
+      if (editor !== input) return;
+      if (guardBlur){
+        try { input.focus({preventScroll:true}); } catch (e) {}
+        return;
+      }
+      const value = input.value;
+      editor = null;
+      input.remove();
+      text.style.visibility = '';
+      shownValue = value;
+      paint();
+      try { window.getSelection()?.removeAllRanges(); } catch (e) {}
+      onCommit(value);
+    };
+    input.addEventListener('blur', finish);
+    input.addEventListener('keydown', e=>{
+      if (e.key === 'Enter'){ e.preventDefault(); guardBlur = false; input.blur(); }
+      else if (e.key === 'Escape'){ e.preventDefault(); input.value = shownValue; guardBlur = false; input.blur(); }
+    });
+    input.addEventListener('pointerdown', e=> e.stopPropagation(), {capture:true});
+    try {
+      input.focus({preventScroll:true});
+      // 編集中だけ末尾固定＋キャレット表示（生きている数秒だけ）
+      input.setSelectionRange(input.value.length, input.value.length);
+    } catch (e) {}
+  };
+  bindTapDown(wrap, ()=>{ open(); });
+  return { wrap, text, open, setText, setColor, isEditing: ()=> !!editor };
+}
+// ランク：表示は「Lv.n」、タップ時だけ数字 input
+function createInlineRank(initialRank, onOpen, onCommit){
+  const wrap = document.createElement('span');
+  wrap.className = 'rank';
+  const text = document.createElement('span');
+  text.className = 'rank-text';
+  let rank = Math.max(1, Math.min(200, Math.floor(Number(initialRank) || 1)));
+  const paint = ()=>{ text.textContent = 'Lv.' + rank; };
+  paint();
+  wrap.appendChild(text);
+
+  let editor = null;
+  const setRank = r => {
+    rank = Math.max(1, Math.min(200, Math.floor(Number(r) || rank)));
+    if (!editor) paint();
+  };
+  const open = ()=>{
+    if (editor) return;
+    if (typeof onOpen === 'function') onOpen();
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.inputMode = 'numeric';
+    input.pattern = '[0-9]*';
+    input.className = 'rank-edit-input';
+    input.value = '';
+    input.autocomplete = 'off';
+    input.spellcheck = false;
+    editor = input;
+    text.style.visibility = 'hidden';
+    wrap.appendChild(input);
+
+    let guardBlur = true;
+    setTimeout(()=>{ guardBlur = false; }, 350);
+
+    const finish = ()=>{
+      if (editor !== input) return;
+      if (guardBlur){
+        try { input.focus({preventScroll:true}); } catch (e) {}
+        return;
+      }
+      const raw = input.value;
+      editor = null;
+      input.remove();
+      text.style.visibility = '';
+      const next = raw === '' ? rank : Math.max(1, Math.min(200, Math.floor(Number(raw.replace(/\D/g, '')) || rank)));
+      rank = next;
+      paint();
+      try { window.getSelection()?.removeAllRanges(); } catch (e) {}
+      onCommit(next);
+    };
+    input.addEventListener('input', ()=>{
+      const v = input.value.replace(/\D/g, '').slice(0, 3);
+      if (input.value !== v) input.value = v;
+    });
+    input.addEventListener('blur', finish);
+    input.addEventListener('keydown', e=>{
+      if (e.key === 'Enter'){ e.preventDefault(); guardBlur = false; input.blur(); }
+      else if (e.key === 'Escape'){ e.preventDefault(); input.value = ''; guardBlur = false; input.blur(); }
+    });
+    input.addEventListener('pointerdown', e=> e.stopPropagation(), {capture:true});
+    try { input.focus({preventScroll:true}); } catch (e) {}
+  };
+  bindTapDown(wrap, ()=>{ open(); });
+  return { wrap, open, setRank, isEditing: ()=> !!editor };
 }
 // 数字は通常の文字として表示し、タップ時だけ数字の真上に入力欄を重ねる。
 // 入力欄はレイアウトから外してあるので、編集開始/終了で周囲の数字や「/」がズレない。
@@ -682,10 +825,13 @@ function bindLongPressDelete(el, id, shortAction){
     if (!target || !target.closest) return false;
     return !!(
       target.closest('.inline-edit-input') ||
+      target.closest('.name-edit-input') ||
+      target.closest('.name-text') ||
+      target.closest('.rank-edit-input') ||
+      target.closest('.rank-text') ||
       target.closest('[data-role="curWrap"]') ||
       target.closest('[data-role="maxWrap"]') ||
       target.closest('.rank') ||
-      target.closest('input.name') ||
       target.closest('.name')
     );
   };
@@ -828,7 +974,8 @@ function askRemoveItem(id){
     if (colorEl){
       colorEl.addEventListener('input', ()=>{
         it.color = colorEl.value;
-        if (refs[id]?.nameEl) refs[id].nameEl.style.color = it.color;
+        if (refs[id]?.nameEditor) refs[id].nameEditor.setColor(it.color);
+        else if (refs[id]?.nameEl) refs[id].nameEl.style.color = it.color;
         save();
       });
       colorEl.addEventListener('pointerdown', e=>e.stopPropagation());
@@ -900,35 +1047,23 @@ function buildStamCard(it){
 function buildAbyssCard(it){
   syncAbyssMax(it);
   const wrap = makeCardEl('abyss', it.id, `
-    <div class="row abyss-head">
+    <div class="row abyss-head" data-role="abyssHead">
       <div class="clockstack abyss-clock" data-role="clock"></div>
-      <input class="rank" data-role="rankInput" inputmode="numeric" pattern="[0-9]*" title="ランク">
     </div>
     ${valrowStamHtml()}
   `);
-  const rankInput = wrap.querySelector('[data-role="rankInput"]');
+  const head = wrap.querySelector('[data-role="abyssHead"]');
   const curWrap = wrap.querySelector('[data-role="curWrap"]');
   const maxLabel = wrap.querySelector('[data-role="maxWrap"]');
   const curEditor = attachCurrentEditor(curWrap, it, () => { pending40Id = null; });
-  // ランクはインラインのまま。フォーカス時だけ空欄。選択ハンドルは出さない。
-  clearOnFocus(rankInput);
-  ['selectstart','contextmenu'].forEach(ev=>{
-    rankInput.addEventListener(ev, e=>{ e.preventDefault(); });
-  });
-  rankInput.setAttribute('autocomplete','off');
-  rankInput.setAttribute('autocapitalize','off');
-  rankInput.setAttribute('autocorrect','off');
-  rankInput.setAttribute('spellcheck','false');
-  rankInput.addEventListener('focus', ()=>{
-    if (pending40Id === it.id){ pending40Id = null; paintAbyssFortyPreview(it.id); }
-  });
-  rankInput.addEventListener('blur', ()=>{
-    // キーボード／選択ハンドルが消えるのを待ってから再描画（同時更新で黒残り・二重描画しやすい）
-    const snap = rankInput.value;
-    setTimeout(()=>{
+  const rankEditor = createInlineRank(it.rank || 1,
+    ()=>{
+      if (pending40Id === it.id){ pending40Id = null; paintAbyssFortyPreview(it.id); }
+    },
+    (next)=>{
       const now = Date.now();
       const live = stamInfo(it, now).cur;
-      it.rank = clampInt(snap, 1, 200, it.rank || 1);
+      it.rank = next;
       syncAbyssMax(it);
       preserveCycle(it, now);
       it.current = Math.min(live, it.max);
@@ -937,8 +1072,9 @@ function buildAbyssCard(it){
       updateOneTimer(it);
       startTicking(true);
       saveAfterPaint();
-    }, 180);
-  });
+    }
+  );
+  head.appendChild(rankEditor.wrap);
   const clockEl = wrap.querySelector('[data-role="clock"]');
   const onForty = (e)=>{
     e.stopPropagation();
@@ -967,8 +1103,7 @@ function buildAbyssCard(it){
   const info0 = stamInfo(it, Date.now());
   curEditor.setText(info0.cur);
   maxLabel.textContent = String(it.max);
-  rankInput.value = 'Lv.' + (it.rank || 1);
-  refs[it.id] = { el: wrap, rankInput, curEl: curEditor, maxLabel, clockEl };
+  refs[it.id] = { el: wrap, rankEditor, curEl: curEditor, maxLabel, clockEl };
   bindLongPressDelete(wrap, it.id, (e) => onForty(e));
   return wrap;
 }
@@ -995,25 +1130,15 @@ function buildGroupCard(it){
   const wrap = document.createElement('div');
   wrap.className = 'card group';
   wrap.innerHTML = `
-    <div class="row namerow group-namerow">
-      <input class="name" placeholder="アカウント" value="${esc(it.name)}">
-    </div>
+    <div class="row namerow group-namerow" data-role="namerow"></div>
     <div class="group-body" data-role="body"></div>
   `;
-  const nameEl = wrap.querySelector('.name');
-  nameEl.addEventListener('blur', ()=>{
-    try { window.getSelection()?.removeAllRanges(); } catch (e) {}
-    if (it.name !== nameEl.value){ it.name = nameEl.value; save(); }
+  const nameRowEl = wrap.querySelector('[data-role="namerow"]');
+  const nameEditor = createInlineText(it.name || '', 'アカウント', (value)=>{
+    if (it.name !== value){ it.name = value; save(); }
   });
-  placeCursorOnFocus(nameEl);
-  ['selectstart','contextmenu'].forEach(ev=>{
-    nameEl.addEventListener(ev, e=>{ e.preventDefault(); });
-  });
-  bindTapDown(nameEl, ()=>{
-    try { nameEl.focus(); } catch (err) {}
-  });
-  const nameRowEl = wrap.querySelector('.group-namerow');
-  refs[it.id] = { el: wrap, nameEl,
+  nameRowEl.appendChild(nameEditor.wrap);
+  refs[it.id] = { el: wrap, nameEl: nameEditor.wrap, nameEditor,
     bodyEl: wrap.querySelector('[data-role="body"]'),
     childRefs: {} };
   bindLongPressDelete(nameRowEl, it.id);
@@ -1049,23 +1174,12 @@ function buildRuleCard(it){
 function buildHeaderCard(it){
   const wrap = document.createElement('div');
   wrap.className = 'divider';
-  wrap.innerHTML = `
-    <input class="name" placeholder="見出し(ゲーム名など)" value="${esc(it.name)}">
-  `;
-  const nameEl = wrap.querySelector('.name');
-  nameEl.style.color = it.color || 'var(--accent)';
-  nameEl.addEventListener('blur', ()=>{
-    try { window.getSelection()?.removeAllRanges(); } catch (e) {}
-    if (it.name !== nameEl.value){ it.name = nameEl.value; save(); }
+  const nameEditor = createInlineText(it.name || '', '見出し(ゲーム名など)', (value)=>{
+    if (it.name !== value){ it.name = value; save(); }
   });
-  placeCursorOnFocus(nameEl);
-  ['selectstart','contextmenu'].forEach(ev=>{
-    nameEl.addEventListener(ev, e=>{ e.preventDefault(); });
-  });
-  bindTapDown(nameEl, ()=>{
-    try { nameEl.focus(); } catch (err) {}
-  });
-  refs[it.id] = { el: wrap, nameEl };
+  nameEditor.setColor(it.color || 'var(--accent)');
+  wrap.appendChild(nameEditor.wrap);
+  refs[it.id] = { el: wrap, nameEl: nameEditor.wrap, nameEditor };
   bindLongPressDelete(wrap, it.id);
   return wrap;
 }
@@ -1234,12 +1348,12 @@ function render(){
   for (const it of state.items){
     const r = refs[it.id];
     if (it.type==='rule') r.el.style.borderTopColor = it.color || '#52617a';
-    if (it.type==='header' && r.nameEl){
-      const c = it.color || '#9b8bff';
-      if (r.nameEl.style.color !== c) r.nameEl.style.color = c;
+    if (it.type==='header' && r.nameEditor){
+      r.nameEditor.setColor(it.color || '#9b8bff');
+      if (!r.nameEditor.isEditing()) r.nameEditor.setText(it.name || '');
     }
     if (it.type==='group'){
-      if (document.activeElement !== r.nameEl && r.nameEl.value !== it.name) r.nameEl.value = it.name;
+      if (r.nameEditor && !r.nameEditor.isEditing()) r.nameEditor.setText(it.name || '');
       for (const child of it.children) updateTimerCard(child, r.childRefs[child.id], now);
     } else {
       updateTimerCard(it, r, now);
@@ -1275,10 +1389,7 @@ function updateTimerCard(it, r, now){
     r.el.classList.toggle('full', info.isFull);
     r.el.classList.toggle('claim', wait40);
     renderClock(r.clockEl, info.remainMs, info.isFull, now, info.fullAt);
-    if (r.rankInput && document.activeElement !== r.rankInput){
-      const v = 'Lv.' + (it.rank || 1);
-      if (r.rankInput.value !== v) r.rankInput.value = v;
-    }
+    if (r.rankEditor && !r.rankEditor.isEditing()) r.rankEditor.setRank(it.rank || 1);
     if (r.curEl && !r.curEl.isEditing()) r.curEl.setText(wait40 ? remainingAfter40(info.cur) : info.cur);
     if (r.maxLabel){
       const v = String(it.max);
@@ -1425,24 +1536,15 @@ bindTapDown(setupConfirmEl, (e)=>{
   confirmSetup();
 });
 
-// 数字・ランク編集は #cards への pointerdown 委譲で一本化（カードごとの bind を減らす）
+// スタミナ数字編集は #cards への pointerdown 委譲（ランク・名前は各 editor が bind）
 cardsEl.addEventListener('pointerdown', (e) => {
   if (e.isPrimary === false) return;
   if (e.pointerType === 'mouse' && e.button !== 0) return;
   const t = e.target;
   if (!t || !t.closest) return;
-
-  // ランク欄：pointerdown でフォーカス（長押し対象外・末尾固定なし）
-  const rank = t.closest('.rank');
-  if (rank) {
-    try { rank.focus(); } catch (err) {}
-    return;
-  }
-
   const cur = t.closest('[data-role="curWrap"]');
   const max = t.closest('[data-role="maxWrap"]');
   if (!cur && !max) return;
-
   const host = (cur || max).closest('[data-id]');
   if (!host) return;
   const r = getTimerRef(host.dataset.id);
@@ -1496,64 +1598,12 @@ document.addEventListener('visibilitychange', ()=>{
 window.addEventListener('pageshow', (e)=>{
   if (e.persisted) resumePipeline();
 });
-// キーボードに合わせてレイアウト高さを合わせ、閉じたあとの黒帯を減らす
-function syncLayoutToVisualViewport(){
-  const vv = window.visualViewport;
-  if (!vv) return;
-  const gap = window.innerHeight - vv.height;
-  if (gap > 50){
-    // キーボード表示中：見える領域に合わせる
-    document.body.style.height = Math.round(vv.height) + 'px';
-  } else {
-    document.body.style.height = '';
-  }
-}
-let viewportFixTimer = null;
-function fixViewportAfterKeyboard(){
-  if (viewportFixTimer) clearTimeout(viewportFixTimer);
-  viewportFixTimer = setTimeout(()=>{
-    viewportFixTimer = null;
-    const ae = document.activeElement;
-    if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) return;
-    clearResumeVeil();
-    document.body.style.height = '';
-    try { window.getSelection()?.removeAllRanges(); } catch (e) {}
-    try { window.scrollTo(0, 0); } catch (e) {}
-    const cards = document.getElementById('cards');
-    if (cards) {
-      // レイアウト再計算だけ促す（見た目を壊さない軽量リフロー）
-      void cards.offsetHeight;
-    }
-  }, 280);
-}
-if (window.visualViewport){
-  let lastH = window.visualViewport.height;
-  window.visualViewport.addEventListener('resize', ()=>{
-    const h = window.visualViewport.height;
-    syncLayoutToVisualViewport();
-    if (h > lastH + 40) fixViewportAfterKeyboard();
-    lastH = h;
-  });
-  window.visualViewport.addEventListener('scroll', ()=>{
-    try { window.scrollTo(0, 0); } catch (e) {}
-  });
-}
-document.addEventListener('focusout', (e)=>{
-  const t = e.target;
-  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')){
-    setTimeout(fixViewportAfterKeyboard, 250);
-  }
-});
-// ベールだけ即消す。選択解除は入力外タップ時のみ・遅延。
+// 入力外タップで選択解除（キーボード専用の viewport ハックは外した）
 document.addEventListener('pointerdown', (e)=>{
   clearResumeVeil();
   const t = e.target;
   if (!t || !t.closest || !t.closest('input, textarea, [contenteditable]')){
-    setTimeout(()=>{
-      const ae = document.activeElement;
-      if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) return;
-      try { window.getSelection()?.removeAllRanges(); } catch (err) {}
-    }, 120);
+    try { window.getSelection()?.removeAllRanges(); } catch (err) {}
   }
 }, true);
 
