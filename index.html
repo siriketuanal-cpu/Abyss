@@ -32,22 +32,23 @@
   }
   /* アプリ内の編集キャレットは一括で非表示。編集自体はそのまま可能。 */
   input{ caret-color:transparent; }
-  /* 数字のインライン編集は表示幅を変えず、編集欄を数字の真上に重ねる。
-     通常時は固定幅を持たせず「/」直前に自然に右寄せ（余白を作らない）。
-     編集開始時だけ JS で現在幅をロックして、最大値側がガクッと動くのを防ぐ。 */
-  .inline-number{position:relative;display:inline-block;min-width:0;height:22px;line-height:22px;overflow:visible;}
-  .inline-number-text{ display:inline-block; width:auto; min-width:0; max-width:none; height:22px; line-height:22px; text-align:right; overflow:visible; font-variant-numeric:tabular-nums; }
+  /* インライン数字：親スロット幅いっぱいに置き、編集欄もその上に重ねる。
+     「/」位置は valrow の左右均等フレックスで固定するため、幅ロックはしない。 */
+  .inline-number{position:relative;display:block;width:100%;min-width:0;height:22px;line-height:22px;overflow:visible;}
+  .inline-number-text{ display:block; width:100%; height:22px; line-height:22px; overflow:visible; font-variant-numeric:tabular-nums; }
+  .stamval .inline-number-text{ text-align:right; }
+  .stammax .inline-number-text{ text-align:center; }
   .inline-number.editing .inline-number-text{visibility:hidden;}
   .inline-edit-input{
-    position:absolute; top:0; left:0; width:100%; max-width:none; height:100%; box-sizing:border-box;
-    transform:none;
+    position:absolute; top:0; left:0; width:100%; height:100%; box-sizing:border-box;
     border:0; outline:0; background:transparent; color:inherit;
-    font:inherit; font-variant-numeric:tabular-nums; text-align:center;
+    font:inherit; font-variant-numeric:tabular-nums; text-align:inherit;
     padding:0; margin:0; border-radius:0; appearance:none; -webkit-appearance:none;
     -webkit-user-select:text; user-select:text; overflow:visible;
-    /* curWrap の広い疑似ヒット領域より必ず手前に出し、編集時のフォーカスを守る。 */
     z-index:3;
   }
+  .stamval .inline-edit-input{ text-align:right; }
+  .stammax .inline-edit-input{ text-align:center; }
   /* アカウント名：編集対象が分かるよう、通常のフォーカス枠を復活。 */
   .group .name:focus{ outline:1px solid #d8d8d8 !important; outline-offset:1px; box-shadow:none !important; }
   .group .name{ -webkit-tap-highlight-color:transparent; -webkit-touch-callout:none; touch-action:manipulation; user-select:text; }
@@ -131,14 +132,9 @@
   .group-body{display:grid; grid-template-columns:repeat(2,1fr); gap:6px; min-height:1px; align-items:end;}
   .group-body.one{grid-template-columns:1fr;}
   .group-body:empty{display:none;}
-  .stammax{
-    color:var(--blue); font-size:18px; font-weight:700; text-align:center;
-    font-variant-numeric:tabular-nums; height:22px; line-height:22px;
-  }
   /* Abyss「40使い切り」プレビュー中：押した所が分かるよう点線で囲む */
   .main{font-size:16px; line-height:1.1; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:.01em;}
-  /* 数字列は固定幅にせず、現在値を「/」の直前へ自然に右寄せ。
-     22/100 のような2桁でも余白が残らず、100/100 でも同じ基準で揃う。 */
+  /* 左右を均等フレックスにし「/」を中央固定。桁数が変わってもスラッシュは動かない。 */
   .valrow-stam{
     margin-top:0 !important; align-items:center; min-height:22px; height:22px;
     position:absolute; left:6px; right:6px; bottom:5px;
@@ -146,17 +142,20 @@
   }
   .stamval{
     color:var(--text); font-size:18px; font-weight:700; text-align:right;
-    font-variant-numeric:tabular-nums; width:auto; min-width:0;
-    overflow:visible; height:22px; line-height:22px; display:inline-block;
-    flex:0 0 auto;
+    font-variant-numeric:tabular-nums; min-width:0;
+    overflow:visible; height:22px; line-height:22px;
+    flex:1 1 0; display:block;
   }
-  /* / は通常のレイアウトに戻し、左右の数字の間に自然に配置。
-     絶対配置を使わないので、桁数が変わっても重ならない。 */
+  .stammax{
+    color:var(--blue); font-size:18px; font-weight:700; text-align:center;
+    font-variant-numeric:tabular-nums; height:22px; line-height:22px;
+    flex:1 1 0; min-width:0; display:block;
+  }
   .slash{
     position:relative; flex:0 0 auto; width:auto; height:22px;
     margin:0 4px; color:#7f8da3;
     font-size:15px; font-weight:700; line-height:20px;
-    text-align:center; top:-1px; transform:none;
+    text-align:center; top:-1px;
     overflow:visible; pointer-events:none;
   }
   .clockstack{
@@ -166,10 +165,9 @@
   }
   .clockstack .ok{color:var(--ok); font-size:14px; line-height:18px;}
   .clockstack .full-at{color:var(--danger); font-size:9.5px; font-weight:800; line-height:18px;}
-  /* 満タンまで2時間未満：スタミナ現在値・放置の数字を赤くする（予定時刻は対象外）
-     .stamval の color より確実に勝たせるため !important */
-  .inline-number.near,
-  .inline-number.near .inline-number-text{color:var(--danger) !important;}
+  /* 満タンまで2時間未満：現在スタミナ・放置数字を赤（予定時刻は触らない） */
+  [data-role="curWrap"].near,
+  [data-role="curWrap"].near .inline-number-text{color:var(--danger) !important;}
   .main.near{color:var(--danger) !important;}
   /* 予定時刻は全タイマーカードで右上に統一。Abyssと同じ基準位置に揃える。 */
   .card.stam > .stam-clock,
@@ -191,13 +189,13 @@
   .valrow-idle .main{min-width:2.6em; text-align:center; padding-left:0; font-size:19px; line-height:1.1;}
   .valrow-idle .clockstack{margin:0; position:absolute; left:0; top:auto;}
   .card.idle .valrow-idle .clockstack{position:absolute; left:0; bottom:22px; top:auto;}
-  /* 現在値・最大値の当たり判定は疑似要素で少し広げる。編集中は is-editing で無効化（:has 不使用） */
+  /* 当たり判定は ::before で左右を分ける。スラッシュをまたがない。編集中は無効化。 */
   [data-role="curWrap"], [data-role="maxWrap"]{ position:relative; }
   [data-role="curWrap"]::before{
-    content:''; position:absolute; top:-4px; bottom:-2px; left:-14px; right:-2px; z-index:1;
+    content:''; position:absolute; top:-6px; bottom:-4px; left:-8px; right:0; z-index:1;
   }
   [data-role="maxWrap"]::before{
-    content:''; position:absolute; top:-4px; bottom:-2px; left:-2px; right:-10px; z-index:1;
+    content:''; position:absolute; top:-6px; bottom:-4px; left:0; right:-8px; z-index:1;
   }
   [data-role="curWrap"].is-editing::before,
   [data-role="maxWrap"].is-editing::before{
@@ -437,21 +435,6 @@ function createInlineNumber(initialValue, onCommit){
   const isEditing = () => editor !== null;
   const open = () => {
     if (editor) return;
-    // 通常表示は固定幅なし。編集中だけ幅を確保する。
-    // 開始値が1桁でも「240」など3桁が全部見えるよう、最低3桁分の幅を確保する。
-    // （以前は開始幅のままロックして、入力中1桁しか見えない不具合があった）
-    let min3 = 0;
-    try {
-      const probe = document.createElement('span');
-      probe.className = 'inline-number-text';
-      probe.style.cssText = 'position:absolute;left:-9999px;visibility:hidden;white-space:nowrap;';
-      probe.textContent = '000';
-      wrap.appendChild(probe);
-      min3 = probe.offsetWidth || 0;
-      probe.remove();
-    } catch (e) {}
-    const lockW = Math.max(wrap.offsetWidth || text.offsetWidth || 0, min3, 1);
-    wrap.style.minWidth = lockW + 'px';
     const parentHit = wrap.parentElement; // curWrap / maxWrap
     if (parentHit) parentHit.classList.add('is-editing');
     const input = document.createElement('input');
@@ -475,7 +458,6 @@ function createInlineNumber(initialValue, onCommit){
       editor = null;
       input.remove();
       wrap.classList.remove('editing');
-      wrap.style.minWidth = '';
       if (parentHit) parentHit.classList.remove('is-editing');
       onCommit(value);
     };
@@ -488,15 +470,9 @@ function createInlineNumber(initialValue, onCommit){
       if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
       else if (e.key === 'Escape') { e.preventDefault(); input.value = originalValue; input.blur(); }
     });
-    // 編集中の pointer を親カードへ漏らさない（キーボード即閉じ防止）
-    ['pointerdown','pointerup','click'].forEach(ev => {
-      input.addEventListener(ev, e => { e.stopPropagation(); }, {capture:true});
-    });
-    // モバイルで focus が直後に外れることがあるので、1フレーム後にもう一度当てる
+    // 入力中の pointer だけ親へ漏らさない（競合対策はここに集約）
+    input.addEventListener('pointerdown', e => e.stopPropagation(), {capture:true});
     input.focus({preventScroll:true});
-    requestAnimationFrame(() => {
-      if (editor === input) try { input.focus({preventScroll:true}); } catch (e) {}
-    });
   };
   return {wrap, text, open, setText, isEditing};
 }
@@ -836,16 +812,8 @@ function buildStamCard(it){
   bindLongPressDelete(wrap, it.id, (e)=>{
     const target = e.target;
     if (target.closest && target.closest('.inline-edit-input')) return;
-    if (target.closest && target.closest('[data-role="curWrap"]')) {
-      try { e.preventDefault(); e.stopPropagation(); } catch (err) {}
-      curEditor.open();
-      return;
-    }
-    if (target.closest && target.closest('[data-role="maxWrap"]')) {
-      try { e.preventDefault(); e.stopPropagation(); } catch (err) {}
-      maxEditor.open();
-      return;
-    }
+    if (target.closest && target.closest('[data-role="curWrap"]')) { curEditor.open(); return; }
+    if (target.closest && target.closest('[data-role="maxWrap"]')) { maxEditor.open(); return; }
   });
   return wrap;
 }
@@ -951,7 +919,6 @@ function buildAbyssCard(it){
       return;
     }
     if (e.target.closest && e.target.closest('[data-role="curWrap"]')){
-      try { e.preventDefault(); e.stopPropagation(); } catch (err) {}
       curEditor.open();
       return;
     }
@@ -1237,9 +1204,9 @@ function updateTimerCard(it, r, now){
     renderClock(r.clockEl, info.remainMs, info.isFull, now, info.fullAt);
     if (r.curEl && !r.curEl.isEditing()) r.curEl.setText(info.cur);
     if (r.maxEl && !r.maxEl.isEditing()) r.maxEl.setText(it.max);
-    // 現在スタミナ：満タンまで2時間未満で赤
-    if (r.curEl && r.curEl.wrap){
-      r.curEl.wrap.classList.toggle('near', isNearFull(info.remainMs, info.isFull));
+    // 現在スタミナ：満タンまで2時間未満で赤（curWrap に付ける）
+    if (r.curEl && r.curEl.wrap && r.curEl.wrap.parentElement){
+      r.curEl.wrap.parentElement.classList.toggle('near', isNearFull(info.remainMs, info.isFull));
     }
   } else if (it.type==='abyss'){
     const info = stamInfo(it, now);
@@ -1256,9 +1223,9 @@ function updateTimerCard(it, r, now){
       const v = String(it.max);
       if (r.maxLabel.textContent !== v) r.maxLabel.textContent = v;
     }
-    // 現在スタミナ：満タンまで2時間未満で赤（40プレビュー中も同じ判定）
-    if (r.curEl && r.curEl.wrap){
-      r.curEl.wrap.classList.toggle('near', isNearFull(info.remainMs, info.isFull));
+    // 現在スタミナ：満タンまで2時間未満で赤（curWrap に付ける）
+    if (r.curEl && r.curEl.wrap && r.curEl.wrap.parentElement){
+      r.curEl.wrap.parentElement.classList.toggle('near', isNearFull(info.remainMs, info.isFull));
     }
   } else if (it.type==='idle'){
     const info = idleInfo(it, now);
