@@ -689,9 +689,26 @@ function createInlineNumber(initialValue, onCommit, editKey){
   text.textContent = shownValue;
   wrap.appendChild(text);
 
+  // 編集欄は最初からDOMに常設する。
+  // タップ前は入力対象にせず、短押しが確定した時だけfocusする。
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.inputMode = 'numeric';
+  input.pattern = '[0-9]*';
+  input.className = 'inline-edit-input';
+  input.autocomplete = 'off';
+  input.autocapitalize = 'off';
+  input.autocorrect = 'off';
+  input.spellcheck = false;
+  input.maxLength = 3;
+  input.tabIndex = -1;
+  input.setAttribute('aria-hidden','true');
+  input.style.visibility = 'hidden';
+  input.style.pointerEvents = 'none';
+  wrap.appendChild(input);
+
   let editor = null;
-  let finishEditor = null;
-  let focusEditor = null;
+  let guardBlur = false;
   const setText = v => {
     v = String(v);
     if (v === shownValue) return;
@@ -700,103 +717,62 @@ function createInlineNumber(initialValue, onCommit, editKey){
   };
   const isEditing = () => editor !== null || (editKey != null && editingId === editKey);
 
+  const closeInput = () => {
+    input.style.visibility = 'hidden';
+    input.style.pointerEvents = 'none';
+    input.tabIndex = -1;
+    input.setAttribute('aria-hidden','true');
+  };
+  const focusInput = () => {
+    if (editor !== input) return;
+    input.style.visibility = 'visible';
+    input.style.pointerEvents = 'auto';
+    input.tabIndex = 0;
+    input.removeAttribute('aria-hidden');
+    try { input.focus({preventScroll:true}); } catch (e) {}
+  };
+
+  const finish = (commit=true) => {
+    if (editor !== input) return;
+    if (guardBlur && commit) {
+      // 編集開始直後のblurは無視する。
+      try { input.focus({preventScroll:true}); } catch (e) {}
+      return;
+    }
+    const value = input.value;
+    editor = null;
+    wrap.classList.remove('editing');
+    const parentHit = wrap.parentElement;
+    if (parentHit) parentHit.classList.remove('is-editing');
+    if (editKey != null && editingId === editKey) editingId = null;
+    try { window.getSelection()?.removeAllRanges(); } catch (e) {}
+    closeInput();
+    if (commit) onCommit(value);
+  };
+
   const open = () => {
     if (editor) return;
     const parentHit = wrap.parentElement;
     if (parentHit) parentHit.classList.add('is-editing');
     if (editKey != null) editingId = editKey;
-
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.inputMode = 'numeric';
-    input.pattern = '[0-9]*';
-    input.className = 'inline-edit-input';
-    input.autocomplete = 'off';
-    input.autocapitalize = 'off';
-    input.autocorrect = 'off';
-    input.spellcheck = false;
-    input.maxLength = 3;
-    const originalValue = shownValue;
+    input.value = shownValue;
     editor = input;
+    guardBlur = true;
     wrap.classList.add('editing');
-    wrap.appendChild(input);
-
-    let guardBlur = true;
-    const clearGuard = () => { guardBlur = false; };
-    setTimeout(clearGuard, 350);
-
-    let holdTimer = null;
-    let holdPointerId = null;
-    let holdX = 0, holdY = 0;
-    const cancelHold = () => {
-      if (holdTimer !== null){ clearTimeout(holdTimer); holdTimer = null; }
-      holdPointerId = null;
-    };
-
-    const finish = () => {
-      if (editor !== input) return;
-      if (guardBlur) {
-        try { input.focus({preventScroll:true}); } catch (e) {}
-        return;
-      }
-      cancelHold();
-      const value = input.value;
-      editor = null;
-      input.remove();
-      wrap.classList.remove('editing');
-      if (parentHit) parentHit.classList.remove('is-editing');
-      if (editKey != null && editingId === editKey) editingId = null;
-      try { window.getSelection()?.removeAllRanges(); } catch (e) {}
-      onCommit(value);
-    };
-    finishEditor = finish;
-    focusEditor = () => {
-      if (editor !== input || input.readOnly) return;
-      try { input.focus({preventScroll:true}); } catch (e) {}
-    };
-
-    input.addEventListener('input', () => {
-      const v = input.value.replace(/\D/g, '').slice(0,3);
-      if (input.value !== v) input.value = v;
-    });
-    input.addEventListener('blur', finish);
-    input.addEventListener('keydown', e => {
-      if (e.key === 'Enter') { e.preventDefault(); clearGuard(); input.blur(); }
-      else if (e.key === 'Escape') { e.preventDefault(); input.value = originalValue; clearGuard(); input.blur(); }
-    });
-    input.addEventListener('pointerdown', e => {
-      if (e.isPrimary === false) return;
-      e.stopPropagation();
-      try { window.getSelection()?.removeAllRanges(); } catch (err) {}
-      cancelHold();
-      holdPointerId = e.pointerId;
-      holdX = e.clientX; holdY = e.clientY;
-      holdTimer = setTimeout(() => {
-        holdTimer = null;
-        holdPointerId = null;
-        try { window.getSelection()?.removeAllRanges(); } catch (err) {}
-        if (editor === input){
-          guardBlur = false;
-          finish();
-        }
-      }, 450);
-    }, {capture:true, passive:true});
-    input.addEventListener('pointermove', e => {
-      if (e.pointerId !== holdPointerId) return;
-      if (Math.hypot(e.clientX-holdX, e.clientY-holdY) > 12) cancelHold();
-    }, {capture:true, passive:true});
-    input.addEventListener('pointerup', e => {
-      if (e.pointerId === holdPointerId) cancelHold();
-    }, {capture:true, passive:true});
-    input.addEventListener('pointercancel', cancelHold, {capture:true, passive:true});
-    input.addEventListener('selectstart', e => {
-      e.preventDefault();
-      try { window.getSelection()?.removeAllRanges(); } catch (err) {}
-    }, {capture:true});
+    // ここでは絶対にfocusしない。長押し判定が先。
+    setTimeout(() => { guardBlur = false; }, 350);
   };
 
-  // 数字も名前・見出しと同じく、編集欄を作った直後にはfocusしない。
-  // 短押しのpointerupで初めてfocusし、長押しならfocus前に編集を破棄する。
+  input.addEventListener('input', () => {
+    const v = input.value.replace(/\D/g, '').slice(0,3);
+    if (input.value !== v) input.value = v;
+  });
+  input.addEventListener('blur', () => finish(true));
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); guardBlur = false; input.blur(); }
+    else if (e.key === 'Escape') { e.preventDefault(); input.value = shownValue; guardBlur = false; input.blur(); }
+  });
+
   let wrapHoldTimer = null;
   let wrapPointerId = null;
   let wrapHoldX = 0, wrapHoldY = 0;
@@ -804,6 +780,7 @@ function createInlineNumber(initialValue, onCommit, editKey){
     if (wrapHoldTimer !== null){ clearTimeout(wrapHoldTimer); wrapHoldTimer = null; }
     wrapPointerId = null;
   };
+
   wrap.addEventListener('pointerdown', e => {
     if (e.isPrimary === false) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -817,19 +794,24 @@ function createInlineNumber(initialValue, onCommit, editKey){
     wrapHoldTimer = setTimeout(() => {
       wrapHoldTimer = null;
       wrapPointerId = null;
-      if (editor && finishEditor) {
-        finishEditor();
+      // 長押しではfocusせず、そのまま編集状態を破棄する。
+      if (editor === input) {
+        guardBlur = false;
+        finish(false);
       }
     }, 450);
   }, {capture:true, passive:false});
+
   wrap.addEventListener('pointermove', e => {
     if (e.pointerId !== wrapPointerId) return;
     if (Math.hypot(e.clientX-wrapHoldX, e.clientY-wrapHoldY) > 12) clearWrapHold();
   }, {capture:true, passive:true});
+
   wrap.addEventListener('pointerup', e => {
     if (e.pointerId !== wrapPointerId) return;
     clearWrapHold();
-    if (editor && focusEditor) focusEditor();
+    // 短押しだけここでfocus。Androidの雫型選択はこの時点まで発生させない。
+    focusInput();
   }, {capture:true, passive:false});
   wrap.addEventListener('pointercancel', clearWrapHold, {capture:true, passive:true});
 
