@@ -762,7 +762,7 @@ function createInlineNumber(initialValue, onCommit, editKey){
       else if (e.key === 'Escape') { e.preventDefault(); input.value = originalValue; guardBlur = false; input.blur(); }
     });
 
-    // 編集欄を実際に操作している間だけ、選択UIを抑止する。
+    // 編集欄に入ってからの長押しも、ネイティブ選択を出さずに終了する。
     input.addEventListener('pointerdown', e=>{
       if (e.isPrimary === false) return;
       e.preventDefault();
@@ -790,8 +790,8 @@ function createInlineNumber(initialValue, onCommit, editKey){
     input.addEventListener('pointercancel', cancelHold, {capture:true, passive:true});
   };
 
-  // 数字そのものの短押し/長押しをここで判定する。
-  // 短押しではpointerup後にだけfocusし、長押しではfocus前に編集を閉じる。
+  // 数字も名前と同じく、編集開始時にはfocusしない。
+  // 短押しのpointerupでだけfocusすることで、長押し時のAndroid雫型を避ける。
   let holdTimer = null;
   let holdPointerId = null;
   let holdX = 0, holdY = 0;
@@ -825,7 +825,6 @@ function createInlineNumber(initialValue, onCommit, editKey){
   wrap.addEventListener('pointerup', e=>{
     if (e.pointerId !== holdPointerId) return;
     clearHold();
-    // Android側でpointerdownのキャンセル処理が残っていても、短押しならここで確実に編集開始。
     if (editor && focusEditor){
       requestAnimationFrame(()=>{
         if (editor && focusEditor) focusEditor();
