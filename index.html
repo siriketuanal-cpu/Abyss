@@ -689,25 +689,11 @@ function bindLongPressDelete(el, id, shortAction){
   };
 
   el.addEventListener('pointerdown', e=>{
-    // 編集系（数字・ランク・名前・編集中input）は長押しに入れない → pointerdown 編集と分離
-    if (e.target && e.target.closest && (
-      e.target.closest('.inline-edit-input') ||
-      e.target.closest('[data-role="curWrap"]') ||
-      e.target.closest('[data-role="maxWrap"]') ||
-      e.target.closest('.rank') ||
-      e.target.closest('input.name') ||
-      e.target.closest('.name')
-    )) return;
-    if (el.querySelector && el.querySelector('.inline-edit-input')) return;
-    if (editingId != null) return;
+    // 編集欄でも長押し禁止はしない（ユーザー要望）。短押し編集はそのまま動く。
     if (!isPrimary(e) || active) return;
     active = true; moved = false; longFired = false;
     sx = e.clientX; sy = e.clientY; pid = e.pointerId;
 
-    // 名前欄も、短押しは邪魔せずブラウザのネイティブなフォーカス/キーボード表示に
-    // 任せる（先回りしてreadonly/preventDefaultすると、短押しでも稀にフォーカスが
-    // 一瞬だけ入ってすぐ外れる＝キーボードが開いてすぐ閉じる、という副作用が出ていた）。
-    // 長押しが確定した時にだけ、この入力欄からフォーカスを外す。
     if (isGroupName(e.target)){
       nameInput = e.target.closest('.group .name');
     }
@@ -717,10 +703,10 @@ function bindLongPressDelete(el, id, shortAction){
       timer = null;
       longFired = true;
       clearSelection();
-      // 名前欄がフォーカス中なら外す（白枠残り・キーボード残り防止）
+      // 長押し確定時だけフォーカスを外す（削除確認へ）
       try {
         const ae = document.activeElement;
-        if (ae && el.contains(ae) && (ae.classList.contains('name') || ae.matches('input.name'))){
+        if (ae && el.contains(ae) && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')){
           ae.blur();
         } else if (nameInput) {
           nameInput.blur();
@@ -930,9 +916,6 @@ function buildAbyssCard(it){
   const curEditor = attachCurrentEditor(curWrap, it, () => { pending40Id = null; });
   // ランクはインラインのまま。フォーカス時だけ空欄。
   clearOnFocus(rankInput);
-  ['paste','copy','cut','contextmenu','selectstart'].forEach(ev=>{
-    rankInput.addEventListener(ev, e=>{ e.preventDefault(); });
-  });
   rankInput.setAttribute('autocomplete','off');
   rankInput.setAttribute('autocapitalize','off');
   rankInput.setAttribute('autocorrect','off');
@@ -1020,10 +1003,6 @@ function buildGroupCard(it){
     if (it.name !== nameEl.value){ it.name = nameEl.value; save(); }
   });
   placeCursorOnFocus(nameEl);
-  // 雫カーソル／選択メニュー抑止（編集はキャレットのみ）
-  ['selectstart','contextmenu','copy','cut','paste'].forEach(ev=>{
-    nameEl.addEventListener(ev, e=>{ e.preventDefault(); });
-  });
   bindTapDown(nameEl, ()=>{
     try {
       nameEl.focus();
@@ -1077,9 +1056,6 @@ function buildHeaderCard(it){
     if (it.name !== nameEl.value){ it.name = nameEl.value; save(); }
   });
   placeCursorOnFocus(nameEl);
-  ['selectstart','contextmenu','copy','cut','paste'].forEach(ev=>{
-    nameEl.addEventListener(ev, e=>{ e.preventDefault(); });
-  });
   bindTapDown(nameEl, ()=>{
     try {
       nameEl.focus();
