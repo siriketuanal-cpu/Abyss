@@ -23,12 +23,14 @@
   .stamval, .stammax, .inline-number-text, .main, .clockstack, .rank{
     font-family:var(--timer-number-font);
   }
-  html,body{height:100%; overflow-x:hidden; overflow-y:auto; overscroll-behavior:none;}
+  /* body は固定。スクロールは #cards のみ → キーボード開閉の黒残り・二重描画を防ぐ */
+  html,body{height:100%; overflow:hidden; overscroll-behavior:none;}
   body{
     margin:0; background:var(--bg); color:var(--text);
     font-family:Roboto,"Noto Sans JP",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
     user-select:none;
+    display:flex; flex-direction:column;
   }
   /* アプリ内の編集キャレットは一括で非表示。編集自体はそのまま可能。 */
   input{ caret-color:transparent; }
@@ -55,13 +57,18 @@
   .group .name:not(:focus),
   .divider .name:not(:focus){ outline:none !important; box-shadow:none !important; }
   .group .name,
-  .divider .name{ -webkit-tap-highlight-color:transparent; -webkit-touch-callout:none; touch-action:manipulation; user-select:text; }
+  .divider .name{
+    -webkit-tap-highlight-color:transparent; -webkit-touch-callout:none; touch-action:manipulation;
+    -webkit-user-select:none; user-select:none;
+  }
+  .group .name:focus,
+  .divider .name:focus{ -webkit-user-select:text; user-select:text; }
   /* TWA復帰時の一瞬の再構築を視覚的に隠す。通常起動・通常操作では非表示。 */
   #resumeVeil{position:fixed;inset:0;background:var(--bg);opacity:0;pointer-events:none;z-index:100;transition:opacity 90ms linear;}
   #resumeVeil.show{opacity:1;}
   header{
     display:flex; align-items:center; gap:8px; padding:10px 12px 6px;
-    position:sticky; top:0; background:var(--bg); z-index:5;
+    flex:0 0 auto; background:var(--bg); z-index:5;
   }
   header .spacer{flex:1; min-width:0;}
   .iconbtn{
@@ -69,7 +76,12 @@
     background:var(--card2); color:var(--text); font-size:18px; line-height:1;
     display:flex; align-items:center; justify-content:center;
   }
-  #cards{padding:6px 6px 20px; display:grid; grid-template-columns:repeat(4,1fr); gap:6px; align-items:start;}
+  #cards{
+    flex:1 1 auto; min-height:0; overflow-x:hidden; overflow-y:auto;
+    overscroll-behavior:none; -webkit-overflow-scrolling:touch;
+    padding:6px 6px calc(20px + env(safe-area-inset-bottom));
+    display:grid; grid-template-columns:repeat(4,1fr); gap:6px; align-items:start;
+  }
   .card{
     background:var(--card); border:1px solid var(--line); border-radius:10px;
     padding:6px 6px; position:relative; min-width:0;
@@ -132,9 +144,10 @@
     font-size:10px; font-weight:800; text-align:left;
     font-variant-numeric:tabular-nums;
     -webkit-appearance:none; appearance:none;
-    -webkit-user-select:text; user-select:text; -webkit-touch-callout:none;
+    -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
     z-index:2;
   }
+  .rank:focus{ -webkit-user-select:text; user-select:text; }
   .rank:focus{
     outline:none; background:transparent !important;
     box-shadow:none;
@@ -1006,7 +1019,10 @@ function buildGroupCard(it){
     if (it.name !== nameEl.value){ it.name = nameEl.value; save(); }
   });
   placeCursorOnFocus(nameEl);
-  // 名前は pointerdown で編集。長押し削除は行の余白のみ。
+  // 雫カーソル／選択メニュー抑止（編集はキャレットのみ）
+  ['selectstart','contextmenu','copy','cut','paste'].forEach(ev=>{
+    nameEl.addEventListener(ev, e=>{ e.preventDefault(); });
+  });
   bindTapDown(nameEl, ()=>{
     try {
       nameEl.focus();
@@ -1060,6 +1076,9 @@ function buildHeaderCard(it){
     if (it.name !== nameEl.value){ it.name = nameEl.value; save(); }
   });
   placeCursorOnFocus(nameEl);
+  ['selectstart','contextmenu','copy','cut','paste'].forEach(ev=>{
+    nameEl.addEventListener(ev, e=>{ e.preventDefault(); });
+  });
   bindTapDown(nameEl, ()=>{
     try {
       nameEl.focus();
@@ -1067,7 +1086,6 @@ function buildHeaderCard(it){
     } catch (err) {}
   });
   refs[it.id] = { el: wrap, nameEl };
-  // 長押し削除は見出し文字の外側（余白）のみ。名前自体は pointerdown 編集。
   bindLongPressDelete(wrap, it.id);
   return wrap;
 }
@@ -1501,7 +1519,33 @@ document.addEventListener('visibilitychange', ()=>{
 window.addEventListener('pageshow', (e)=>{
   if (e.persisted) resumePipeline();
 });
-// 操作開始時に残留ベールを消す。入力外タップでは選択ハンドル（雫カーソル）も解除。
+// キーボード閉じ後の黒残り・二重描画を強制クリア
+function fixViewportAfterKeyboard(){
+  clearResumeVeil();
+  try { window.getSelection()?.removeAllRanges(); } catch (e) {}
+  try { window.scrollTo(0, 0); } catch (e) {}
+  // コンポジタのゴミレイヤを落とす
+  requestAnimationFrame(()=>{
+    document.body.style.transform = 'translateZ(0)';
+    requestAnimationFrame(()=>{ document.body.style.transform = ''; });
+  });
+}
+if (window.visualViewport){
+  let lastH = window.visualViewport.height;
+  window.visualViewport.addEventListener('resize', ()=>{
+    const h = window.visualViewport.height;
+    // キーボードが閉じた（高さが戻った）ときだけ掃除
+    if (h > lastH + 40) fixViewportAfterKeyboard();
+    lastH = h;
+  });
+}
+document.addEventListener('focusout', (e)=>{
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')){
+    setTimeout(fixViewportAfterKeyboard, 50);
+  }
+});
+// 操作開始時に残留ベール・選択を消す
 document.addEventListener('pointerdown', (e)=>{
   clearResumeVeil();
   const t = e.target;
