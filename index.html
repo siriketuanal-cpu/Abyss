@@ -247,7 +247,8 @@
     touch-action:pan-y; -webkit-touch-callout:none;
   }
   .divider .name{
-    touch-action:manipulation;
+    touch-action:none;
+    -webkit-user-select:none; user-select:none;
     width:65%; max-width:260px; flex:0 1 auto; font-size:13px; font-weight:700; color:var(--accent); padding:0 0 2px;
   }
   .header-palette{display:flex; gap:5px; flex-wrap:wrap; justify-content:center; margin:4px 0 2px;}
@@ -492,13 +493,22 @@ function createInlineText(initialValue, placeholder, onCommit){
         return;
       }
       const value = input.value;
-      // 長押し解除後にネイティブ入力のフォーカス枠だけ残らないよう、
-      // blur/remove の直前に明示的に見えない状態へ戻す。
+      // Android/TWA のネイティブ編集UIを先に閉じてからDOMを破棄する。
+      // 先に見えなくし、readonly化→blur→DOM除去の順にすることで、
+      // 雫型キャレットやフォーカス表示だけが画面に残る経路を抑える。
+      cancelHold();
       input.style.outline = 'none';
       input.style.caretColor = 'transparent';
+      input.style.visibility = 'hidden';
+      input.style.pointerEvents = 'none';
+      input.readOnly = true;
       editor = null;
       try { input.blur(); } catch (e) {}
-      input.remove();
+      // live DOMから切り離した一時領域へ移してから完全破棄する。
+      // Android側の編集対象を画面上から先に消すのが目的。
+      const graveyard = document.createDocumentFragment();
+      try { graveyard.appendChild(input); } catch (e) {}
+      try { input.remove(); } catch (e) {}
       text.style.visibility = '';
       shownValue = value;
       paint();
@@ -1248,7 +1258,7 @@ function buildHeaderCard(it){
   nameEditor.setColor(it.color || 'var(--accent)');
   wrap.appendChild(nameEditor.wrap);
   refs[it.id] = { el: wrap, nameEl: nameEditor.wrap, nameEditor };
-  bindLongPressDelete(wrap, it.id);
+  bindLongPressDelete(nameEditor.wrap, it.id);
   return wrap;
 }
 
