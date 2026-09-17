@@ -166,8 +166,9 @@
   }
   .clockstack .ok{color:var(--ok); font-size:14px; line-height:18px;}
   .clockstack .full-at{color:var(--danger); font-size:9.5px; font-weight:800; line-height:18px;}
-  /* 満タンまで2時間未満で予定時刻・カウントダウンを赤くする */
-  .clockstack.near{color:var(--danger);}
+  /* 満タンまで2時間未満：スタミナ現在値・放置の数字を赤くする（予定時刻は対象外） */
+  .inline-number.near .inline-number-text,
+  .inline-number.near{color:var(--danger);}
   .main.near{color:var(--danger);}
   /* 予定時刻は全タイマーカードで右上に統一。Abyssと同じ基準位置に揃える。 */
   .card.stam > .stam-clock,
@@ -189,17 +190,17 @@
   .valrow-idle .main{min-width:2.6em; text-align:center; padding-left:0; font-size:19px; line-height:1.1;}
   .valrow-idle .clockstack{margin:0; position:absolute; left:0; top:auto;}
   .card.idle .valrow-idle .clockstack{position:absolute; left:0; bottom:22px; top:auto;}
-  /* Abyss現在値の編集ヒット領域：下段左側を広く確保し、/ と最大値の位置は固定。 */
-  /* 現在値の当たり判定は別要素を重ねず、curWrap自身の疑似要素で広げる。
-     （別のdivを上に重ねる方式だと、最初のタップがその重なった要素に取られて
-     フォーカスの奪い合いが起きやすく、キーボードが開いてすぐ閉じる不具合の
-     原因になっていた。） */
-  [data-role="curWrap"]{ position:relative; }
+  /* 現在値・最大値の当たり判定は疑似要素で少し広げる。編集中は is-editing で無効化（:has 不使用） */
+  [data-role="curWrap"], [data-role="maxWrap"]{ position:relative; }
   [data-role="curWrap"]::before{
-    content:''; position:absolute; top:-6px; bottom:-6px; left:-18px; right:-3px;
-    /* 編集欄より下に置く。通常時は従来どおり広いタップ範囲を維持し、
-       編集中は実際のinputがタップを受け取れるようにする。 */
-    z-index:1;
+    content:''; position:absolute; top:-4px; bottom:-2px; left:-14px; right:-2px; z-index:1;
+  }
+  [data-role="maxWrap"]::before{
+    content:''; position:absolute; top:-4px; bottom:-2px; left:-2px; right:-10px; z-index:1;
+  }
+  [data-role="curWrap"].is-editing::before,
+  [data-role="maxWrap"].is-editing::before{
+    pointer-events:none;
   }
   .divider{
     grid-column:1 / -1; display:flex; align-items:center; gap:6px;
@@ -435,10 +436,11 @@ function createInlineNumber(initialValue, onCommit){
   const isEditing = () => editor !== null;
   const open = () => {
     if (editor) return;
-    // 編集開始直前の実幅をロック。通常表示は固定幅なしで「/」に自然に右寄せしつつ、
-    // 編集中だけ最大値側が動かないようにする。
+    // 編集開始直前の実幅をロック（通常は固定幅なしで「/」に自然右寄せ）
     const lockW = wrap.offsetWidth || text.offsetWidth;
     if (lockW > 0) wrap.style.minWidth = lockW + 'px';
+    const parentHit = wrap.parentElement; // curWrap / maxWrap
+    if (parentHit) parentHit.classList.add('is-editing');
     const input = document.createElement('input');
     input.type = 'text';
     input.inputMode = 'numeric';
@@ -461,6 +463,7 @@ function createInlineNumber(initialValue, onCommit){
       input.remove();
       wrap.classList.remove('editing');
       wrap.style.minWidth = '';
+      if (parentHit) parentHit.classList.remove('is-editing');
       onCommit(value);
     };
     input.addEventListener('input', () => {
@@ -565,6 +568,10 @@ function fmtHM(ts){
   const d = new Date(ts);
   const p = n => String(n).padStart(2,'0');
   return p(d.getHours()) + ':' + p(d.getMinutes());
+}
+// 満タンまで2時間未満かどうか（スタミナ現在値・放置数字の赤判定用）
+function isNearFull(remainMs, isFull){
+  return !isFull && remainMs > 0 && remainMs < 7200000;
 }
 
 function timerNeedsTick(it, now){
@@ -1130,14 +1137,11 @@ function removeItem(id){
 }
 
 // 04/20のようなデジタル時計表示を組み立てる共通処理(スタミナ・放置報酬で共用)。
-// 満タンまで2時間未満なら .near を付けて赤表示。
 function renderClock(el, remainMs, isFull, now, fullAt){
   if (!el) return;
-  const near = !isFull && remainMs > 0 && remainMs < 7200000; // 2h
-  const key = (isFull ? 'full:' + fmtHM(fullAt || now) : (()=>{ const c = fmtClockAt(remainMs, now); return c.h+c.m; })()) + (near ? ':n' : '');
+  const key = isFull ? 'full:' + fmtHM(fullAt || now) : (()=>{ const c = fmtClockAt(remainMs, now); return c.h+c.m; })();
   if (el.dataset.clk === key) return;
   el.dataset.clk = key;
-  el.classList.toggle('near', near);
   if (isFull) el.innerHTML = `<span class="full-at">${fmtHM(fullAt || now)}</span>`;
   else el.textContent = fmtHM((now || Date.now()) + Math.max(0, remainMs));
 }
@@ -1154,18 +1158,10 @@ function findItemById(id){
   }
   return null;
 }
+// 40プレビューの見た目更新は updateTimerCard に任せる（重複ロジック削減）
 function paintAbyssFortyPreview(id){
   const it = findItemById(id);
-  const r = refs[id];
-  if (!it || !r || it.type!=='abyss') return;
-  syncAbyssMax(it);
-  const now = Date.now();
-  const info = stamInfo(it, now);
-  const wait = pending40Id === id;
-  r.el.classList.toggle('claim', wait);
-  if (r.curEl && !r.curEl.isEditing()) r.curEl.setText(wait ? remainingAfter40(info.cur) : info.cur);
-  if (r.maxLabel) r.maxLabel.textContent = String(it.max);
-  renderClock(r.clockEl, info.remainMs, info.isFull, now, info.fullAt);
+  if (it && it.type === 'abyss') updateOneTimer(it);
 }
 function render(){
   const now = Date.now();
@@ -1219,6 +1215,10 @@ function updateTimerCard(it, r, now){
     renderClock(r.clockEl, info.remainMs, info.isFull, now, info.fullAt);
     if (r.curEl && !r.curEl.isEditing()) r.curEl.setText(info.cur);
     if (r.maxEl && !r.maxEl.isEditing()) r.maxEl.setText(it.max);
+    // 現在スタミナ：満タンまで2時間未満で赤
+    if (r.curEl && r.curEl.wrap){
+      r.curEl.wrap.classList.toggle('near', isNearFull(info.remainMs, info.isFull));
+    }
   } else if (it.type==='abyss'){
     const info = stamInfo(it, now);
     const wait40 = pending40Id === it.id;
@@ -1234,15 +1234,18 @@ function updateTimerCard(it, r, now){
       const v = String(it.max);
       if (r.maxLabel.textContent !== v) r.maxLabel.textContent = v;
     }
+    // 現在スタミナ：満タンまで2時間未満で赤（40プレビュー中も同じ判定）
+    if (r.curEl && r.curEl.wrap){
+      r.curEl.wrap.classList.toggle('near', isNearFull(info.remainMs, info.isFull));
+    }
   } else if (it.type==='idle'){
     const info = idleInfo(it, now);
     r.el.classList.toggle('claim', it.state==='claim');
     r.el.classList.toggle('full', info.isFull && it.state!=='claim');
     const label = it.state==='claim' ? '受取' : (info.isFull ? fmtHM(info.fullAt) : fmtCountdown(info.remainMs));
     if (r.curEl.textContent !== label) r.curEl.textContent = label;
-    // カウントダウン表示中かつ2時間未満なら赤
-    const near = it.state!=='claim' && !info.isFull && info.remainMs > 0 && info.remainMs < 7200000;
-    r.curEl.classList.toggle('near', near);
+    // 放置の数字：カウントダウン中かつ2時間未満で赤
+    r.curEl.classList.toggle('near', it.state!=='claim' && isNearFull(info.remainMs, info.isFull));
     renderClock(r.clockEl, info.remainMs, info.isFull, now, info.fullAt);
   }
 }
