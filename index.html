@@ -108,7 +108,7 @@
   /* Abyssはカード全体を1つのタップ領域にする。入力欄以外はどこを押しても40使い切り。 */
   .card.abyss .clockstack, .card.abyss .stammax, .card.abyss .slash{pointer-events:none;}
   .card.abyss .abyss-head{justify-content:space-between; min-height:18px; height:18px; margin-bottom:2px; position:static;}
-  .card.abyss .rank{position:absolute; top:0; left:6px; right:auto; flex:0 0 4.5em; width:4.5em; max-width:none; text-align:left; padding:0 2px; z-index:2; height:18px; line-height:18px; transform:none;}
+  .card.abyss .rank{position:absolute; top:0; left:6px; right:auto; width:4.5em; max-width:none; text-align:left;}
   .card.stam, .card.idle{
     padding:6px; display:flex; flex-direction:column; justify-content:center;
   }
@@ -117,12 +117,23 @@
     font-size:11px; font-weight:600; padding:2px 0; min-width:0;
   }
   .name::placeholder{color:var(--sub);}
+  /* ランクは常にインライン（ネイティブの大きな入力ボックス化を抑止） */
   .rank{
-    position:absolute; top:2px; right:2px; width:36px; max-width:40%;
-    background:transparent; border:none; color:var(--orange);
-    font-size:10px; font-weight:800; text-align:right; padding:2px 0; z-index:2;
+    position:absolute; top:2px; right:2px; width:4.5em; max-width:45%;
+    height:18px; line-height:18px; min-height:0; max-height:18px;
+    margin:0; padding:0 2px; box-sizing:border-box;
+    background:transparent !important; border:none !important; outline:none;
+    border-radius:0; box-shadow:none;
+    color:var(--orange);
+    font-size:10px; font-weight:800; text-align:left;
     font-variant-numeric:tabular-nums;
-    -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+    -webkit-appearance:none; appearance:none;
+    -webkit-user-select:text; user-select:text; -webkit-touch-callout:none;
+    z-index:2;
+  }
+  .rank:focus{
+    outline:none; background:transparent !important;
+    box-shadow:none;
   }
   /* アカウント枠：通常カード2枚分の横幅 */
   .card.group{grid-column:span 2; padding:4px; border:1px solid #555b68; box-shadow:none; border-radius:8px;}
@@ -325,6 +336,8 @@ let tickId = null;
 let tickGen = 0;
 let pending40Id = null;
 let claimId = null;
+// インライン数字編集中の対象。null | `${itemId}:cur` | `${itemId}:max`
+let editingId = null;
 
 // DOM参照は一度だけ取得して使い回す(毎分ティックや毎クリックで検索し直さない)。
 const cardsEl = document.getElementById('cards');
@@ -416,7 +429,7 @@ function clearOnFocus(input){
 }
 // 数字は通常の文字として表示し、タップ時だけ数字の真上に入力欄を重ねる。
 // 入力欄はレイアウトから外してあるので、編集開始/終了で周囲の数字や「/」がズレない。
-function createInlineNumber(initialValue, onCommit){
+function createInlineNumber(initialValue, onCommit, editKey){
   const wrap = document.createElement('span');
   wrap.className = 'inline-number';
   const text = document.createElement('span');
@@ -432,11 +445,12 @@ function createInlineNumber(initialValue, onCommit){
     shownValue = v;
     text.textContent = v;
   };
-  const isEditing = () => editor !== null;
+  const isEditing = () => editor !== null || (editKey != null && editingId === editKey);
   const open = () => {
     if (editor) return;
     const parentHit = wrap.parentElement; // curWrap / maxWrap
     if (parentHit) parentHit.classList.add('is-editing');
+    if (editKey != null) editingId = editKey;
     const input = document.createElement('input');
     input.type = 'text';
     input.inputMode = 'numeric';
@@ -452,7 +466,6 @@ function createInlineNumber(initialValue, onCommit){
     wrap.classList.add('editing');
     wrap.appendChild(input);
 
-    // モバイルでは「pointerup で作った input に focus → 同じタッチの後始末で blur」が起きやすい。
     // 開始直後の短時間だけ blur を握りつぶして focus を戻す。
     let guardBlur = true;
     const clearGuard = () => { guardBlur = false; };
@@ -469,6 +482,7 @@ function createInlineNumber(initialValue, onCommit){
       input.remove();
       wrap.classList.remove('editing');
       if (parentHit) parentHit.classList.remove('is-editing');
+      if (editKey != null && editingId === editKey) editingId = null;
       onCommit(value);
     };
     input.addEventListener('input', () => {
@@ -568,16 +582,28 @@ function fmtHM(ts){
   const p = n => String(n).padStart(2,'0');
   return p(d.getHours()) + ':' + p(d.getMinutes());
 }
-// 満タンまで2時間未満かどうか（スタミナ現在値・放置数字の赤判定用）
+// 満タン、または満タンまで2時間未満 → 赤
 function isNearFull(remainMs, isFull){
-  return !isFull && remainMs > 0 && remainMs < 7200000;
+  return !!isFull || (remainMs > 0 && remainMs < 7200000);
 }
-// 現在値の赤表示。CSS負け対策で text に直接 color も当てる。
+// 現在値の赤表示。CSS・継承に負けないよう important で直書き。
 function setNearOnCurrent(editor, near){
   if (!editor || !editor.wrap) return;
   const parent = editor.wrap.parentElement;
   if (parent) parent.classList.toggle('near', !!near);
-  if (editor.text) editor.text.style.color = near ? 'var(--danger)' : '';
+  const color = near ? 'var(--danger)' : '';
+  if (editor.text){
+    if (color) editor.text.style.setProperty('color', color, 'important');
+    else editor.text.style.removeProperty('color');
+  }
+  if (editor.wrap){
+    if (color) editor.wrap.style.setProperty('color', color, 'important');
+    else editor.wrap.style.removeProperty('color');
+  }
+  if (parent){
+    if (color) parent.style.setProperty('color', color, 'important');
+    else parent.style.removeProperty('color');
+  }
 }
 
 function timerNeedsTick(it, now){
@@ -646,14 +672,17 @@ function bindLongPressDelete(el, id, shortAction){
   };
 
   el.addEventListener('pointerdown', e=>{
-    // 編集系ヒットは長押しに入れない（数字・ランク・編集中input）
+    // 編集系ヒットは長押しに入れない（数字・ランク・名前・編集中input）
     if (e.target && e.target.closest && (
       e.target.closest('.inline-edit-input') ||
       e.target.closest('[data-role="curWrap"]') ||
       e.target.closest('[data-role="maxWrap"]') ||
-      e.target.closest('.rank')
+      e.target.closest('.rank') ||
+      e.target.closest('input.name') ||
+      e.target.closest('.name')
     )) return;
     if (el.querySelector && el.querySelector('.inline-edit-input')) return;
+    if (editingId != null) return;
     if (!isPrimary(e) || active) return;
     active = true; moved = false; longFired = false;
     sx = e.clientX; sy = e.clientY; pid = e.pointerId;
@@ -790,30 +819,42 @@ function askRemoveItem(id){
   toastTapDownHandler = onClick;
   toast.addEventListener('pointerdown', onClick);
 }
+// stam / abyss 共通の下段 HTML
+function valrowStamHtml(){
+  return `<div class="row valrow-stam">
+      <span class="stamval" data-role="curWrap"></span>
+      <span class="slash">/</span>
+      <span class="stammax" data-role="maxWrap"></span>
+    </div>`;
+}
+// 現在値インライン編集（stam / abyss 共用）
+function attachCurrentEditor(curWrap, it, extraCommit){
+  const curEditor = createInlineNumber(stamInfo(it, Date.now()).cur, value => {
+    const now = Date.now();
+    if (it.type === 'abyss') syncAbyssMax(it);
+    const info = stamInfo(it, now);
+    const newCur = clampInt(value, 0, it.max, info.cur);
+    preserveCycle(it, now);
+    it.current = newCur;
+    if (typeof extraCommit === 'function') extraCommit();
+    updateOneTimer(it);
+    startTicking(true);
+    saveAfterPaint();
+  }, it.id + ':cur');
+  curWrap.appendChild(curEditor.wrap);
+  return curEditor;
+}
 function buildStamCard(it){
   const wrap = document.createElement('div');
   wrap.className = 'card stam';
   wrap.dataset.id = it.id;
   wrap.innerHTML = `
     <div class="clockstack stam-clock" data-role="clock"></div>
-    <div class="row valrow-stam">
-      <span class="stamval" data-role="curWrap"></span>
-      <span class="slash">/</span>
-      <span class="stammax" data-role="maxWrap"></span>
-    </div>
+    ${valrowStamHtml()}
   `;
   const curWrap = wrap.querySelector('[data-role="curWrap"]');
   const maxWrap = wrap.querySelector('[data-role="maxWrap"]');
-  const curEditor = createInlineNumber(stamInfo(it, Date.now()).cur, value => {
-    const now = Date.now();
-    const info = stamInfo(it, now);
-    const newCur = clampInt(value, 0, it.max, info.cur);
-    preserveCycle(it, now);
-    it.current = newCur;
-    updateOneTimer(it);
-    startTicking(true);
-    saveAfterPaint();
-  });
+  const curEditor = attachCurrentEditor(curWrap, it);
   const maxEditor = createInlineNumber(it.max, value => {
     const now = Date.now();
     const curNow = stamInfo(it, now).cur;
@@ -824,13 +865,11 @@ function buildStamCard(it){
     updateOneTimer(it);
     startTicking(true);
     saveAfterPaint();
-  });
-  curWrap.appendChild(curEditor.wrap);
+  }, it.id + ':max');
   maxWrap.appendChild(maxEditor.wrap);
 
   refs[it.id] = { el: wrap, curEl: curEditor, maxEl: maxEditor,
     clockEl: wrap.querySelector('[data-role="clock"]') };
-  // 数字編集は #cards 委譲の pointerdown。ここでは長押し削除のみ。
   bindLongPressDelete(wrap, it.id);
   return wrap;
 }
@@ -845,31 +884,14 @@ function buildAbyssCard(it){
       <div class="clockstack abyss-clock" data-role="clock"></div>
       <input class="rank" data-role="rankInput" inputmode="numeric" pattern="[0-9]*" title="ランク">
     </div>
-    <div class="row valrow-stam">
-      <span class="stamval" data-role="curWrap"></span>
-      <span class="slash">/</span>
-      <span class="stammax" data-role="maxLabel"></span>
-    </div>
+    ${valrowStamHtml()}
   `;
   const rankInput = wrap.querySelector('[data-role="rankInput"]');
   const curWrap = wrap.querySelector('[data-role="curWrap"]');
-  const maxLabel = wrap.querySelector('[data-role="maxLabel"]');
-  const curEditor = createInlineNumber(stamInfo(it, Date.now()).cur, value => {
-    const now = Date.now();
-    syncAbyssMax(it);
-    const info = stamInfo(it, now);
-    const newCur = clampInt(value, 0, it.max, info.cur);
-    preserveCycle(it, now);
-    it.current = newCur;
-    pending40Id = null;
-    updateOneTimer(it);
-    startTicking(true);
-    saveAfterPaint();
-  });
-  curWrap.appendChild(curEditor.wrap);
-  // ランク欄は従来どおりネイティブ入力。フォーカス時だけ空欄にする。
+  const maxLabel = wrap.querySelector('[data-role="maxWrap"]');
+  const curEditor = attachCurrentEditor(curWrap, it, () => { pending40Id = null; });
+  // ランクはインラインのまま。フォーカス時だけ空欄。
   clearOnFocus(rankInput);
-  // 長押しの貼り付けメニュー等を出さない
   ['paste','copy','cut','contextmenu','selectstart'].forEach(ev=>{
     rankInput.addEventListener(ev, e=>{ e.preventDefault(); });
   });
@@ -893,7 +915,6 @@ function buildAbyssCard(it){
     saveAfterPaint();
   });
   const clockEl = wrap.querySelector('[data-role="clock"]');
-  // 最大 or 予定時刻タップ → 40使い切りプレビュー/確定（ルナビィに近い）
   const onForty = (e)=>{
     e.stopPropagation();
     e.preventDefault();
@@ -908,7 +929,6 @@ function buildAbyssCard(it){
       startTicking(true);
       saveAfterPaint();
     } else {
-      // 他カードのプレビューが残っていれば外す
       if (pending40Id && pending40Id !== it.id){
         const prev = pending40Id;
         pending40Id = null;
@@ -918,13 +938,11 @@ function buildAbyssCard(it){
       paintAbyssFortyPreview(it.id);
     }
   };
-  // 初回から数字を出しておく（更新直後の空表示防止）
   const info0 = stamInfo(it, Date.now());
   curEditor.setText(info0.cur);
   maxLabel.textContent = String(it.max);
   rankInput.value = 'Lv.' + (it.rank || 1);
   refs[it.id] = { el: wrap, rankInput, curEl: curEditor, maxLabel, clockEl };
-  // 現在値・ランク編集は #cards 委譲の pointerdown。40だけ短押し(pointerup)で長押しと共存。
   bindLongPressDelete(wrap, it.id, (e) => onForty(e));
   return wrap;
 }
@@ -966,16 +984,8 @@ function buildGroupCard(it){
   refs[it.id] = { el: wrap, nameEl,
     bodyEl: wrap.querySelector('[data-role="body"]'),
     childRefs: {} };
-  // アカウント枠の長押しは「名前欄の行」だけに限定する。
-  // wrap(カード全体)に付けてしまうと、枠内の子タイマーを長押しした時に
-  // 子タイマー自身の長押し処理と二重に発火して競合し、動作がおかしくなるため。
-  bindLongPressDelete(nameRowEl, it.id, (e)=>{
-    if(e.target===nameEl || e.target.closest('.group-namerow')){
-      nameEl.removeAttribute('readonly');
-      nameEl.focus();
-      try{ nameEl.setSelectionRange(nameEl.value.length,nameEl.value.length); }catch(err){}
-    }
-  });
+  // 名前入力は長押し対象外（ネイティブ編集）。削除は名前行の余白長押しのみ。
+  bindLongPressDelete(nameRowEl, it.id);
   renderGroupBody(it);
   return wrap;
 }
@@ -1231,7 +1241,8 @@ function updateTimerCard(it, r, now){
     const label = it.state==='claim' ? '受取' : (info.isFull ? fmtHM(info.fullAt) : fmtCountdown(info.remainMs));
     if (r.curEl.textContent !== label) r.curEl.textContent = label;
     // 放置の数字：カウントダウン中かつ2時間未満で赤
-    r.curEl.classList.toggle('near', it.state!=='claim' && isNearFull(info.remainMs, info.isFull));
+    // 満タン・2時間前・受取待ちも赤維持
+    r.curEl.classList.toggle('near', it.state==='claim' || isNearFull(info.remainMs, info.isFull));
     renderClock(r.clockEl, info.remainMs, info.isFull, now, info.fullAt);
   }
 }
@@ -1385,22 +1396,19 @@ cardsEl.addEventListener('pointerdown', (e) => {
 
 const resumeVeilEl = document.getElementById('resumeVeil');
 let resumeTimer = null;
-function resumeFromBackground(){
+// 復帰処理を1本化：覆う → 差分更新 → tick再開 → 安定後に覆いを外す
+function resumePipeline(){
   if (resumeTimer) clearTimeout(resumeTimer);
-  // TWA/Android復帰直後はWebViewの合成が安定するまで覆う。
-  // 全体 render はせず差分更新だけにして点滅を抑える。
   resumeVeilEl.classList.add('show');
-  requestAnimationFrame(()=>{
+  const finish = () => {
     tickRender(Date.now());
     startTicking(true);
-    // 2フレーム + 余裕を見てから外す（短いとチラつきが残ることがある）
-    requestAnimationFrame(()=>{
-      resumeTimer = setTimeout(()=>{
-        resumeTimer = null;
-        resumeVeilEl.classList.remove('show');
-      }, 280);
-    });
-  });
+    resumeTimer = setTimeout(()=>{
+      resumeTimer = null;
+      resumeVeilEl.classList.remove('show');
+    }, 280);
+  };
+  requestAnimationFrame(() => requestAnimationFrame(finish));
 }
 document.addEventListener('visibilitychange', ()=>{
   if (document.hidden){
@@ -1408,10 +1416,10 @@ document.addEventListener('visibilitychange', ()=>{
     if (tickId){ clearTimeout(tickId); tickId=null; }
     return;
   }
-  resumeFromBackground();
+  resumePipeline();
 });
 window.addEventListener('pageshow', (e)=>{
-  if (e.persisted) resumeFromBackground();
+  if (e.persisted) resumePipeline();
 });
 
 render();
