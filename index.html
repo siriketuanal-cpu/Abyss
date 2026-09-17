@@ -65,7 +65,7 @@
   .name-edit-input{
     position:absolute; inset:0; width:100%; height:100%; box-sizing:border-box;
     background:transparent; border:none; color:inherit; font:inherit; font-weight:inherit;
-    padding:0; margin:0; outline:1px solid #d8d8d8; outline-offset:1px;
+    padding:0; margin:0; outline:none;
     caret-color:transparent; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
     touch-action:none;
     appearance:none; -webkit-appearance:none; z-index:2;
@@ -160,7 +160,6 @@
     font:inherit; font-weight:inherit; font-variant-numeric:tabular-nums;
     text-align:left; padding:0; margin:0; caret-color:transparent;
     -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
-    touch-action:none;
     appearance:none; -webkit-appearance:none; z-index:3;
   }
   /* アカウント枠：通常カード2枚分の横幅 */
@@ -496,12 +495,7 @@ function createInlineText(initialValue, placeholder, onCommit){
       text.style.visibility = '';
       shownValue = value;
       paint();
-      // 編集欄をDOMから外した直後にSelectionを明示的に破棄する。
-      // Android/TWA側に残る選択コンテキストを次のタップへ持ち越さない。
-      try {
-        const sel = window.getSelection();
-        if (sel) sel.removeAllRanges();
-      } catch (e) {}
+      try { window.getSelection()?.removeAllRanges(); } catch (e) {}
       onCommit(value);
     };
     input.addEventListener('blur', finish);
@@ -509,20 +503,42 @@ function createInlineText(initialValue, placeholder, onCommit){
       if (e.key === 'Enter'){ e.preventDefault(); guardBlur = false; input.blur(); }
       else if (e.key === 'Escape'){ e.preventDefault(); input.value = shownValue; guardBlur = false; input.blur(); }
     });
-    input.addEventListener('pointerdown', e=> e.stopPropagation(), {capture:true});
+    // 編集中の長押しはAndroid標準の文字選択へ渡さず、
+    // アカウント名・見出しとも同じく「編集終了」として扱う。
+    let holdTimer = null, holdPointerId = null, holdX = 0, holdY = 0;
+    const cancelHold = ()=>{
+      if (holdTimer !== null){ clearTimeout(holdTimer); holdTimer = null; }
+      holdPointerId = null;
+    };
+    input.addEventListener('pointerdown', e=>{
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.isPrimary === false) return;
+      cancelHold();
+      holdPointerId = e.pointerId;
+      holdX = e.clientX; holdY = e.clientY;
+      holdTimer = setTimeout(()=>{
+        holdTimer = null;
+        holdPointerId = null;
+        if (editor === input){
+          // 520ms以上の長押しはAndroidの選択UIを出す前に編集を閉じる。
+          try { input.blur(); } catch (err) {}
+        }
+      }, 520);
+    }, {capture:true, passive:false});
+    input.addEventListener('pointermove', e=>{
+      if (e.pointerId !== holdPointerId) return;
+      if (Math.hypot(e.clientX - holdX, e.clientY - holdY) > 12) cancelHold();
+    }, {capture:true, passive:true});
+    input.addEventListener('pointerup', e=>{
+      if (e.pointerId === holdPointerId) cancelHold();
+    }, {capture:true, passive:true});
+    input.addEventListener('pointercancel', cancelHold, {capture:true, passive:true});
     try {
       input.focus({preventScroll:true});
     } catch (e) {}
   };
-  // 編集開始そのものをこの要素の pointerdown で完結させ、ブラウザの
-  // 「タップした文字を選択する」既定ジェスチャーを先に走らせない。
-  wrap.addEventListener('pointerdown', e=>{
-    if (e.isPrimary === false) return;
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
-    e.preventDefault();
-    e.stopPropagation();
-    open();
-  }, {capture:true});
+  bindTapDown(wrap, ()=>{ open(); });
   return { wrap, text, open, setText, setColor, isEditing: ()=> !!editor };
 }
 // ランク：表示は「Lv.n」、タップ時だけ数字 input
@@ -572,11 +588,7 @@ function createInlineRank(initialRank, onOpen, onCommit){
       const next = raw === '' ? rank : Math.max(1, Math.min(200, Math.floor(Number(raw.replace(/\D/g, '')) || rank)));
       rank = next;
       paint();
-      // 編集終了時のSelectionを確実に破棄。
-      try {
-        const sel = window.getSelection();
-        if (sel) sel.removeAllRanges();
-      } catch (e) {}
+      try { window.getSelection()?.removeAllRanges(); } catch (e) {}
       onCommit(next);
     };
     input.addEventListener('input', ()=>{
@@ -591,14 +603,7 @@ function createInlineRank(initialRank, onOpen, onCommit){
     input.addEventListener('pointerdown', e=> e.stopPropagation(), {capture:true});
     try { input.focus({preventScroll:true}); } catch (e) {}
   };
-  // ランク表示も編集開始前にブラウザの文字選択ジェスチャーを抑止する。
-  wrap.addEventListener('pointerdown', e=>{
-    if (e.isPrimary === false) return;
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
-    e.preventDefault();
-    e.stopPropagation();
-    open();
-  }, {capture:true});
+  bindTapDown(wrap, ()=>{ open(); });
   return { wrap, open, setRank, isEditing: ()=> !!editor };
 }
 // 数字は通常の文字として表示し、タップ時だけ数字の真上に入力欄を重ねる。
