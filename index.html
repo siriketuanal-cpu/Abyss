@@ -428,20 +428,9 @@ function bindTapDown(el, handler){
   });
 }
 
-// 入力欄フォーカス時は常に末尾へカーソルを固定する。
-function forceCursorToEnd(input){
-  const place = () => { try{ input.setSelectionRange(input.value.length, input.value.length); }catch(e){} };
-  input.addEventListener('focus', () => { place(); setTimeout(place, 0); });
-  input.addEventListener('pointerdown', place);
-}
-// アカウント枠の名前欄専用：長押し判定(bindLongPressDelete)が同じ入力欄の
-// pointerdown で readonly の付け外しを行っているため、forceCursorToEnd の
-// pointerdown リスナーまで重ねると早押し時にフォーカスの取り合いになり、
-// キーボードが開いてすぐ閉じる現象が起きていた。focus起点の処理だけに絞る。
-function placeCursorOnFocus(input){
-  const place = () => { try{ input.setSelectionRange(input.value.length, input.value.length); }catch(e){} };
-  input.addEventListener('focus', () => { place(); setTimeout(place, 0); });
-}
+// 末尾固定は雫ハンドル誘発の主因になりやすいため停止中。
+function forceCursorToEnd(_input){ /* no-op */ }
+function placeCursorOnFocus(_input){ /* no-op */ }
 // 数字入力の共通処理。インライン編集側ではキャレット自体を非表示にする。
 function clearOnFocus(input){
   input.addEventListener('focus', () => { input.value = ''; });
@@ -1015,10 +1004,7 @@ function buildGroupCard(it){
   });
   placeCursorOnFocus(nameEl);
   bindTapDown(nameEl, ()=>{
-    try {
-      nameEl.focus();
-      nameEl.setSelectionRange(nameEl.value.length, nameEl.value.length);
-    } catch (err) {}
+    try { nameEl.focus(); } catch (err) {}
   });
   const nameRowEl = wrap.querySelector('.group-namerow');
   refs[it.id] = { el: wrap, nameEl,
@@ -1068,10 +1054,7 @@ function buildHeaderCard(it){
   });
   placeCursorOnFocus(nameEl);
   bindTapDown(nameEl, ()=>{
-    try {
-      nameEl.focus();
-      nameEl.setSelectionRange(nameEl.value.length, nameEl.value.length);
-    } catch (err) {}
+    try { nameEl.focus(); } catch (err) {}
   });
   refs[it.id] = { el: wrap, nameEl };
   bindLongPressDelete(wrap, it.id);
@@ -1440,13 +1423,10 @@ cardsEl.addEventListener('pointerdown', (e) => {
   const t = e.target;
   if (!t || !t.closest) return;
 
-  // ランク欄：pointerdown でフォーカス（長押し対象外）
+  // ランク欄：pointerdown でフォーカス（長押し対象外・末尾固定なし）
   const rank = t.closest('.rank');
   if (rank) {
-    try {
-      rank.focus();
-      rank.setSelectionRange(rank.value.length, rank.value.length);
-    } catch (err) {}
+    try { rank.focus(); } catch (err) {}
     return;
   }
 
