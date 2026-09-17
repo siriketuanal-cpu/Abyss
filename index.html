@@ -452,8 +452,18 @@ function createInlineNumber(initialValue, onCommit){
     wrap.classList.add('editing');
     wrap.appendChild(input);
 
+    // モバイルでは「pointerup で作った input に focus → 同じタッチの後始末で blur」が起きやすい。
+    // 開始直後の短時間だけ blur を握りつぶして focus を戻す。
+    let guardBlur = true;
+    const clearGuard = () => { guardBlur = false; };
+    setTimeout(clearGuard, 350);
+
     const finish = () => {
       if (editor !== input) return;
+      if (guardBlur) {
+        try { input.focus({preventScroll:true}); } catch (e) {}
+        return;
+      }
       const value = input.value;
       editor = null;
       input.remove();
@@ -465,14 +475,13 @@ function createInlineNumber(initialValue, onCommit){
       const v = input.value.replace(/\D/g, '').slice(0,3);
       if (input.value !== v) input.value = v;
     });
-    input.addEventListener('blur', finish, {once:true});
+    input.addEventListener('blur', finish);
     input.addEventListener('keydown', e => {
-      if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
-      else if (e.key === 'Escape') { e.preventDefault(); input.value = originalValue; input.blur(); }
+      if (e.key === 'Enter') { e.preventDefault(); clearGuard(); input.blur(); }
+      else if (e.key === 'Escape') { e.preventDefault(); input.value = originalValue; clearGuard(); input.blur(); }
     });
-    // 入力中の pointer だけ親へ漏らさない（競合対策はここに集約）
     input.addEventListener('pointerdown', e => e.stopPropagation(), {capture:true});
-    input.focus({preventScroll:true});
+    try { input.focus({preventScroll:true}); } catch (e) {}
   };
   return {wrap, text, open, setText, isEditing};
 }
@@ -563,6 +572,13 @@ function fmtHM(ts){
 function isNearFull(remainMs, isFull){
   return !isFull && remainMs > 0 && remainMs < 7200000;
 }
+// 現在値の赤表示。CSS負け対策で text に直接 color も当てる。
+function setNearOnCurrent(editor, near){
+  if (!editor || !editor.wrap) return;
+  const parent = editor.wrap.parentElement;
+  if (parent) parent.classList.toggle('near', !!near);
+  if (editor.text) editor.text.style.color = near ? 'var(--danger)' : '';
+}
 
 function timerNeedsTick(it, now){
   if (it.type==='stam' || it.type==='abyss') return !stamInfo(it, now).isFull;
@@ -630,9 +646,13 @@ function bindLongPressDelete(el, id, shortAction){
   };
 
   el.addEventListener('pointerdown', e=>{
-    // インライン数字編集中はカード側の長押し/短押しを一切動かさない。
-    // 境界付近や ::before ヒット領域を触ってもフォーカスが外れてキーボードが即閉じるのを防ぐ。
-    if (e.target && e.target.closest && e.target.closest('.inline-edit-input')) return;
+    // 編集系ヒットは長押しに入れない（数字・ランク・編集中input）
+    if (e.target && e.target.closest && (
+      e.target.closest('.inline-edit-input') ||
+      e.target.closest('[data-role="curWrap"]') ||
+      e.target.closest('[data-role="maxWrap"]') ||
+      e.target.closest('.rank')
+    )) return;
     if (el.querySelector && el.querySelector('.inline-edit-input')) return;
     if (!isPrimary(e) || active) return;
     active = true; moved = false; longFired = false;
@@ -773,6 +793,7 @@ function askRemoveItem(id){
 function buildStamCard(it){
   const wrap = document.createElement('div');
   wrap.className = 'card stam';
+  wrap.dataset.id = it.id;
   wrap.innerHTML = `
     <div class="clockstack stam-clock" data-role="clock"></div>
     <div class="row valrow-stam">
@@ -809,12 +830,8 @@ function buildStamCard(it){
 
   refs[it.id] = { el: wrap, curEl: curEditor, maxEl: maxEditor,
     clockEl: wrap.querySelector('[data-role="clock"]') };
-  bindLongPressDelete(wrap, it.id, (e)=>{
-    const target = e.target;
-    if (target.closest && target.closest('.inline-edit-input')) return;
-    if (target.closest && target.closest('[data-role="curWrap"]')) { curEditor.open(); return; }
-    if (target.closest && target.closest('[data-role="maxWrap"]')) { maxEditor.open(); return; }
-  });
+  // 数字編集は #cards 委譲の pointerdown。ここでは長押し削除のみ。
+  bindLongPressDelete(wrap, it.id);
   return wrap;
 }
 
@@ -822,6 +839,7 @@ function buildAbyssCard(it){
   syncAbyssMax(it);
   const wrap = document.createElement('div');
   wrap.className = 'card abyss';
+  wrap.dataset.id = it.id;
   wrap.innerHTML = `
     <div class="row abyss-head">
       <div class="clockstack abyss-clock" data-role="clock"></div>
@@ -900,37 +918,21 @@ function buildAbyssCard(it){
       paintAbyssFortyPreview(it.id);
     }
   };
-  // 注意：maxLabel/clockEl の短押しは bindLongPressDelete の shortAction 経由で
-  // onForty を呼ぶので、ここで別途 bindTapDown も付けると1回のタップで
-  // onForty が2回(pointerdown時点とpointerup時点)発火し、
-  // 「1回のタップで確定まで進んでしまい、確定待ちのまま外タップで戻せない」
-  // 原因になっていた。二重登録はしない。
   // 初回から数字を出しておく（更新直後の空表示防止）
   const info0 = stamInfo(it, Date.now());
   curEditor.setText(info0.cur);
   maxLabel.textContent = String(it.max);
   rankInput.value = 'Lv.' + (it.rank || 1);
   refs[it.id] = { el: wrap, rankInput, curEl: curEditor, maxLabel, clockEl };
-  bindLongPressDelete(wrap, it.id, (e)=>{
-    const input = e.target && e.target.closest ? e.target.closest('input') : null;
-    if (input === rankInput){
-      input.focus();
-      try{ input.setSelectionRange(input.value.length,input.value.length); }catch(err){}
-      return;
-    }
-    if (e.target.closest && e.target.closest('[data-role="curWrap"]')){
-      curEditor.open();
-      return;
-    }
-    // 入力欄以外はカード全体が同じ40使い切り操作。
-    onForty(e);
-  });
+  // 現在値・ランク編集は #cards 委譲の pointerdown。40だけ短押し(pointerup)で長押しと共存。
+  bindLongPressDelete(wrap, it.id, (e) => onForty(e));
   return wrap;
 }
 
 function buildIdleCard(it){
   const wrap = document.createElement('div');
   wrap.className = 'card idle';
+  wrap.dataset.id = it.id;
   wrap.innerHTML = `
     <div class="clockstack idle-clock" data-role="clock"></div>
     <div class="row valrow-idle">
@@ -939,6 +941,7 @@ function buildIdleCard(it){
   `;
   refs[it.id] = { el: wrap,
     curEl: wrap.querySelector('[data-role="cur"]'), clockEl: wrap.querySelector('[data-role="clock"]') };
+  // 受取トグルは短押し(pointerup)。pointerdown にすると長押し削除と同時発火する。
   bindLongPressDelete(wrap, it.id, ()=>toggleIdle(it));
   return wrap;
 }
@@ -1204,10 +1207,7 @@ function updateTimerCard(it, r, now){
     renderClock(r.clockEl, info.remainMs, info.isFull, now, info.fullAt);
     if (r.curEl && !r.curEl.isEditing()) r.curEl.setText(info.cur);
     if (r.maxEl && !r.maxEl.isEditing()) r.maxEl.setText(it.max);
-    // 現在スタミナ：満タンまで2時間未満で赤（curWrap に付ける）
-    if (r.curEl && r.curEl.wrap && r.curEl.wrap.parentElement){
-      r.curEl.wrap.parentElement.classList.toggle('near', isNearFull(info.remainMs, info.isFull));
-    }
+    setNearOnCurrent(r.curEl, isNearFull(info.remainMs, info.isFull));
   } else if (it.type==='abyss'){
     const info = stamInfo(it, now);
     const wait40 = pending40Id === it.id;
@@ -1223,10 +1223,7 @@ function updateTimerCard(it, r, now){
       const v = String(it.max);
       if (r.maxLabel.textContent !== v) r.maxLabel.textContent = v;
     }
-    // 現在スタミナ：満タンまで2時間未満で赤（curWrap に付ける）
-    if (r.curEl && r.curEl.wrap && r.curEl.wrap.parentElement){
-      r.curEl.wrap.parentElement.classList.toggle('near', isNearFull(info.remainMs, info.isFull));
-    }
+    setNearOnCurrent(r.curEl, isNearFull(info.remainMs, info.isFull));
   } else if (it.type==='idle'){
     const info = idleInfo(it, now);
     r.el.classList.toggle('claim', it.state==='claim');
@@ -1357,21 +1354,51 @@ bindTapDown(setupConfirmEl, (e)=>{
   save(); render(); startTicking(true);
 });
 
+// 数字・ランク編集は #cards への pointerdown 委譲で一本化（カードごとの bind を減らす）
+cardsEl.addEventListener('pointerdown', (e) => {
+  if (e.isPrimary === false) return;
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  const t = e.target;
+  if (!t || !t.closest) return;
+
+  // ランク欄：pointerdown でフォーカス（長押し対象外）
+  const rank = t.closest('.rank');
+  if (rank) {
+    try {
+      rank.focus();
+      rank.setSelectionRange(rank.value.length, rank.value.length);
+    } catch (err) {}
+    return;
+  }
+
+  const cur = t.closest('[data-role="curWrap"]');
+  const max = t.closest('[data-role="maxWrap"]');
+  if (!cur && !max) return;
+
+  const host = (cur || max).closest('[data-id]');
+  if (!host) return;
+  const r = getTimerRef(host.dataset.id);
+  if (!r) return;
+  if (cur && r.curEl && r.curEl.open) r.curEl.open();
+  else if (max && r.maxEl && r.maxEl.open) r.maxEl.open();
+});
+
 const resumeVeilEl = document.getElementById('resumeVeil');
 let resumeTimer = null;
 function resumeFromBackground(){
   if (resumeTimer) clearTimeout(resumeTimer);
-  // TWA/Android復帰直後はWebViewの合成・レイアウトが安定するまで短時間だけ覆う。
+  // TWA/Android復帰直後はWebViewの合成が安定するまで覆う。
+  // 全体 render はせず差分更新だけにして点滅を抑える。
   resumeVeilEl.classList.add('show');
   requestAnimationFrame(()=>{
-    // DOM構造は既に残っているため、復帰時は全体renderではなく表示値だけ再同期。
     tickRender(Date.now());
     startTicking(true);
+    // 2フレーム + 余裕を見てから外す（短いとチラつきが残ることがある）
     requestAnimationFrame(()=>{
       resumeTimer = setTimeout(()=>{
         resumeTimer = null;
         resumeVeilEl.classList.remove('show');
-      }, 180);
+      }, 280);
     });
   });
 }
