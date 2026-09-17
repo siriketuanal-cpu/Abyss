@@ -587,9 +587,23 @@ function createPersistentInlineEditor({
   let holdTimer = null;
   let pointerId = null;
   let holdX = 0, holdY = 0;
-  const clearHold = ()=>{
+  const clearHoldTimer = ()=>{
     if (holdTimer !== null){ clearTimeout(holdTimer); holdTimer = null; }
+  };
+  const clearHold = ()=>{
+    clearHoldTimer();
     pointerId = null;
+  };
+  // focus 前に編集だけ開いた状態を捨てる（表示は text のまま）
+  const abortOpenIfNotFocused = ()=>{
+    if (editor === input && input.style.visibility === 'hidden'){
+      guardBlur = false;
+      editor = null;
+      wrap.classList.remove('editing');
+      text.style.visibility = '';
+      if (editKey != null && editingId === editKey) editingId = null;
+      closeInput();
+    }
   };
 
   wrap.addEventListener('pointerdown', e=>{
@@ -605,26 +619,30 @@ function createPersistentInlineEditor({
     holdTimer = setTimeout(()=>{
       holdTimer = null;
       pointerId = null;
-      // 長押しはfocus前に編集状態だけ破棄。
-      if (editor === input){
-        guardBlur = false;
-        finish(false);
-      }
+      // 長押しは focus 前に編集状態だけ破棄
+      abortOpenIfNotFocused();
     }, 450);
   }, {capture:true, passive:false});
 
   wrap.addEventListener('pointermove', e=>{
     if (e.pointerId !== pointerId) return;
-    if (Math.hypot(e.clientX-holdX, e.clientY-holdY) > 12) clearHold();
+    // 長押しだけキャンセル。pointerId は残して pointerup で短押し focus できるようにする
+    if (Math.hypot(e.clientX-holdX, e.clientY-holdY) > 12) clearHoldTimer();
   }, {capture:true, passive:true});
 
   wrap.addEventListener('pointerup', e=>{
     if (e.pointerId !== pointerId) return;
+    const wasHold = holdTimer !== null;
     clearHold();
-    // 短押しだけここでfocusする。
-    focusEditor();
+    if (wasHold || editor === input){
+      // 短押し（または移動後の離し）→ focus
+      focusEditor();
+    }
   }, {capture:true, passive:false});
-  wrap.addEventListener('pointercancel', clearHold, {capture:true, passive:true});
+  wrap.addEventListener('pointercancel', ()=>{
+    clearHold();
+    abortOpenIfNotFocused();
+  }, {capture:true, passive:true});
 
   return {
     wrap, text, input, open, setText, setValue,
@@ -1355,47 +1373,69 @@ function paintAbyssFortyPreview(id){
   const it = findItemById(id);
   if (it && it.type === 'abyss') updateOneTimer(it);
 }
+function buildTopItem(it){
+  if (it.type==='stam') return buildStamCard(it);
+  if (it.type==='abyss') return buildAbyssCard(it);
+  if (it.type==='idle') return buildIdleCard(it);
+  if (it.type==='rule') return buildRuleCard(it);
+  if (it.type==='group') return buildGroupCard(it);
+  if (it.type==='header') return buildHeaderCard(it);
+  return null;
+}
 function render(){
-  const now = Date.now();
-  emptyEl.style.display = state.items.length ? 'none' : 'block';
+  try {
+    const now = Date.now();
+    if (!cardsEl || !emptyEl) return;
+    emptyEl.style.display = state.items.length ? 'none' : 'block';
 
-  const existingIds = new Set(state.items.map(i=>i.id));
-  state.items.forEach(it=>{ if (it.type==='group') it.children.forEach(c=>existingIds.add(c.id)); });
-  Object.keys(refs).forEach(id=>{ if(!existingIds.has(id)) delete refs[id]; });
+    const existingIds = new Set(state.items.map(i=>i.id));
+    state.items.forEach(it=>{ if (it.type==='group' && Array.isArray(it.children)) it.children.forEach(c=>existingIds.add(c.id)); });
+    Object.keys(refs).forEach(id=>{ if(!existingIds.has(id)) delete refs[id]; });
 
-  for (const it of state.items){
-    if (!refs[it.id]){
-      const el = it.type==='stam' ? buildStamCard(it) : it.type==='abyss' ? buildAbyssCard(it) : it.type==='idle' ? buildIdleCard(it) : it.type==='rule' ? buildRuleCard(it) : it.type==='group' ? buildGroupCard(it) : buildHeaderCard(it);
-    } else if (it.type==='group'){
-      renderGroupBody(it);
+    for (const it of state.items){
+      if (!it || !it.id) continue;
+      try {
+        if (!refs[it.id]) buildTopItem(it);
+        else if (it.type==='group') renderGroupBody(it);
+      } catch (err) {
+        console.error('build item failed', it && it.id, err);
+      }
     }
-  }
 
-  const topEls = state.items.map(it => refs[it.id].el);
+    const topEls = state.items.map(it => refs[it.id] && refs[it.id].el).filter(Boolean);
 
-  // 順序が違うときだけ並べ替え（毎分の append を避ける）
-  let needOrder = false;
-  const kids = cardsEl.children;
-  for (let i = 0; i < topEls.length; i++){
-    if (kids[i] !== topEls[i]){ needOrder = true; break; }
-  }
-  if (needOrder){
-    for (const el of topEls) cardsEl.appendChild(el);
-  }
-
-  for (const it of state.items){
-    const r = refs[it.id];
-    if (it.type==='rule') r.el.style.borderTopColor = it.color || '#52617a';
-    if (it.type==='header' && r.nameEditor){
-      r.nameEditor.setColor(it.color || '#9b8bff');
-      if (!r.nameEditor.isEditing()) r.nameEditor.setText(it.name || '');
+    let needOrder = false;
+    const kids = cardsEl.children;
+    for (let i = 0; i < topEls.length; i++){
+      if (kids[i] !== topEls[i]){ needOrder = true; break; }
     }
-    if (it.type==='group'){
-      if (r.nameEditor && !r.nameEditor.isEditing()) r.nameEditor.setText(it.name || '');
-      for (const child of it.children) updateTimerCard(child, r.childRefs[child.id], now);
-    } else {
-      updateTimerCard(it, r, now);
+    if (needOrder){
+      for (const el of topEls) cardsEl.appendChild(el);
     }
+
+    for (const it of state.items){
+      const r = refs[it.id];
+      if (!r || !r.el) continue;
+      try {
+        if (it.type==='rule') r.el.style.borderTopColor = it.color || '#52617a';
+        if (it.type==='header' && r.nameEditor){
+          r.nameEditor.setColor(it.color || '#9b8bff');
+          if (!r.nameEditor.isEditing()) r.nameEditor.setText(it.name || '');
+        }
+        if (it.type==='group'){
+          if (r.nameEditor && !r.nameEditor.isEditing()) r.nameEditor.setText(it.name || '');
+          if (Array.isArray(it.children)){
+            for (const child of it.children) updateTimerCard(child, r.childRefs && r.childRefs[child.id], now);
+          }
+        } else {
+          updateTimerCard(it, r, now);
+        }
+      } catch (err) {
+        console.error('update item failed', it && it.id, err);
+      }
+    }
+  } catch (err) {
+    console.error('render failed', err);
   }
 }
 // stam/abyss/idle の値更新をトップレベル/アカウント枠の子どちらでも共用する
@@ -1553,29 +1593,45 @@ function confirmSetup(){
   save(); render(); startTicking(true);
 }
 
-bindTapDown(addBtnEl, ()=>{
-  if (addPanelEl.classList.contains('show') && !addPanelEl.classList.contains('group-mode')){
-    closeAddPanel();
-  } else {
-    openAddPanel();
+function wireChromeButtons(){
+  if (addBtnEl){
+    bindTapDown(addBtnEl, ()=>{
+      if (addPanelEl && addPanelEl.classList.contains('show') && !addPanelEl.classList.contains('group-mode')){
+        closeAddPanel();
+      } else {
+        openAddPanel();
+      }
+    });
   }
-});
-bindTapDown(addPanelEl, (e)=>{
-  const btn = e.target.closest('button[data-type]');
-  if (!btn) return;
-  const type = btn.dataset.type;
-  if (type === 'group'){
-    state.items.push(newGroupItem());
-    closeAddPanel();
-    save(); render(); startTicking(true);
-    return;
+  if (addPanelEl){
+    bindTapDown(addPanelEl, (e)=>{
+      const btn = e.target.closest('button[data-type]');
+      if (!btn) return;
+      e.stopPropagation();
+      const type = btn.dataset.type;
+      if (type === 'group'){
+        state.items.push(newGroupItem());
+        closeAddPanel();
+        save(); render(); startTicking(true);
+        return;
+      }
+      openSetup(type);
+    });
   }
-  openSetup(type);
-});
-bindTapDown(setupConfirmEl, (e)=>{
-  e.stopPropagation();
-  confirmSetup();
-});
+  if (setupConfirmEl){
+    bindTapDown(setupConfirmEl, (e)=>{
+      e.stopPropagation();
+      confirmSetup();
+    });
+  }
+  const updateBtn = document.getElementById('updateBtn');
+  if (updateBtn){
+    bindTapDown(updateBtn, ()=>{
+      location.href = 'update.html?r=' + Date.now().toString(36);
+    });
+  }
+}
+wireChromeButtons();
 
 const resumeVeilEl = document.getElementById('resumeVeil');
 let resumeTimer = null;
@@ -1631,19 +1687,13 @@ document.addEventListener('pointerdown', (e)=>{
   }
 }, true);
 
-render();
-startTicking(true);
-
 // 長押しメニュー(コピー等)やドラッグ選択を出さない。
 document.addEventListener('contextmenu', (e)=> e.preventDefault());
 document.addEventListener('dragstart', (e)=> e.preventDefault());
-// テキスト選択は入力欄側で必要な範囲だけ抑止する。
 document.addEventListener('paste', (e)=> e.preventDefault());
 
-bindTapDown(document.getElementById('updateBtn'), ()=>{
-  // クエリ付きで update.html 自体のキャッシュも避ける
-  location.href = 'update.html?r=' + Date.now().toString(36);
-});
+render();
+startTicking(true);
 
 // Service worker: register once, never poll for updates automatically.
 if ('serviceWorker' in navigator){
