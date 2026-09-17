@@ -442,100 +442,95 @@ function clearOnFocus(input){
   input.addEventListener('focus', () => { input.value = ''; });
 }
 // 名前・見出し：普段は span、タップ時だけ input を生成して破棄（雫ハンドルの土台を消す）
+// 名前・見出し：inputを編集開始のたびに生成/破棄せず、最初からDOMに置いておく。
+// Androidのネイティブ入力カーソル描画と、DOM追加・削除/visibility切替の衝突を避ける。
 function createAccountNameText(initialValue, placeholder, onCommit){
   const wrap = document.createElement('span');
   wrap.className = 'name';
   const text = document.createElement('span');
   text.className = 'name-text';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'name-edit-input';
+  input.placeholder = placeholder || '';
+  input.autocomplete = 'off';
+  input.spellcheck = false;
+  input.tabIndex = -1;
   let shownValue = String(initialValue || '');
+  let editor = false;
+
   const paint = ()=>{
-    if (shownValue){
-      text.textContent = shownValue;
-      text.classList.remove('is-placeholder');
-    } else {
-      text.textContent = placeholder || '';
-      text.classList.add('is-placeholder');
-    }
+    if (shownValue){ text.textContent = shownValue; text.classList.remove('is-placeholder'); }
+    else { text.textContent = placeholder || ''; text.classList.add('is-placeholder'); }
   };
   paint();
+  input.value = shownValue;
+  input.style.display = 'none';
   wrap.appendChild(text);
+  wrap.appendChild(input);
 
-  let editor = null;
   const setText = v => {
     shownValue = String(v == null ? '' : v);
-    if (!editor) paint();
+    if (!editor){ paint(); input.value = shownValue; }
   };
   const setColor = c => { wrap.style.color = c || ''; };
+  let guardBlur = false;
+  let holdTimer = null, holdPointerId = null, holdX = 0, holdY = 0;
+  const cancelHold = ()=>{
+    if (holdTimer !== null){ clearTimeout(holdTimer); holdTimer = null; }
+    holdPointerId = null;
+  };
+  const finish = (restore=false)=>{
+    if (!editor) return;
+    if (guardBlur){
+      try { input.focus({preventScroll:true}); } catch (e) {}
+      return;
+    }
+    const value = restore ? shownValue : input.value;
+    editor = false;
+    input.style.display = 'none';
+    text.style.visibility = '';
+    shownValue = value;
+    input.value = value;
+    paint();
+    try { window.getSelection()?.removeAllRanges(); } catch (e) {}
+    onCommit(value);
+  };
   const open = ()=>{
     if (editor) return;
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.className = 'name-edit-input';
-    input.placeholder = placeholder || '';
+    editor = true;
     input.value = shownValue;
-    input.autocomplete = 'off';
-    input.spellcheck = false;
-    editor = input;
     text.style.visibility = 'hidden';
-    wrap.appendChild(input);
-
-    let guardBlur = true;
+    input.style.display = '';
+    guardBlur = true;
     setTimeout(()=>{ guardBlur = false; }, 350);
-
-    const finish = ()=>{
-      if (editor !== input) return;
-      if (guardBlur){
-        try { input.focus({preventScroll:true}); } catch (e) {}
-        return;
-      }
-      const value = input.value;
-      editor = null;
-      input.remove();
-      text.style.visibility = '';
-      shownValue = value;
-      paint();
-      onCommit(value);
-    };
-    input.addEventListener('blur', finish);
-    input.addEventListener('keydown', e=>{
-      if (e.key === 'Enter'){ e.preventDefault(); guardBlur = false; input.blur(); }
-      else if (e.key === 'Escape'){ e.preventDefault(); input.value = shownValue; guardBlur = false; input.blur(); }
-    });
-    // この編集欄専用：520ms以上の長押しはAndroid標準の文字選択へ渡さず編集終了。
-    let holdTimer = null, holdPointerId = null, holdX = 0, holdY = 0;
-    const cancelHold = ()=>{
-      if (holdTimer !== null){ clearTimeout(holdTimer); holdTimer = null; }
-      holdPointerId = null;
-    };
-    input.addEventListener('pointerdown', e=>{
-      e.preventDefault();
-      e.stopPropagation();
-      if (e.isPrimary === false) return;
-      cancelHold();
-      holdPointerId = e.pointerId;
-      holdX = e.clientX; holdY = e.clientY;
-      holdTimer = setTimeout(()=>{
-        holdTimer = null;
-        holdPointerId = null;
-        if (editor === input){
-          try { input.blur(); } catch (err) {}
-        }
-      }, 520);
-    }, {capture:true, passive:false});
-    input.addEventListener('pointermove', e=>{
-      if (e.pointerId !== holdPointerId) return;
-      if (Math.hypot(e.clientX - holdX, e.clientY - holdY) > 12) cancelHold();
-    }, {capture:true, passive:true});
-    input.addEventListener('pointerup', e=>{
-      if (e.pointerId === holdPointerId) cancelHold();
-    }, {capture:true, passive:true});
-    input.addEventListener('pointercancel', cancelHold, {capture:true, passive:true});
-    try {
-      input.focus({preventScroll:true});
-    } catch (e) {}
+    try { input.focus({preventScroll:true}); } catch (e) {}
   };
-  bindTapDown(wrap, ()=>{ open(); });
-  return { wrap, text, open, setText, setColor, isEditing: ()=> !!editor };
+  input.addEventListener('blur', ()=>finish());
+  input.addEventListener('keydown', e=>{
+    if (e.key === 'Enter'){ e.preventDefault(); guardBlur = false; input.blur(); }
+    else if (e.key === 'Escape'){ e.preventDefault(); guardBlur = false; finish(true); }
+  });
+  input.addEventListener('pointerdown', e=>{
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.isPrimary === false) return;
+    cancelHold();
+    holdPointerId = e.pointerId;
+    holdX = e.clientX; holdY = e.clientY;
+    holdTimer = setTimeout(()=>{
+      holdTimer = null; holdPointerId = null;
+      if (editor){ guardBlur = false; try { input.blur(); } catch (err) {} }
+    }, 520);
+  }, {capture:true, passive:false});
+  input.addEventListener('pointermove', e=>{
+    if (e.pointerId !== holdPointerId) return;
+    if (Math.hypot(e.clientX-holdX,e.clientY-holdY)>12) cancelHold();
+  }, {capture:true, passive:true});
+  input.addEventListener('pointerup', e=>{ if (e.pointerId === holdPointerId) cancelHold(); }, {capture:true, passive:true});
+  input.addEventListener('pointercancel', cancelHold, {capture:true, passive:true});
+  bindTapDown(wrap, ()=>open());
+  return { wrap, text, open, setText, setColor, isEditing: ()=>editor };
 }
 
 function createHeaderNameText(initialValue, placeholder, onCommit){
@@ -543,95 +538,74 @@ function createHeaderNameText(initialValue, placeholder, onCommit){
   wrap.className = 'name';
   const text = document.createElement('span');
   text.className = 'name-text';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'name-edit-input';
+  input.placeholder = placeholder || '';
+  input.autocomplete = 'off';
+  input.spellcheck = false;
+  input.tabIndex = -1;
   let shownValue = String(initialValue || '');
+  let editor = false;
   const paint = ()=>{
-    if (shownValue){
-      text.textContent = shownValue;
-      text.classList.remove('is-placeholder');
-    } else {
-      text.textContent = placeholder || '';
-      text.classList.add('is-placeholder');
-    }
+    if (shownValue){ text.textContent = shownValue; text.classList.remove('is-placeholder'); }
+    else { text.textContent = placeholder || ''; text.classList.add('is-placeholder'); }
   };
   paint();
+  input.value = shownValue;
+  input.style.display = 'none';
   wrap.appendChild(text);
-
-  let editor = null;
+  wrap.appendChild(input);
   const setText = v => {
     shownValue = String(v == null ? '' : v);
-    if (!editor) paint();
+    if (!editor){ paint(); input.value = shownValue; }
   };
   const setColor = c => { wrap.style.color = c || ''; };
+  let guardBlur = false;
+  let holdTimer = null, holdPointerId = null, holdX = 0, holdY = 0;
+  const cancelHold = ()=>{
+    if (holdTimer !== null){ clearTimeout(holdTimer); holdTimer = null; }
+    holdPointerId = null;
+  };
+  const finish = (restore=false)=>{
+    if (!editor) return;
+    if (guardBlur){ try { input.focus({preventScroll:true}); } catch (e) {} return; }
+    const value = restore ? shownValue : input.value;
+    editor = false;
+    input.style.display = 'none';
+    text.style.visibility = '';
+    shownValue = value;
+    input.value = value;
+    paint();
+    try { window.getSelection()?.removeAllRanges(); } catch (e) {}
+    onCommit(value);
+  };
   const open = ()=>{
     if (editor) return;
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.className = 'name-edit-input';
-    input.placeholder = placeholder || '';
+    editor = true;
     input.value = shownValue;
-    input.autocomplete = 'off';
-    input.spellcheck = false;
-    editor = input;
     text.style.visibility = 'hidden';
-    wrap.appendChild(input);
-
-    let guardBlur = true;
+    input.style.display = '';
+    guardBlur = true;
     setTimeout(()=>{ guardBlur = false; }, 350);
-
-    const finish = ()=>{
-      if (editor !== input) return;
-      if (guardBlur){
-        try { input.focus({preventScroll:true}); } catch (e) {}
-        return;
-      }
-      const value = input.value;
-      editor = null;
-      input.remove();
-      text.style.visibility = '';
-      shownValue = value;
-      paint();
-      onCommit(value);
-    };
-    input.addEventListener('blur', finish);
-    input.addEventListener('keydown', e=>{
-      if (e.key === 'Enter'){ e.preventDefault(); guardBlur = false; input.blur(); }
-      else if (e.key === 'Escape'){ e.preventDefault(); input.value = shownValue; guardBlur = false; input.blur(); }
-    });
-    // この編集欄専用：520ms以上の長押しはAndroid標準の文字選択へ渡さず編集終了。
-    let holdTimer = null, holdPointerId = null, holdX = 0, holdY = 0;
-    const cancelHold = ()=>{
-      if (holdTimer !== null){ clearTimeout(holdTimer); holdTimer = null; }
-      holdPointerId = null;
-    };
-    input.addEventListener('pointerdown', e=>{
-      e.preventDefault();
-      e.stopPropagation();
-      if (e.isPrimary === false) return;
-      cancelHold();
-      holdPointerId = e.pointerId;
-      holdX = e.clientX; holdY = e.clientY;
-      holdTimer = setTimeout(()=>{
-        holdTimer = null;
-        holdPointerId = null;
-        if (editor === input){
-          try { input.blur(); } catch (err) {}
-        }
-      }, 520);
-    }, {capture:true, passive:false});
-    input.addEventListener('pointermove', e=>{
-      if (e.pointerId !== holdPointerId) return;
-      if (Math.hypot(e.clientX - holdX, e.clientY - holdY) > 12) cancelHold();
-    }, {capture:true, passive:true});
-    input.addEventListener('pointerup', e=>{
-      if (e.pointerId === holdPointerId) cancelHold();
-    }, {capture:true, passive:true});
-    input.addEventListener('pointercancel', cancelHold, {capture:true, passive:true});
-    try {
-      input.focus({preventScroll:true});
-    } catch (e) {}
+    try { input.focus({preventScroll:true}); } catch (e) {}
   };
-  bindTapDown(wrap, ()=>{ open(); });
-  return { wrap, text, open, setText, setColor, isEditing: ()=> !!editor };
+  input.addEventListener('blur', ()=>finish());
+  input.addEventListener('keydown', e=>{
+    if (e.key === 'Enter'){ e.preventDefault(); guardBlur = false; input.blur(); }
+    else if (e.key === 'Escape'){ e.preventDefault(); guardBlur = false; finish(true); }
+  });
+  input.addEventListener('pointerdown', e=>{
+    e.preventDefault(); e.stopPropagation();
+    if (e.isPrimary === false) return;
+    cancelHold(); holdPointerId=e.pointerId; holdX=e.clientX; holdY=e.clientY;
+    holdTimer=setTimeout(()=>{ holdTimer=null; holdPointerId=null; if(editor){guardBlur=false;try{input.blur();}catch(err){}} },520);
+  }, {capture:true, passive:false});
+  input.addEventListener('pointermove', e=>{ if(e.pointerId===holdPointerId && Math.hypot(e.clientX-holdX,e.clientY-holdY)>12) cancelHold(); }, {capture:true, passive:true});
+  input.addEventListener('pointerup', e=>{ if(e.pointerId===holdPointerId) cancelHold(); }, {capture:true, passive:true});
+  input.addEventListener('pointercancel', cancelHold, {capture:true, passive:true});
+  bindTapDown(wrap, ()=>open());
+  return { wrap, text, open, setText, setColor, isEditing: ()=>editor };
 }
 // ランク：表示は「Lv.n」、タップ時だけ数字 input
 function createInlineRank(initialRank, onOpen, onCommit){
