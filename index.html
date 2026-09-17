@@ -50,8 +50,12 @@
   .stamval .inline-edit-input{ text-align:right; }
   .stammax .inline-edit-input{ text-align:left; }
   /* アカウント名：編集対象が分かるよう、通常のフォーカス枠を復活。 */
-  .group .name:focus{ outline:1px solid #d8d8d8 !important; outline-offset:1px; box-shadow:none !important; }
-  .group .name{ -webkit-tap-highlight-color:transparent; -webkit-touch-callout:none; touch-action:manipulation; user-select:text; }
+  .group .name:focus,
+  .divider .name:focus{ outline:1px solid #d8d8d8 !important; outline-offset:1px; box-shadow:none !important; }
+  .group .name:not(:focus),
+  .divider .name:not(:focus){ outline:none !important; box-shadow:none !important; }
+  .group .name,
+  .divider .name{ -webkit-tap-highlight-color:transparent; -webkit-touch-callout:none; touch-action:manipulation; user-select:text; }
   /* TWA復帰時の一瞬の再構築を視覚的に隠す。通常起動・通常操作では非表示。 */
   #resumeVeil{position:fixed;inset:0;background:var(--bg);opacity:0;pointer-events:none;z-index:100;transition:opacity 90ms linear;}
   #resumeVeil.show{opacity:1;}
@@ -484,6 +488,7 @@ function createInlineNumber(initialValue, onCommit, editKey){
       wrap.classList.remove('editing');
       if (parentHit) parentHit.classList.remove('is-editing');
       if (editKey != null && editingId === editKey) editingId = null;
+      try { window.getSelection()?.removeAllRanges(); } catch (e) {}
       onCommit(value);
     };
     input.addEventListener('input', () => {
@@ -670,7 +675,7 @@ function bindLongPressDelete(el, id, shortAction){
   };
 
   el.addEventListener('pointerdown', e=>{
-    // 編集系ヒットは長押しに入れない（数字・ランク・名前・編集中input）
+    // 編集系（数字・ランク・名前・編集中input）は長押しに入れない → pointerdown 編集と分離
     if (e.target && e.target.closest && (
       e.target.closest('.inline-edit-input') ||
       e.target.closest('[data-role="curWrap"]') ||
@@ -698,7 +703,15 @@ function bindLongPressDelete(el, id, shortAction){
       timer = null;
       longFired = true;
       clearSelection();
-      if (nameInput) nameInput.blur();
+      // 名前欄がフォーカス中なら外す（白枠残り・キーボード残り防止）
+      try {
+        const ae = document.activeElement;
+        if (ae && el.contains(ae) && (ae.classList.contains('name') || ae.matches('input.name'))){
+          ae.blur();
+        } else if (nameInput) {
+          nameInput.blur();
+        }
+      } catch (err) {}
       suppressNextClick = true;
       if (suppressClearTimer) clearTimeout(suppressClearTimer);
       suppressClearTimer = setTimeout(()=>{ suppressNextClick=false; suppressClearTimer=null; }, 1000);
@@ -988,9 +1001,12 @@ function buildGroupCard(it){
     <div class="group-body" data-role="body"></div>
   `;
   const nameEl = wrap.querySelector('.name');
-  nameEl.addEventListener('blur', ()=>{ it.name = nameEl.value; save(); });
+  nameEl.addEventListener('blur', ()=>{
+    try { window.getSelection()?.removeAllRanges(); } catch (e) {}
+    if (it.name !== nameEl.value){ it.name = nameEl.value; save(); }
+  });
   placeCursorOnFocus(nameEl);
-  // アカウント名も pointerdown で編集開始（長押し対象外）
+  // 名前は pointerdown で編集。長押し削除は行の余白のみ。
   bindTapDown(nameEl, ()=>{
     try {
       nameEl.focus();
@@ -1001,7 +1017,6 @@ function buildGroupCard(it){
   refs[it.id] = { el: wrap, nameEl,
     bodyEl: wrap.querySelector('[data-role="body"]'),
     childRefs: {} };
-  // 削除は名前行の余白長押しのみ（入力そのものは長押し対象外）
   bindLongPressDelete(nameRowEl, it.id);
   renderGroupBody(it);
   return wrap;
@@ -1009,18 +1024,18 @@ function buildGroupCard(it){
 function renderGroupBody(it){
   const r = refs[it.id];
   if (!r) return;
-  // 子カードの追加/削除に合わせてDOMを作り直す（並べ替えは発生しない：移動機能なし）
-  const existingChildIds = new Set(it.children.map(c=>c.id));
-  Object.keys(r.childRefs).forEach(id=>{ if(!existingChildIds.has(id)) delete r.childRefs[id]; });
+  const ids = new Set(it.children.map(c => c.id));
+  for (const id of Object.keys(r.childRefs)){
+    if (!ids.has(id)) delete r.childRefs[id];
+  }
   const single = it.children.length <= 1;
   r.el.classList.toggle('single', single);
   r.bodyEl.classList.toggle('one', single);
   for (const child of it.children){
-    if (!r.childRefs[child.id]){
-      const el = buildTimerChild(child);
-      r.childRefs[child.id] = refs[child.id];
-      r.bodyEl.appendChild(el);
-    }
+    if (r.childRefs[child.id]) continue;
+    const el = buildTimerChild(child);
+    r.childRefs[child.id] = refs[child.id];
+    r.bodyEl.appendChild(el);
   }
 }
 function buildRuleCard(it){
@@ -1040,7 +1055,10 @@ function buildHeaderCard(it){
   `;
   const nameEl = wrap.querySelector('.name');
   nameEl.style.color = it.color || 'var(--accent)';
-  nameEl.addEventListener('blur', ()=>{ it.name = nameEl.value; save(); });
+  nameEl.addEventListener('blur', ()=>{
+    try { window.getSelection()?.removeAllRanges(); } catch (e) {}
+    if (it.name !== nameEl.value){ it.name = nameEl.value; save(); }
+  });
   placeCursorOnFocus(nameEl);
   bindTapDown(nameEl, ()=>{
     try {
@@ -1049,6 +1067,7 @@ function buildHeaderCard(it){
     } catch (err) {}
   });
   refs[it.id] = { el: wrap, nameEl };
+  // 長押し削除は見出し文字の外側（余白）のみ。名前自体は pointerdown 編集。
   bindLongPressDelete(wrap, it.id);
   return wrap;
 }
@@ -1439,9 +1458,17 @@ cardsEl.addEventListener('pointerdown', (e) => {
 
 const resumeVeilEl = document.getElementById('resumeVeil');
 let resumeTimer = null;
+let wasBackgrounded = false;
+let hiddenAt = 0;
+function clearResumeVeil(){
+  if (resumeTimer){ clearTimeout(resumeTimer); resumeTimer = null; }
+  if (resumeVeilEl) resumeVeilEl.classList.remove('show');
+}
 // 復帰処理を1本化：覆う → 差分更新 → tick再開 → 安定後に覆いを外す
+// キーボード開閉などの短い hidden では動かさない（黒ベール残留の主因）
 function resumePipeline(){
   if (resumeTimer) clearTimeout(resumeTimer);
+  if (!resumeVeilEl) return;
   resumeVeilEl.classList.add('show');
   const finish = () => {
     tickRender(Date.now());
@@ -1449,14 +1476,24 @@ function resumePipeline(){
     resumeTimer = setTimeout(()=>{
       resumeTimer = null;
       resumeVeilEl.classList.remove('show');
-    }, 280);
+    }, 220);
   };
   requestAnimationFrame(() => requestAnimationFrame(finish));
 }
 document.addEventListener('visibilitychange', ()=>{
   if (document.hidden){
+    wasBackgrounded = true;
+    hiddenAt = Date.now();
     tickGen++;
     if (tickId){ clearTimeout(tickId); tickId=null; }
+    return;
+  }
+  if (!wasBackgrounded) return;
+  wasBackgrounded = false;
+  // キーボード等の瞬間的な hidden はベールなしで tick だけ再開
+  if (Date.now() - hiddenAt < 200){
+    startTicking(true);
+    clearResumeVeil();
     return;
   }
   resumePipeline();
@@ -1464,6 +1501,14 @@ document.addEventListener('visibilitychange', ()=>{
 window.addEventListener('pageshow', (e)=>{
   if (e.persisted) resumePipeline();
 });
+// 操作開始時に残留ベールを消す。入力外タップでは選択ハンドル（雫カーソル）も解除。
+document.addEventListener('pointerdown', (e)=>{
+  clearResumeVeil();
+  const t = e.target;
+  if (!t || !t.closest || !t.closest('input, textarea, [contenteditable]')){
+    try { window.getSelection()?.removeAllRanges(); } catch (err) {}
+  }
+}, true);
 
 render();
 startTicking(true);
