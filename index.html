@@ -229,18 +229,8 @@
   .valrow-idle .main{min-width:2.6em; text-align:center; padding-left:0; font-size:19px; line-height:1.1;}
   .valrow-idle .clockstack{margin:0; position:absolute; left:0; top:auto;}
   .card.idle .valrow-idle .clockstack{position:absolute; left:0; bottom:22px; top:auto;}
-  /* 当たり判定は ::before で左右を分ける。スラッシュをまたがない。編集中は無効化。 */
+  /* 数字の操作は透明な ::before ヒットボックスを使わず、実際の数字要素で受ける。 */
   [data-role="curWrap"], [data-role="maxWrap"]{ position:relative; }
-  [data-role="curWrap"]::before{
-    content:''; position:absolute; top:-6px; bottom:-4px; left:-8px; right:0; z-index:1;
-  }
-  [data-role="maxWrap"]::before{
-    content:''; position:absolute; top:-6px; bottom:-4px; left:0; right:-8px; z-index:1;
-  }
-  [data-role="curWrap"].is-editing::before,
-  [data-role="maxWrap"].is-editing::before{
-    pointer-events:none;
-  }
   .divider{
     grid-column:1 / -1; display:flex; align-items:center; gap:6px;
     padding:3px 2px; border-bottom:1px solid var(--line); position:relative;
