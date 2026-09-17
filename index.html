@@ -3,7 +3,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" name="viewport"/>
+<meta content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no, interactive-widget=resizes-content" name="viewport"/>
 <meta content="#0b0b14" name="theme-color"/>
 <meta content="yes" name="mobile-web-app-capable"/>
 <title>タイマー</title>
@@ -56,13 +56,12 @@
   .divider .name:focus{ outline:1px solid #d8d8d8 !important; outline-offset:1px; box-shadow:none !important; }
   .group .name:not(:focus),
   .divider .name:not(:focus){ outline:none !important; box-shadow:none !important; }
+  /* 名前も選択不可のまま（キャレットは出る／雫ハンドルは出にくい） */
   .group .name,
   .divider .name{
     -webkit-tap-highlight-color:transparent; -webkit-touch-callout:none; touch-action:manipulation;
     -webkit-user-select:none; user-select:none;
   }
-  .group .name:focus,
-  .divider .name:focus{ -webkit-user-select:text; user-select:text; }
   /* TWA復帰時の一瞬の再構築を視覚的に隠す。通常起動・通常操作では非表示。 */
   #resumeVeil{position:fixed;inset:0;background:var(--bg);opacity:0;pointer-events:none;z-index:100;transition:opacity 90ms linear;}
   #resumeVeil.show{opacity:1;}
@@ -148,7 +147,7 @@
     -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
     z-index:2;
   }
-  .rank:focus{ -webkit-user-select:text; user-select:text; }
+  /* フォーカス時も user-select:none のまま → 雫ハンドル抑制、キャレットは表示 */
   .rank:focus{
     outline:none; background:transparent !important;
     box-shadow:none;
@@ -1007,6 +1006,9 @@ function buildGroupCard(it){
     if (it.name !== nameEl.value){ it.name = nameEl.value; save(); }
   });
   placeCursorOnFocus(nameEl);
+  ['selectstart','contextmenu'].forEach(ev=>{
+    nameEl.addEventListener(ev, e=>{ e.preventDefault(); });
+  });
   bindTapDown(nameEl, ()=>{
     try { nameEl.focus(); } catch (err) {}
   });
@@ -1057,6 +1059,9 @@ function buildHeaderCard(it){
     if (it.name !== nameEl.value){ it.name = nameEl.value; save(); }
   });
   placeCursorOnFocus(nameEl);
+  ['selectstart','contextmenu'].forEach(ev=>{
+    nameEl.addEventListener(ev, e=>{ e.preventDefault(); });
+  });
   bindTapDown(nameEl, ()=>{
     try { nameEl.focus(); } catch (err) {}
   });
@@ -1491,39 +1496,52 @@ document.addEventListener('visibilitychange', ()=>{
 window.addEventListener('pageshow', (e)=>{
   if (e.persisted) resumePipeline();
 });
-// キーボード閉じ後の掃除。選択ハンドル中は触らない／遅らせる。
+// キーボードに合わせてレイアウト高さを合わせ、閉じたあとの黒帯を減らす
+function syncLayoutToVisualViewport(){
+  const vv = window.visualViewport;
+  if (!vv) return;
+  const gap = window.innerHeight - vv.height;
+  if (gap > 50){
+    // キーボード表示中：見える領域に合わせる
+    document.body.style.height = Math.round(vv.height) + 'px';
+  } else {
+    document.body.style.height = '';
+  }
+}
 let viewportFixTimer = null;
 function fixViewportAfterKeyboard(){
   if (viewportFixTimer) clearTimeout(viewportFixTimer);
   viewportFixTimer = setTimeout(()=>{
     viewportFixTimer = null;
-    // まだ入力中なら何もしない（雫ハンドル表示中の再描画を避ける）
     const ae = document.activeElement;
     if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) return;
     clearResumeVeil();
-    // removeAllRanges は入力外にフォーカスが移ったあとにだけ（ハンドルと競合しやすい）
-    try {
-      const sel = window.getSelection();
-      if (sel && sel.rangeCount && sel.isCollapsed === false) sel.removeAllRanges();
-      else if (sel && sel.rangeCount) sel.removeAllRanges();
-    } catch (e) {}
-    // scroll / transform は最終手段。短い遅延のあと1回だけ。
+    document.body.style.height = '';
+    try { window.getSelection()?.removeAllRanges(); } catch (e) {}
     try { window.scrollTo(0, 0); } catch (e) {}
-  }, 220);
+    const cards = document.getElementById('cards');
+    if (cards) {
+      // レイアウト再計算だけ促す（見た目を壊さない軽量リフロー）
+      void cards.offsetHeight;
+    }
+  }, 280);
 }
 if (window.visualViewport){
   let lastH = window.visualViewport.height;
   window.visualViewport.addEventListener('resize', ()=>{
     const h = window.visualViewport.height;
+    syncLayoutToVisualViewport();
     if (h > lastH + 40) fixViewportAfterKeyboard();
     lastH = h;
+  });
+  window.visualViewport.addEventListener('scroll', ()=>{
+    try { window.scrollTo(0, 0); } catch (e) {}
   });
 }
 document.addEventListener('focusout', (e)=>{
   const t = e.target;
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')){
-    // すぐではなく、キーボード閉じとハンドル消えを待ってから
-    setTimeout(fixViewportAfterKeyboard, 200);
+    setTimeout(fixViewportAfterKeyboard, 250);
   }
 });
 // ベールだけ即消す。選択解除は入力外タップ時のみ・遅延。
