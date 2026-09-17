@@ -66,7 +66,8 @@
     position:absolute; inset:0; width:100%; height:100%; box-sizing:border-box;
     background:transparent; border:none; color:inherit; font:inherit; font-weight:inherit;
     padding:0; margin:0; outline:1px solid #d8d8d8; outline-offset:1px;
-    caret-color:transparent;
+    caret-color:transparent; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+    touch-action:none;
     appearance:none; -webkit-appearance:none; z-index:2;
   }
   .name-edit-input::placeholder{ color:var(--sub); }
@@ -159,6 +160,7 @@
     font:inherit; font-weight:inherit; font-variant-numeric:tabular-nums;
     text-align:left; padding:0; margin:0; caret-color:transparent;
     -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+    touch-action:none;
     appearance:none; -webkit-appearance:none; z-index:3;
   }
   /* アカウント枠：通常カード2枚分の横幅 */
@@ -442,170 +444,124 @@ function clearOnFocus(input){
   input.addEventListener('focus', () => { input.value = ''; });
 }
 // 名前・見出し：普段は span、タップ時だけ input を生成して破棄（雫ハンドルの土台を消す）
-// 名前・見出し：inputを編集開始のたびに生成/破棄せず、最初からDOMに置いておく。
-// Androidのネイティブ入力カーソル描画と、DOM追加・削除/visibility切替の衝突を避ける。
-function createAccountNameText(initialValue, placeholder, onCommit){
+function createInlineText(initialValue, placeholder, onCommit){
   const wrap = document.createElement('span');
   wrap.className = 'name';
   const text = document.createElement('span');
   text.className = 'name-text';
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.className = 'name-edit-input';
-  input.placeholder = placeholder || '';
-  input.autocomplete = 'off';
-  input.spellcheck = false;
-  input.tabIndex = -1;
   let shownValue = String(initialValue || '');
-  let editor = false;
-
   const paint = ()=>{
-    if (shownValue){ text.textContent = shownValue; text.classList.remove('is-placeholder'); }
-    else { text.textContent = placeholder || ''; text.classList.add('is-placeholder'); }
+    if (shownValue){
+      text.textContent = shownValue;
+      text.classList.remove('is-placeholder');
+    } else {
+      text.textContent = placeholder || '';
+      text.classList.add('is-placeholder');
+    }
   };
   paint();
-  input.value = shownValue;
-  input.style.display = 'none';
   wrap.appendChild(text);
-  wrap.appendChild(input);
 
+  let editor = null;
   const setText = v => {
     shownValue = String(v == null ? '' : v);
-    if (!editor){ paint(); input.value = shownValue; }
+    if (!editor) paint();
   };
   const setColor = c => { wrap.style.color = c || ''; };
-  let guardBlur = false;
-  let holdTimer = null, holdPointerId = null, holdX = 0, holdY = 0;
-  const cancelHold = ()=>{
-    if (holdTimer !== null){ clearTimeout(holdTimer); holdTimer = null; }
-    holdPointerId = null;
-  };
-  const finish = (restore=false)=>{
-    if (!editor) return;
-    if (guardBlur){
-      try { input.focus({preventScroll:true}); } catch (e) {}
-      return;
-    }
-    const value = restore ? shownValue : input.value;
-    editor = false;
-    input.style.display = 'none';
-    text.style.visibility = '';
-    shownValue = value;
-    input.value = value;
-    paint();
-    try { window.getSelection()?.removeAllRanges(); } catch (e) {}
-    onCommit(value);
-  };
   const open = ()=>{
     if (editor) return;
-    editor = true;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'name-edit-input';
+    input.placeholder = placeholder || '';
     input.value = shownValue;
+    input.autocomplete = 'off';
+    input.spellcheck = false;
+    editor = input;
     text.style.visibility = 'hidden';
-    input.style.display = '';
-    guardBlur = true;
+    wrap.appendChild(input);
+
+    let guardBlur = true;
     setTimeout(()=>{ guardBlur = false; }, 350);
-    try { input.focus({preventScroll:true}); } catch (e) {}
+
+    const finish = ()=>{
+      if (editor !== input) return;
+      if (guardBlur){
+        try { input.focus({preventScroll:true}); } catch (e) {}
+        return;
+      }
+      const value = input.value;
+      editor = null;
+      input.remove();
+      text.style.visibility = '';
+      shownValue = value;
+      paint();
+      // 編集欄をDOMから外した直後にSelectionを明示的に破棄する。
+      // Android/TWA側に残る選択コンテキストを次のタップへ持ち越さない。
+      try {
+        const sel = window.getSelection();
+        if (sel) sel.removeAllRanges();
+      } catch (e) {}
+      onCommit(value);
+    };
+    input.addEventListener('blur', finish);
+    input.addEventListener('keydown', e=>{
+      if (e.key === 'Enter'){ e.preventDefault(); guardBlur = false; input.blur(); }
+      else if (e.key === 'Escape'){ e.preventDefault(); input.value = shownValue; guardBlur = false; input.blur(); }
+    });
+    // Android/TWA のネイティブ文字選択へ渡さない。編集開始後の長押しも
+    // input 自身で完結させ、名前・見出しの外側の長押し処理とは分離する。
+    let holdTimer = null;
+    let holdPointerId = null;
+    let holdX = 0, holdY = 0;
+    const cancelHold = ()=>{
+      if (holdTimer !== null){ clearTimeout(holdTimer); holdTimer = null; }
+      holdPointerId = null;
+    };
+    input.addEventListener('pointerdown', e=>{
+      if (e.isPrimary === false) return;
+      e.preventDefault();
+      e.stopPropagation();
+      try { window.getSelection()?.removeAllRanges(); } catch (err) {}
+      cancelHold();
+      holdPointerId = e.pointerId;
+      holdX = e.clientX; holdY = e.clientY;
+      holdTimer = setTimeout(()=>{
+        holdTimer = null;
+        holdPointerId = null;
+        try { window.getSelection()?.removeAllRanges(); } catch (err) {}
+        if (editor === input){
+          guardBlur = false;
+          try { input.blur(); } catch (err) {}
+        }
+      }, 450);
+    }, {capture:true, passive:false});
+    input.addEventListener('pointermove', e=>{
+      if (e.pointerId !== holdPointerId) return;
+      if (Math.hypot(e.clientX-holdX, e.clientY-holdY) > 12) cancelHold();
+    }, {capture:true, passive:true});
+    input.addEventListener('pointerup', e=>{
+      if (e.pointerId === holdPointerId) cancelHold();
+    }, {capture:true, passive:true});
+    input.addEventListener('pointercancel', cancelHold, {capture:true, passive:true});
+    input.addEventListener('selectstart', e=>{
+      e.preventDefault();
+      try { window.getSelection()?.removeAllRanges(); } catch (err) {}
+    }, {capture:true});
+    try {
+      input.focus({preventScroll:true});
+    } catch (e) {}
   };
-  input.addEventListener('blur', ()=>finish());
-  input.addEventListener('keydown', e=>{
-    if (e.key === 'Enter'){ e.preventDefault(); guardBlur = false; input.blur(); }
-    else if (e.key === 'Escape'){ e.preventDefault(); guardBlur = false; finish(true); }
-  });
-  input.addEventListener('pointerdown', e=>{
+  // 編集開始そのものをこの要素の pointerdown で完結させ、ブラウザの
+  // 「タップした文字を選択する」既定ジェスチャーを先に走らせない。
+  wrap.addEventListener('pointerdown', e=>{
+    if (e.isPrimary === false) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
-    if (e.isPrimary === false) return;
-    cancelHold();
-    holdPointerId = e.pointerId;
-    holdX = e.clientX; holdY = e.clientY;
-    holdTimer = setTimeout(()=>{
-      holdTimer = null; holdPointerId = null;
-      if (editor){ guardBlur = false; try { input.blur(); } catch (err) {} }
-    }, 520);
-  }, {capture:true, passive:false});
-  input.addEventListener('pointermove', e=>{
-    if (e.pointerId !== holdPointerId) return;
-    if (Math.hypot(e.clientX-holdX,e.clientY-holdY)>12) cancelHold();
-  }, {capture:true, passive:true});
-  input.addEventListener('pointerup', e=>{ if (e.pointerId === holdPointerId) cancelHold(); }, {capture:true, passive:true});
-  input.addEventListener('pointercancel', cancelHold, {capture:true, passive:true});
-  bindTapDown(wrap, ()=>open());
-  return { wrap, text, open, setText, setColor, isEditing: ()=>editor };
-}
-
-function createHeaderNameText(initialValue, placeholder, onCommit){
-  const wrap = document.createElement('span');
-  wrap.className = 'name';
-  const text = document.createElement('span');
-  text.className = 'name-text';
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.className = 'name-edit-input';
-  input.placeholder = placeholder || '';
-  input.autocomplete = 'off';
-  input.spellcheck = false;
-  input.tabIndex = -1;
-  let shownValue = String(initialValue || '');
-  let editor = false;
-  const paint = ()=>{
-    if (shownValue){ text.textContent = shownValue; text.classList.remove('is-placeholder'); }
-    else { text.textContent = placeholder || ''; text.classList.add('is-placeholder'); }
-  };
-  paint();
-  input.value = shownValue;
-  input.style.display = 'none';
-  wrap.appendChild(text);
-  wrap.appendChild(input);
-  const setText = v => {
-    shownValue = String(v == null ? '' : v);
-    if (!editor){ paint(); input.value = shownValue; }
-  };
-  const setColor = c => { wrap.style.color = c || ''; };
-  let guardBlur = false;
-  let holdTimer = null, holdPointerId = null, holdX = 0, holdY = 0;
-  const cancelHold = ()=>{
-    if (holdTimer !== null){ clearTimeout(holdTimer); holdTimer = null; }
-    holdPointerId = null;
-  };
-  const finish = (restore=false)=>{
-    if (!editor) return;
-    if (guardBlur){ try { input.focus({preventScroll:true}); } catch (e) {} return; }
-    const value = restore ? shownValue : input.value;
-    editor = false;
-    input.style.display = 'none';
-    text.style.visibility = '';
-    shownValue = value;
-    input.value = value;
-    paint();
-    try { window.getSelection()?.removeAllRanges(); } catch (e) {}
-    onCommit(value);
-  };
-  const open = ()=>{
-    if (editor) return;
-    editor = true;
-    input.value = shownValue;
-    text.style.visibility = 'hidden';
-    input.style.display = '';
-    guardBlur = true;
-    setTimeout(()=>{ guardBlur = false; }, 350);
-    try { input.focus({preventScroll:true}); } catch (e) {}
-  };
-  input.addEventListener('blur', ()=>finish());
-  input.addEventListener('keydown', e=>{
-    if (e.key === 'Enter'){ e.preventDefault(); guardBlur = false; input.blur(); }
-    else if (e.key === 'Escape'){ e.preventDefault(); guardBlur = false; finish(true); }
-  });
-  input.addEventListener('pointerdown', e=>{
-    e.preventDefault(); e.stopPropagation();
-    if (e.isPrimary === false) return;
-    cancelHold(); holdPointerId=e.pointerId; holdX=e.clientX; holdY=e.clientY;
-    holdTimer=setTimeout(()=>{ holdTimer=null; holdPointerId=null; if(editor){guardBlur=false;try{input.blur();}catch(err){}} },520);
-  }, {capture:true, passive:false});
-  input.addEventListener('pointermove', e=>{ if(e.pointerId===holdPointerId && Math.hypot(e.clientX-holdX,e.clientY-holdY)>12) cancelHold(); }, {capture:true, passive:true});
-  input.addEventListener('pointerup', e=>{ if(e.pointerId===holdPointerId) cancelHold(); }, {capture:true, passive:true});
-  input.addEventListener('pointercancel', cancelHold, {capture:true, passive:true});
-  bindTapDown(wrap, ()=>open());
-  return { wrap, text, open, setText, setColor, isEditing: ()=>editor };
+    open();
+  }, {capture:true});
+  return { wrap, text, open, setText, setColor, isEditing: ()=> !!editor };
 }
 // ランク：表示は「Lv.n」、タップ時だけ数字 input
 function createInlineRank(initialRank, onOpen, onCommit){
@@ -654,6 +610,11 @@ function createInlineRank(initialRank, onOpen, onCommit){
       const next = raw === '' ? rank : Math.max(1, Math.min(200, Math.floor(Number(raw.replace(/\D/g, '')) || rank)));
       rank = next;
       paint();
+      // 編集終了時のSelectionを確実に破棄。
+      try {
+        const sel = window.getSelection();
+        if (sel) sel.removeAllRanges();
+      } catch (e) {}
       onCommit(next);
     };
     input.addEventListener('input', ()=>{
@@ -668,7 +629,14 @@ function createInlineRank(initialRank, onOpen, onCommit){
     input.addEventListener('pointerdown', e=> e.stopPropagation(), {capture:true});
     try { input.focus({preventScroll:true}); } catch (e) {}
   };
-  bindTapDown(wrap, ()=>{ open(); });
+  // ランク表示も編集開始前にブラウザの文字選択ジェスチャーを抑止する。
+  wrap.addEventListener('pointerdown', e=>{
+    if (e.isPrimary === false) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    open();
+  }, {capture:true});
   return { wrap, open, setRank, isEditing: ()=> !!editor };
 }
 // 数字は通常の文字として表示し、タップ時だけ数字の真上に入力欄を重ねる。
@@ -727,6 +695,7 @@ function createInlineNumber(initialValue, onCommit, editKey){
       wrap.classList.remove('editing');
       if (parentHit) parentHit.classList.remove('is-editing');
       if (editKey != null && editingId === editKey) editingId = null;
+      try { window.getSelection()?.removeAllRanges(); } catch (e) {}
       onCommit(value);
     };
     input.addEventListener('input', () => {
@@ -1227,7 +1196,7 @@ function buildGroupCard(it){
     <div class="group-body" data-role="body"></div>
   `;
   const nameRowEl = wrap.querySelector('[data-role="namerow"]');
-  const nameEditor = createAccountNameText(it.name || '', 'アカウント', (value)=>{
+  const nameEditor = createInlineText(it.name || '', 'アカウント', (value)=>{
     if (it.name !== value){ it.name = value; save(); }
   });
   nameRowEl.appendChild(nameEditor.wrap);
@@ -1267,7 +1236,7 @@ function buildRuleCard(it){
 function buildHeaderCard(it){
   const wrap = document.createElement('div');
   wrap.className = 'divider';
-  const nameEditor = createHeaderNameText(it.name || '', '見出し(ゲーム名など)', (value)=>{
+  const nameEditor = createInlineText(it.name || '', '見出し(ゲーム名など)', (value)=>{
     if (it.name !== value){ it.name = value; save(); }
   });
   nameEditor.setColor(it.color || 'var(--accent)');
@@ -1321,6 +1290,13 @@ function cancelClaim(it){
 // 動作しないことがあるため使わない。
 
 document.addEventListener('pointerdown', (e) => {
+  // 実際に選択状態があるときだけ解除する。通常のカードタップでは不要な処理を省く。
+  try {
+    if (document.activeElement !== e.target && window.getSelection){
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount) sel.removeAllRanges();
+    }
+  } catch(err){}
   if (claimId != null){
     const claimed = findItemById(claimId);
     const r = claimed ? getTimerRef(claimId) : null;
@@ -1684,6 +1660,15 @@ document.addEventListener('visibilitychange', ()=>{
 window.addEventListener('pageshow', (e)=>{
   if (e.persisted) resumePipeline();
 });
+// 入力外タップで選択解除（キーボード専用の viewport ハックは外した）
+document.addEventListener('pointerdown', (e)=>{
+  clearResumeVeil();
+  const t = e.target;
+  if (!t || !t.closest || !t.closest('input, textarea, [contenteditable]')){
+    try { window.getSelection()?.removeAllRanges(); } catch (err) {}
+  }
+}, true);
+
 render();
 startTicking(true);
 
