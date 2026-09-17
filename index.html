@@ -37,7 +37,7 @@
   .inline-number{position:relative;display:block;width:100%;min-width:0;height:22px;line-height:22px;overflow:visible;}
   .inline-number-text{ display:block; width:100%; height:22px; line-height:22px; overflow:visible; font-variant-numeric:tabular-nums; }
   .stamval .inline-number-text{ text-align:right; }
-  .stammax .inline-number-text{ text-align:center; }
+  .stammax .inline-number-text{ text-align:left; }
   .inline-number.editing .inline-number-text{visibility:hidden;}
   .inline-edit-input{
     position:absolute; top:0; left:0; width:100%; height:100%; box-sizing:border-box;
@@ -48,7 +48,7 @@
     z-index:3;
   }
   .stamval .inline-edit-input{ text-align:right; }
-  .stammax .inline-edit-input{ text-align:center; }
+  .stammax .inline-edit-input{ text-align:left; }
   /* アカウント名：編集対象が分かるよう、通常のフォーカス枠を復活。 */
   .group .name:focus{ outline:1px solid #d8d8d8 !important; outline-offset:1px; box-shadow:none !important; }
   .group .name{ -webkit-tap-highlight-color:transparent; -webkit-touch-callout:none; touch-action:manipulation; user-select:text; }
@@ -157,8 +157,9 @@
     overflow:visible; height:22px; line-height:22px;
     flex:1 1 0; display:block;
   }
+  /* 最大値は左寄せにして、現在値(右寄せ)と対称。「/」が中央に見える */
   .stammax{
-    color:var(--blue); font-size:18px; font-weight:700; text-align:center;
+    color:var(--blue); font-size:18px; font-weight:700; text-align:left;
     font-variant-numeric:tabular-nums; height:22px; line-height:22px;
     flex:1 1 0; min-width:0; display:block;
   }
@@ -536,19 +537,29 @@ function fmtCountdown(ms){
 }
 
 function stamInfo(it, now){
+  // ベースが既に満タンなら回復計算しない（満タン時刻は start に固定）
+  if (it.current >= it.max){
+    return { cur: it.max, remainMs:0, isFull:true, fullAt: it.start };
+  }
   const intervalMs = Math.max(1, it.intervalMin) * 60000;
   const elapsed = Math.max(0, now - it.start);
   const recovered = Math.floor(elapsed / intervalMs);
   const cur = Math.min(it.max, it.current + recovered);
-  const isFull = cur >= it.max;
-  if (isFull) {
+  if (cur >= it.max){
     const fullAt = it.start + Math.max(0, it.max - it.current) * intervalMs;
-    return { cur, remainMs:0, isFull, fullAt: Math.min(now, fullAt) };
+    return { cur: it.max, remainMs:0, isFull:true, fullAt: Math.min(now, fullAt) };
   }
   const nextIn = intervalMs - (elapsed % intervalMs);
   const need = it.max - cur;
-  const remainMs = (need-1)*intervalMs + nextIn;
-  return { cur, remainMs, isFull };
+  const remainMs = (need - 1) * intervalMs + nextIn;
+  return { cur, remainMs, isFull:false };
+}
+// 満タンにしたら start を今に固定して、以降の回復計算を止める
+function freezeIfFull(it, now){
+  if (it.current >= it.max){
+    it.current = it.max;
+    it.start = now;
+  }
 }
 // 現在値/上限値を書き換えても「次の1回復までの残り時間」がリセットされないよう、
 // サイクルの位相(既にどれだけ経過しているか)を維持したまま基準時刻だけを進める。
@@ -586,24 +597,11 @@ function fmtHM(ts){
 function isNearFull(remainMs, isFull){
   return !!isFull || (remainMs > 0 && remainMs < 7200000);
 }
-// 現在値の赤表示。CSS・継承に負けないよう important で直書き。
+// 現在値の赤表示（文字に1回だけ当てる）
 function setNearOnCurrent(editor, near){
-  if (!editor || !editor.wrap) return;
-  const parent = editor.wrap.parentElement;
-  if (parent) parent.classList.toggle('near', !!near);
-  const color = near ? 'var(--danger)' : '';
-  if (editor.text){
-    if (color) editor.text.style.setProperty('color', color, 'important');
-    else editor.text.style.removeProperty('color');
-  }
-  if (editor.wrap){
-    if (color) editor.wrap.style.setProperty('color', color, 'important');
-    else editor.wrap.style.removeProperty('color');
-  }
-  if (parent){
-    if (color) parent.style.setProperty('color', color, 'important');
-    else parent.style.removeProperty('color');
-  }
+  if (!editor || !editor.text) return;
+  if (near) editor.text.style.setProperty('color', 'var(--danger)', 'important');
+  else editor.text.style.removeProperty('color');
 }
 
 function timerNeedsTick(it, now){
@@ -836,6 +834,7 @@ function attachCurrentEditor(curWrap, it, extraCommit){
     const newCur = clampInt(value, 0, it.max, info.cur);
     preserveCycle(it, now);
     it.current = newCur;
+    freezeIfFull(it, now);
     if (typeof extraCommit === 'function') extraCommit();
     updateOneTimer(it);
     startTicking(true);
@@ -862,6 +861,7 @@ function buildStamCard(it){
     preserveCycle(it, now);
     it.max = newMax;
     it.current = Math.min(curNow, newMax);
+    freezeIfFull(it, now);
     updateOneTimer(it);
     startTicking(true);
     saveAfterPaint();
@@ -909,6 +909,7 @@ function buildAbyssCard(it){
     syncAbyssMax(it);
     preserveCycle(it, now);
     it.current = Math.min(live, it.max);
+    freezeIfFull(it, now);
     pending40Id = null;
     updateOneTimer(it);
     startTicking(true);
@@ -924,6 +925,7 @@ function buildAbyssCard(it){
     if (pending40Id === it.id){
       preserveCycle(it, now);
       it.current = remainingAfter40(info.cur);
+      freezeIfFull(it, now);
       pending40Id = null;
       paintAbyssFortyPreview(it.id);
       startTicking(true);
@@ -980,11 +982,18 @@ function buildGroupCard(it){
   const nameEl = wrap.querySelector('.name');
   nameEl.addEventListener('blur', ()=>{ it.name = nameEl.value; save(); });
   placeCursorOnFocus(nameEl);
+  // アカウント名も pointerdown で編集開始（長押し対象外）
+  bindTapDown(nameEl, ()=>{
+    try {
+      nameEl.focus();
+      nameEl.setSelectionRange(nameEl.value.length, nameEl.value.length);
+    } catch (err) {}
+  });
   const nameRowEl = wrap.querySelector('.group-namerow');
   refs[it.id] = { el: wrap, nameEl,
     bodyEl: wrap.querySelector('[data-role="body"]'),
     childRefs: {} };
-  // 名前入力は長押し対象外（ネイティブ編集）。削除は名前行の余白長押しのみ。
+  // 削除は名前行の余白長押しのみ（入力そのものは長押し対象外）
   bindLongPressDelete(nameRowEl, it.id);
   renderGroupBody(it);
   return wrap;
@@ -1024,8 +1033,13 @@ function buildHeaderCard(it){
   const nameEl = wrap.querySelector('.name');
   nameEl.style.color = it.color || 'var(--accent)';
   nameEl.addEventListener('blur', ()=>{ it.name = nameEl.value; save(); });
-  // 長押し削除と pointerdown が重なるため、focus起点だけにする（グループ名と同じ方針）
   placeCursorOnFocus(nameEl);
+  bindTapDown(nameEl, ()=>{
+    try {
+      nameEl.focus();
+      nameEl.setSelectionRange(nameEl.value.length, nameEl.value.length);
+    } catch (err) {}
+  });
   refs[it.id] = { el: wrap, nameEl };
   bindLongPressDelete(wrap, it.id);
   return wrap;
@@ -1212,14 +1226,27 @@ function render(){
 function updateTimerCard(it, r, now){
   if (!it || !r) return;
   if (it.type==='stam'){
-    const info = stamInfo(it, now);
+    let info = stamInfo(it, now);
+    // 自然回復で満タン到達したら固定して以降の計算を止める
+    if (info.isFull && it.current < it.max){
+      it.current = it.max;
+      it.start = info.fullAt || now;
+      info = stamInfo(it, now);
+      saveAfterPaint();
+    }
     r.el.classList.toggle('full', info.isFull);
     renderClock(r.clockEl, info.remainMs, info.isFull, now, info.fullAt);
     if (r.curEl && !r.curEl.isEditing()) r.curEl.setText(info.cur);
     if (r.maxEl && !r.maxEl.isEditing()) r.maxEl.setText(it.max);
     setNearOnCurrent(r.curEl, isNearFull(info.remainMs, info.isFull));
   } else if (it.type==='abyss'){
-    const info = stamInfo(it, now);
+    let info = stamInfo(it, now);
+    if (info.isFull && it.current < it.max){
+      it.current = it.max;
+      it.start = info.fullAt || now;
+      info = stamInfo(it, now);
+      saveAfterPaint();
+    }
     const wait40 = pending40Id === it.id;
     r.el.classList.toggle('full', info.isFull);
     r.el.classList.toggle('claim', wait40);
