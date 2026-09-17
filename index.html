@@ -754,68 +754,85 @@ function clearLongPressTarget(){
     longPressTargetEl = null;
   }
 }
-function askRemoveItem(id){
+// トースト＝確認UI専用。開く/閉じる/2段階確定をここに集約。
+function closeToast(){
   clearLongPressTarget();
+  if (!toastEl) return;
+  toastEl.classList.remove('show');
+  if (toastTapDownHandler){
+    toastEl.removeEventListener('pointerdown', toastTapDownHandler);
+    toastTapDownHandler = null;
+  }
+}
+function showConfirmToast(html, onAct){
+  if (!toastEl) return;
+  closeToast();
+  toastEl.innerHTML = html;
+  toastEl.classList.add('show');
+  const onClick = (e)=>{
+    const btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    const act = btn.dataset.act;
+    // 即閉じ（やめる）
+    if (act === 'no' || act === 'cancel'){
+      closeToast();
+      if (typeof onAct === 'function') onAct(act, btn);
+      return;
+    }
+    // 危険操作は2回タップ確定
+    if (!btn.classList.contains('armed')){
+      toastEl.querySelectorAll('button.armed').forEach(b => b.classList.remove('armed'));
+      btn.classList.add('armed');
+      return;
+    }
+    closeToast();
+    if (typeof onAct === 'function') onAct(act, btn);
+  };
+  toastTapDownHandler = onClick;
+  toastEl.addEventListener('pointerdown', onClick);
+}
+function askRemoveItem(id){
+  const it = findItemById(id);
+  if (!toastEl){ removeItem(id); return; }
+  const canAdd = it && it.type === 'group' && it.children.length < 2;
+  const isHeader = it && it.type === 'header';
+  const extra =
+    (isHeader ? `<label class="toast-color">色<input type="color" value="${it.color || '#9b8bff'}" aria-label="ゲーム名の色"></label>` : '')
+    + (canAdd ? '<button type="button" data-act="add">タイマー追加</button>' : '');
+  showConfirmToast(
+    extra
+    + '<button type="button" class="ok" data-act="yes">削除</button>'
+    + '<button type="button" data-act="no">やめる</button>',
+    (act)=>{
+      if (act === 'yes') removeItem(id);
+      else if (act === 'add') openAddPanel({ groupId: id });
+    }
+  );
+  // closeToast の後にハイライトを付け直す
   const targetRef = refs[id];
   if (targetRef && targetRef.el){
     targetRef.el.classList.add('longpress-target');
     longPressTargetEl = targetRef.el;
   }
-  const it = findItemById(id);
-  const toast = document.getElementById('toast');
-  if (!toast){ removeItem(id); return; }
-  if (toastTapDownHandler){ toast.removeEventListener('pointerdown', toastTapDownHandler); toastTapDownHandler = null; }
-  const canAdd = it && it.type === 'group' && it.children.length < 2;
-  const isHeader = it && it.type === 'header';
-  toast.innerHTML = (isHeader ? `<label class="toast-color">色<input type="color" value="${it.color || '#9b8bff'}" aria-label="ゲーム名の色"></label>` : '')
-    + (canAdd ? '<button type="button" data-act="add">タイマー追加</button>' : '')
-    + '<button type="button" class="ok" data-act="yes">削除</button>'
-    + '<button type="button" data-act="no">やめる</button>';
   if (isHeader){
-    const colorEl = toast.querySelector('.toast-color input');
-    colorEl.addEventListener('input', ()=>{
-      it.color = colorEl.value;
-      if (refs[id]?.nameEl) refs[id].nameEl.style.color = it.color;
-      save();
-    });
-    colorEl.addEventListener('pointerdown', e=>e.stopPropagation());
+    const colorEl = toastEl.querySelector('.toast-color input');
+    if (colorEl){
+      colorEl.addEventListener('input', ()=>{
+        it.color = colorEl.value;
+        if (refs[id]?.nameEl) refs[id].nameEl.style.color = it.color;
+        save();
+      });
+      colorEl.addEventListener('pointerdown', e=>e.stopPropagation());
+    }
   }
-  toast.classList.add('show');
-  const onClick = (e)=>{
-    const btn = e.target.closest('button');
-    if (!btn) return;
-    const act = btn.dataset.act;
-    if (act === 'no'){
-      // やめるは即閉じ
-      clearLongPressTarget();
-      toast.classList.remove('show');
-      toast.removeEventListener('pointerdown', onClick);
-      toastTapDownHandler = null;
-      return;
-    }
-    if (act === 'yes' || act === 'add'){
-      // 1回目: 破線で囲って確定待ち。他ボタンの破線は外す
-      if (!btn.classList.contains('armed')){
-        toast.querySelectorAll('button.armed').forEach(b => b.classList.remove('armed'));
-        btn.classList.add('armed');
-        return;
-      }
-      // 2回目: 実行
-      clearLongPressTarget();
-      toast.classList.remove('show');
-      toast.removeEventListener('pointerdown', onClick);
-      toastTapDownHandler = null;
-      if (act === 'yes'){
-        removeItem(id);
-      } else {
-        pendingAddGroupId = id;
-        addPanelEl.classList.add('group-mode');
-        addPanelEl.classList.add('show');
-      }
-    }
-  };
-  toastTapDownHandler = onClick;
-  toast.addEventListener('pointerdown', onClick);
+}
+// カード外枠の共通生成（stam / abyss / idle）
+function makeCardEl(type, id, innerHtml){
+  const wrap = document.createElement('div');
+  wrap.className = 'card ' + type;
+  wrap.dataset.id = id;
+  wrap.innerHTML = innerHtml;
+  return wrap;
 }
 // stam / abyss 共通の下段 HTML
 function valrowStamHtml(){
@@ -844,13 +861,10 @@ function attachCurrentEditor(curWrap, it, extraCommit){
   return curEditor;
 }
 function buildStamCard(it){
-  const wrap = document.createElement('div');
-  wrap.className = 'card stam';
-  wrap.dataset.id = it.id;
-  wrap.innerHTML = `
+  const wrap = makeCardEl('stam', it.id, `
     <div class="clockstack stam-clock" data-role="clock"></div>
     ${valrowStamHtml()}
-  `;
+  `);
   const curWrap = wrap.querySelector('[data-role="curWrap"]');
   const maxWrap = wrap.querySelector('[data-role="maxWrap"]');
   const curEditor = attachCurrentEditor(curWrap, it);
@@ -876,16 +890,13 @@ function buildStamCard(it){
 
 function buildAbyssCard(it){
   syncAbyssMax(it);
-  const wrap = document.createElement('div');
-  wrap.className = 'card abyss';
-  wrap.dataset.id = it.id;
-  wrap.innerHTML = `
+  const wrap = makeCardEl('abyss', it.id, `
     <div class="row abyss-head">
       <div class="clockstack abyss-clock" data-role="clock"></div>
       <input class="rank" data-role="rankInput" inputmode="numeric" pattern="[0-9]*" title="ランク">
     </div>
     ${valrowStamHtml()}
-  `;
+  `);
   const rankInput = wrap.querySelector('[data-role="rankInput"]');
   const curWrap = wrap.querySelector('[data-role="curWrap"]');
   const maxLabel = wrap.querySelector('[data-role="maxWrap"]');
@@ -950,15 +961,12 @@ function buildAbyssCard(it){
 }
 
 function buildIdleCard(it){
-  const wrap = document.createElement('div');
-  wrap.className = 'card idle';
-  wrap.dataset.id = it.id;
-  wrap.innerHTML = `
+  const wrap = makeCardEl('idle', it.id, `
     <div class="clockstack idle-clock" data-role="clock"></div>
     <div class="row valrow-idle">
       <div class="main" data-role="cur"></div>
     </div>
-  `;
+  `);
   refs[it.id] = { el: wrap,
     curEl: wrap.querySelector('[data-role="cur"]'), clockEl: wrap.querySelector('[data-role="clock"]') };
   // 受取トグルは短押し(pointerup)。pointerdown にすると長押し削除と同時発火する。
@@ -1110,12 +1118,11 @@ document.addEventListener('pointerdown', (e) => {
     }
   }
   if (addPanelEl.classList.contains('show') && !addPanelEl.contains(e.target) && e.target !== addBtnEl){
-    addPanelEl.classList.remove('show');
+    closeAddPanel();
+    pendingAddGroupId = null;
   }
   if (toastEl && toastEl.classList.contains('show') && !toastEl.contains(e.target)){
-    clearLongPressTarget();
-    toastEl.classList.remove('show');
-    if (toastTapDownHandler){ toastEl.removeEventListener('pointerdown', toastTapDownHandler); toastTapDownHandler = null; }
+    closeToast();
   }
   // 作成パネルは基本、枠外タップで閉じない（数字入力中にキーボードを閉じただけで
   // 誤キャンセルされるのを防ぐため）。ただし仕切り線の色選択にはキャンセル手段が
@@ -1275,43 +1282,35 @@ function updateTimerCard(it, r, now){
 }
 
 let pendingAddGroupId = null;
-bindTapDown(addBtnEl, ()=>{
-  pendingAddGroupId = null;
-  addPanelEl.classList.remove('group-mode');
-  addPanelEl.classList.toggle('show');
-});
-bindTapDown(addPanelEl, (e)=>{
-  const btn = e.target.closest('button[data-type]');
-  if (!btn) return;
-  const type = btn.dataset.type;
-  if (type === 'group'){
-    state.items.push(newGroupItem());
-    addPanelEl.classList.remove('show');
-    save(); render(); startTicking(true);
-    return;
-  }
-  if (type === 'header'){
-    openSetup('header');
-    return;
-  }
-  if (type === 'rule'){
-    openSetup('rule');
-    return;
-  }
-  // stam / abyss / idle（アカウント枠の中の「タイマー追加」で出てくる選択肢）
-  openSetup(type);
-});
-
-// 追加種別ごとの設定ダイアログ(回復間隔 / 満タンまでの時間をここで固定する)。
 let setupType = null;
+
+function closeAddPanel(){
+  addPanelEl.classList.remove('show');
+  addPanelEl.classList.remove('group-mode');
+}
+function openAddPanel(opts){
+  opts = opts || {};
+  pendingAddGroupId = opts.groupId || null;
+  addPanelEl.classList.toggle('group-mode', !!pendingAddGroupId);
+  if (!opts.groupId) pendingAddGroupId = null;
+  addPanelEl.classList.add('show');
+  closeSetup();
+}
+function closeSetup(){
+  setupType = null;
+  setupPanelEl.classList.remove('show');
+}
 function openSetup(type){
   setupType = type;
-  addPanelEl.classList.remove('show');
+  closeAddPanel();
+  setupFieldsEl.innerHTML = '';
+  delete setupFieldsEl.dataset.color;
   if (type === 'header'){
     setupLabelEl.textContent = 'ゲーム名ヘッダーの文字色';
     const colors = ['#9b8bff','#b48cff','#6fc7ff','#70d6b0','#ffd166','#ff9f68','#ff7b9c','#d7dbe7'];
     const current = '#9b8bff';
     setupFieldsEl.innerHTML = `<div class="header-palette">${colors.map(c=>`<button type="button" class="header-swatch${c===current?' selected':''}" data-color="${c}" style="background:${c}" aria-label="${c}"></button>`).join('')}</div>`;
+    setupFieldsEl.dataset.color = current;
     setupFieldsEl.querySelectorAll('.header-swatch').forEach(btn=>{
       bindTapDown(btn, ()=>{
         setupFieldsEl.querySelectorAll('.header-swatch').forEach(b=>b.classList.remove('selected'));
@@ -1319,7 +1318,6 @@ function openSetup(type){
         setupFieldsEl.dataset.color = btn.dataset.color;
       });
     });
-    setupFieldsEl.dataset.color = current;
   } else if (type === 'stam' || type === 'abyss'){
     setupLabelEl.textContent = type === 'abyss' ? 'Abyssスタミナ回復間隔' : 'スタミナ回復間隔';
     setupFieldsEl.innerHTML = `<input type="text" inputmode="numeric" pattern="[0-9]*" id="setupInterval" value="${type==='abyss'?'3':'5'}"><span>分で1回復</span>`;
@@ -1327,17 +1325,6 @@ function openSetup(type){
     setupLabelEl.textContent = '仕切り線の色（#RRGGBB）';
     setupFieldsEl.innerHTML = `<input type="color" id="setupColorPick" value="#52617a" style="width:42px;height:36px;padding:0;border:1px solid var(--line);background:transparent;">
       <input type="text" id="setupColor" value="#52617a" maxlength="7" style="width:7em;background:var(--card2);border:1px solid var(--line);border-radius:8px;color:var(--text);font-size:14px;padding:8px;">`;
-  } else {
-    setupLabelEl.textContent = '満タンまでの時間';
-    setupFieldsEl.innerHTML = `<input type="text" inputmode="numeric" pattern="[0-9]*" id="setupH" value="12"><span>h</span>
-      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupM" value="0"><span>m</span>`;
-  }
-  setupFieldsEl.querySelectorAll('input').forEach(el=>{
-    if (el.type === 'color') return;
-    forceCursorToEnd(el);
-    clearOnFocus(el); // フォーカスで空欄（放置の h/m や回復間隔）
-  });
-  if (type === 'rule'){
     const pick = setupFieldsEl.querySelector('#setupColorPick');
     const text = setupFieldsEl.querySelector('#setupColor');
     if (pick && text){
@@ -1347,36 +1334,41 @@ function openSetup(type){
         if (/^#[0-9a-fA-F]{6}$/.test(v)) pick.value = v;
       });
     }
+  } else {
+    setupLabelEl.textContent = '満タンまでの時間';
+    setupFieldsEl.innerHTML = `<input type="text" inputmode="numeric" pattern="[0-9]*" id="setupH" value="12"><span>h</span>
+      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupM" value="0"><span>m</span>`;
   }
+  setupFieldsEl.querySelectorAll('input').forEach(el=>{
+    if (el.type === 'color') return;
+    forceCursorToEnd(el);
+    clearOnFocus(el);
+  });
   setupPanelEl.classList.add('show');
-}
-function closeSetup(){
-  setupType = null;
-  setupPanelEl.classList.remove('show');
 }
 function pushNewTimer(item){
   const group = pendingAddGroupId ? state.items.find(g=>g.id===pendingAddGroupId && g.type==='group') : null;
   if (!group || group.children.length >= 2){
     pendingAddGroupId = null;
-    addPanelEl.classList.remove('group-mode');
+    closeAddPanel();
     return false;
   }
   group.children.push(item);
   pendingAddGroupId = null;
-  addPanelEl.classList.remove('group-mode');
+  closeAddPanel();
   return true;
 }
-bindTapDown(setupConfirmEl, (e)=>{
-  e.stopPropagation();
+function confirmSetup(){
+  if (!setupType) return;
   if (setupType === 'header'){
     const item = newHeaderItem();
     item.color = setupFieldsEl.dataset.color || '#9b8bff';
     state.items.push(item);
   } else if (setupType === 'stam'){
-    const interval = clampInt(setupFieldsEl.querySelector('#setupInterval').value, 1, 999, 5);
+    const interval = clampInt(setupFieldsEl.querySelector('#setupInterval')?.value, 1, 999, 5);
     if (!pushNewTimer(newStamItem(interval))) return;
   } else if (setupType === 'abyss'){
-    const interval = clampInt(setupFieldsEl.querySelector('#setupInterval').value, 1, 999, 3);
+    const interval = clampInt(setupFieldsEl.querySelector('#setupInterval')?.value, 1, 999, 3);
     if (!pushNewTimer(newAbyssItem(interval))) return;
   } else if (setupType === 'rule'){
     let color = (setupFieldsEl.querySelector('#setupColor')||{}).value || '#52617a';
@@ -1384,12 +1376,36 @@ bindTapDown(setupConfirmEl, (e)=>{
     if (!/^#[0-9a-fA-F]{6}$/.test(color)) color = '#52617a';
     state.items.push(newRuleItem(color));
   } else if (setupType === 'idle'){
-    const h = clampInt(setupFieldsEl.querySelector('#setupH').value, 0, 999, 12);
-    const m = clampInt(setupFieldsEl.querySelector('#setupM').value, 0, 59, 0);
+    const h = clampInt(setupFieldsEl.querySelector('#setupH')?.value, 0, 999, 12);
+    const m = clampInt(setupFieldsEl.querySelector('#setupM')?.value, 0, 59, 0);
     if (!pushNewTimer(newIdleItem(h*60+m))) return;
   }
   closeSetup();
   save(); render(); startTicking(true);
+}
+
+bindTapDown(addBtnEl, ()=>{
+  if (addPanelEl.classList.contains('show') && !addPanelEl.classList.contains('group-mode')){
+    closeAddPanel();
+  } else {
+    openAddPanel();
+  }
+});
+bindTapDown(addPanelEl, (e)=>{
+  const btn = e.target.closest('button[data-type]');
+  if (!btn) return;
+  const type = btn.dataset.type;
+  if (type === 'group'){
+    state.items.push(newGroupItem());
+    closeAddPanel();
+    save(); render(); startTicking(true);
+    return;
+  }
+  openSetup(type);
+});
+bindTapDown(setupConfirmEl, (e)=>{
+  e.stopPropagation();
+  confirmSetup();
 });
 
 // 数字・ランク編集は #cards への pointerdown 委譲で一本化（カードごとの bind を減らす）
