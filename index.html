@@ -59,7 +59,7 @@
   }
   .name-text{
     display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-    -webkit-user-select:none; user-select:none;
+    -webkit-user-select:none; user-select:none; touch-action:manipulation;
   }
   .name-text.is-placeholder{ color:var(--sub); font-weight:600; }
   .name-edit-input{
@@ -247,6 +247,7 @@
     touch-action:pan-y; -webkit-touch-callout:none;
   }
   .divider .name{
+    touch-action:manipulation;
     width:65%; max-width:260px; flex:0 1 auto; font-size:13px; font-weight:700; color:var(--accent); padding:0 0 2px;
   }
   .header-palette{display:flex; gap:5px; flex-wrap:wrap; justify-content:center; margin:4px 0 2px;}
@@ -491,7 +492,12 @@ function createInlineText(initialValue, placeholder, onCommit){
         return;
       }
       const value = input.value;
+      // 長押し解除後にネイティブ入力のフォーカス枠だけ残らないよう、
+      // blur/remove の直前に明示的に見えない状態へ戻す。
+      input.style.outline = 'none';
+      input.style.caretColor = 'transparent';
       editor = null;
+      try { input.blur(); } catch (e) {}
       input.remove();
       text.style.visibility = '';
       shownValue = value;
