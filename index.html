@@ -166,10 +166,11 @@
   }
   .clockstack .ok{color:var(--ok); font-size:14px; line-height:18px;}
   .clockstack .full-at{color:var(--danger); font-size:9.5px; font-weight:800; line-height:18px;}
-  /* 満タンまで2時間未満：スタミナ現在値・放置の数字を赤くする（予定時刻は対象外） */
-  .inline-number.near .inline-number-text,
-  .inline-number.near{color:var(--danger);}
-  .main.near{color:var(--danger);}
+  /* 満タンまで2時間未満：スタミナ現在値・放置の数字を赤くする（予定時刻は対象外）
+     .stamval の color より確実に勝たせるため !important */
+  .inline-number.near,
+  .inline-number.near .inline-number-text{color:var(--danger) !important;}
+  .main.near{color:var(--danger) !important;}
   /* 予定時刻は全タイマーカードで右上に統一。Abyssと同じ基準位置に揃える。 */
   .card.stam > .stam-clock,
   .card.idle > .idle-clock{
@@ -436,9 +437,21 @@ function createInlineNumber(initialValue, onCommit){
   const isEditing = () => editor !== null;
   const open = () => {
     if (editor) return;
-    // 編集開始直前の実幅をロック（通常は固定幅なしで「/」に自然右寄せ）
-    const lockW = wrap.offsetWidth || text.offsetWidth;
-    if (lockW > 0) wrap.style.minWidth = lockW + 'px';
+    // 通常表示は固定幅なし。編集中だけ幅を確保する。
+    // 開始値が1桁でも「240」など3桁が全部見えるよう、最低3桁分の幅を確保する。
+    // （以前は開始幅のままロックして、入力中1桁しか見えない不具合があった）
+    let min3 = 0;
+    try {
+      const probe = document.createElement('span');
+      probe.className = 'inline-number-text';
+      probe.style.cssText = 'position:absolute;left:-9999px;visibility:hidden;white-space:nowrap;';
+      probe.textContent = '000';
+      wrap.appendChild(probe);
+      min3 = probe.offsetWidth || 0;
+      probe.remove();
+    } catch (e) {}
+    const lockW = Math.max(wrap.offsetWidth || text.offsetWidth || 0, min3, 1);
+    wrap.style.minWidth = lockW + 'px';
     const parentHit = wrap.parentElement; // curWrap / maxWrap
     if (parentHit) parentHit.classList.add('is-editing');
     const input = document.createElement('input');
@@ -475,14 +488,15 @@ function createInlineNumber(initialValue, onCommit){
       if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
       else if (e.key === 'Escape') { e.preventDefault(); input.value = originalValue; input.blur(); }
     });
-    // 編集中の pointer イベントを親カードの長押し判定へ漏らさない。
-    // 境界タップでフォーカスが外れてキーボードが即閉じる競合をさらに抑える。
+    // 編集中の pointer を親カードへ漏らさない（キーボード即閉じ防止）
     ['pointerdown','pointerup','click'].forEach(ev => {
       input.addEventListener(ev, e => { e.stopPropagation(); }, {capture:true});
     });
-    // inputは生成直後から空欄。focus時に空欄へ戻すリスナーは不要で、
-    // キーボード表示時のイベント競合も避けられる。
+    // モバイルで focus が直後に外れることがあるので、1フレーム後にもう一度当てる
     input.focus({preventScroll:true});
+    requestAnimationFrame(() => {
+      if (editor === input) try { input.focus({preventScroll:true}); } catch (e) {}
+    });
   };
   return {wrap, text, open, setText, isEditing};
 }
@@ -822,8 +836,16 @@ function buildStamCard(it){
   bindLongPressDelete(wrap, it.id, (e)=>{
     const target = e.target;
     if (target.closest && target.closest('.inline-edit-input')) return;
-    if (target.closest && target.closest('[data-role="curWrap"]')) { curEditor.open(); return; }
-    if (target.closest && target.closest('[data-role="maxWrap"]')) { maxEditor.open(); return; }
+    if (target.closest && target.closest('[data-role="curWrap"]')) {
+      try { e.preventDefault(); e.stopPropagation(); } catch (err) {}
+      curEditor.open();
+      return;
+    }
+    if (target.closest && target.closest('[data-role="maxWrap"]')) {
+      try { e.preventDefault(); e.stopPropagation(); } catch (err) {}
+      maxEditor.open();
+      return;
+    }
   });
   return wrap;
 }
@@ -929,11 +951,11 @@ function buildAbyssCard(it){
       return;
     }
     if (e.target.closest && e.target.closest('[data-role="curWrap"]')){
+      try { e.preventDefault(); e.stopPropagation(); } catch (err) {}
       curEditor.open();
       return;
     }
     // 入力欄以外はカード全体が同じ40使い切り操作。
-    // max/時刻/余白/枠の間でタップ判定が分かれないようにする。
     onForty(e);
   });
   return wrap;
