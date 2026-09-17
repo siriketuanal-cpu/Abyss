@@ -65,7 +65,7 @@
   .name-edit-input{
     position:absolute; inset:0; width:100%; height:100%; box-sizing:border-box;
     background:transparent; border:none; color:inherit; font:inherit; font-weight:inherit;
-    padding:0; margin:0; outline:1px solid #d8d8d8; outline-offset:1px;
+    padding:0; margin:0; outline:none; outline-offset:0;
     caret-color:transparent; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
     touch-action:none;
     appearance:none; -webkit-appearance:none; z-index:2;
@@ -564,19 +564,56 @@ function createInlineText(initialValue, placeholder, onCommit){
       e.preventDefault();
       try { window.getSelection()?.removeAllRanges(); } catch (err) {}
     }, {capture:true});
-    try {
-      input.focus({preventScroll:true});
-    } catch (e) {}
+    // ここではfocusしない。
+    // Android/TWAはinput.focus()直後からネイティブ編集カーソルを管理するため、
+    // タップと長押しを同じpointerdown内でfocusさせると、長押し終了後に
+    // 雫型カーソルだけが残ることがある。通常タップ時だけpointerupでfocusする。
   };
-  // 編集開始そのものをこの要素の pointerdown で完結させ、ブラウザの
-  // 「タップした文字を選択する」既定ジェスチャーを先に走らせない。
+
+  // 編集開始そのものをこの要素のpointerdownで完結させる。
+  // pointerdownではinputを作るだけにして、短押し確定後のpointerupで初めてfocusする。
+  // これにより長押し中はAndroidのネイティブ編集状態を作らない。
+  let wrapHoldTimer = null;
+  let wrapPointerId = null;
+  let wrapHoldX = 0, wrapHoldY = 0;
+  const clearWrapHold = ()=>{
+    if (wrapHoldTimer !== null){ clearTimeout(wrapHoldTimer); wrapHoldTimer = null; }
+    wrapPointerId = null;
+  };
   wrap.addEventListener('pointerdown', e=>{
     if (e.isPrimary === false) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
+    clearWrapHold();
     open();
+    if (!editor) return;
+    wrapPointerId = e.pointerId;
+    wrapHoldX = e.clientX;
+    wrapHoldY = e.clientY;
+    wrapHoldTimer = setTimeout(()=>{
+      wrapHoldTimer = null;
+      wrapPointerId = null;
+      if (editor){
+        // focus前なのでblurを発生させず、そのまま編集欄を終了する。
+        // Androidのネイティブ雫型カーソルを生成する前にDOMを破棄する。
+        guardBlur = false;
+        finish();
+      }
+    }, 450);
   }, {capture:true});
+  wrap.addEventListener('pointermove', e=>{
+    if (e.pointerId !== wrapPointerId) return;
+    if (Math.hypot(e.clientX-wrapHoldX, e.clientY-wrapHoldY) > 12) clearWrapHold();
+  }, {capture:true, passive:true});
+  wrap.addEventListener('pointerup', e=>{
+    if (e.pointerId !== wrapPointerId) return;
+    clearWrapHold();
+    if (editor === input && !input.readOnly){
+      try { input.focus({preventScroll:true}); } catch (err) {}
+    }
+  }, {capture:true, passive:false});
+  wrap.addEventListener('pointercancel', clearWrapHold, {capture:true, passive:true});
   return { wrap, text, open, setText, setColor, isEditing: ()=> !!editor };
 }
 // ランク：表示は「Lv.n」、タップ時だけ数字 input
