@@ -699,11 +699,13 @@ function createInlineNumber(initialValue, onCommit, editKey){
     text.textContent = v;
   };
   const isEditing = () => editor !== null || (editKey != null && editingId === editKey);
+
   const open = () => {
     if (editor) return;
     const parentHit = wrap.parentElement;
     if (parentHit) parentHit.classList.add('is-editing');
     if (editKey != null) editingId = editKey;
+
     const input = document.createElement('input');
     input.type = 'text';
     input.inputMode = 'numeric';
@@ -720,8 +722,7 @@ function createInlineNumber(initialValue, onCommit, editKey){
     wrap.appendChild(input);
 
     let guardBlur = true;
-    const clearGuard = () => { guardBlur = false; };
-    setTimeout(clearGuard, 350);
+    setTimeout(()=>{ guardBlur = false; }, 350);
 
     let holdTimer = null;
     let holdPointerId = null;
@@ -730,6 +731,7 @@ function createInlineNumber(initialValue, onCommit, editKey){
       if (holdTimer !== null){ clearTimeout(holdTimer); holdTimer = null; }
       holdPointerId = null;
     };
+
     const finish = () => {
       if (editor !== input) return;
       if (guardBlur) return;
@@ -746,7 +748,7 @@ function createInlineNumber(initialValue, onCommit, editKey){
     };
     finishEditor = finish;
     focusEditor = ()=>{
-      if (editor !== input) return;
+      if (editor !== input || input.readOnly) return;
       try { input.focus({preventScroll:true}); } catch (e) {}
     };
 
@@ -756,9 +758,11 @@ function createInlineNumber(initialValue, onCommit, editKey){
     });
     input.addEventListener('blur', finish);
     input.addEventListener('keydown', e => {
-      if (e.key === 'Enter') { e.preventDefault(); clearGuard(); input.blur(); }
-      else if (e.key === 'Escape') { e.preventDefault(); input.value = originalValue; clearGuard(); input.blur(); }
+      if (e.key === 'Enter') { e.preventDefault(); guardBlur = false; input.blur(); }
+      else if (e.key === 'Escape') { e.preventDefault(); input.value = originalValue; guardBlur = false; input.blur(); }
     });
+
+    // 編集欄を実際に操作している間だけ、選択UIを抑止する。
     input.addEventListener('pointerdown', e=>{
       if (e.isPrimary === false) return;
       e.preventDefault();
@@ -770,16 +774,15 @@ function createInlineNumber(initialValue, onCommit, editKey){
       holdTimer = setTimeout(()=>{
         holdTimer = null;
         holdPointerId = null;
-        try { window.getSelection()?.removeAllRanges(); } catch (err) {}
         if (editor === input){
-          clearGuard();
+          guardBlur = false;
           finish();
         }
       }, 450);
     }, {capture:true, passive:false});
     input.addEventListener('pointermove', e=>{
       if (e.pointerId !== holdPointerId) return;
-      if (Math.hypot(e.clientX-holdX, e.clientY-holdY) > 12) cancelHold();
+      if (Math.hypot(e.clientX-holdX,e.clientY-holdY) > 12) cancelHold();
     }, {capture:true, passive:true});
     input.addEventListener('pointerup', e=>{
       if (e.pointerId === holdPointerId) cancelHold();
@@ -787,44 +790,52 @@ function createInlineNumber(initialValue, onCommit, editKey){
     input.addEventListener('pointercancel', cancelHold, {capture:true, passive:true});
   };
 
-  // 数字編集も名前と同じく、pointerdownではinputを作るだけにする。
-  // 短押しのpointerupでfocus、長押しならfocus前に編集終了。
-  let wrapHoldTimer = null;
-  let wrapPointerId = null;
-  let wrapHoldX = 0, wrapHoldY = 0;
-  const clearWrapHold = ()=>{
-    if (wrapHoldTimer !== null){ clearTimeout(wrapHoldTimer); wrapHoldTimer = null; }
-    wrapPointerId = null;
+  // 数字そのものの短押し/長押しをここで判定する。
+  // 短押しではpointerup後にだけfocusし、長押しではfocus前に編集を閉じる。
+  let holdTimer = null;
+  let holdPointerId = null;
+  let holdX = 0, holdY = 0;
+  const clearHold = ()=>{
+    if (holdTimer !== null){ clearTimeout(holdTimer); holdTimer = null; }
+    holdPointerId = null;
   };
+
   wrap.addEventListener('pointerdown', e=>{
     if (e.isPrimary === false) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
-    clearWrapHold();
+    clearHold();
     open();
     if (!editor) return;
-    wrapPointerId = e.pointerId;
-    wrapHoldX = e.clientX; wrapHoldY = e.clientY;
-    wrapHoldTimer = setTimeout(()=>{
-      wrapHoldTimer = null;
-      wrapPointerId = null;
-      if (finishEditor) finishEditor();
+    holdPointerId = e.pointerId;
+    holdX = e.clientX; holdY = e.clientY;
+    holdTimer = setTimeout(()=>{
+      holdTimer = null;
+      holdPointerId = null;
+      if (editor && finishEditor) finishEditor();
     }, 450);
   }, {capture:true, passive:false});
+
   wrap.addEventListener('pointermove', e=>{
-    if (e.pointerId !== wrapPointerId) return;
-    if (Math.hypot(e.clientX-wrapHoldX, e.clientY-wrapHoldY) > 12) clearWrapHold();
+    if (e.pointerId !== holdPointerId) return;
+    if (Math.hypot(e.clientX-holdX,e.clientY-holdY) > 12) clearHold();
   }, {capture:true, passive:true});
+
   wrap.addEventListener('pointerup', e=>{
-    if (e.pointerId !== wrapPointerId) return;
-    clearWrapHold();
-    if (editor && focusEditor) focusEditor();
-  }, {capture:true, passive:false});
-  wrap.addEventListener('pointercancel', clearWrapHold, {capture:true, passive:true});
+    if (e.pointerId !== holdPointerId) return;
+    clearHold();
+    // Android側でpointerdownのキャンセル処理が残っていても、短押しならここで確実に編集開始。
+    if (editor && focusEditor){
+      requestAnimationFrame(()=>{
+        if (editor && focusEditor) focusEditor();
+      });
+    }
+  }, {capture:true, passive:true});
+  wrap.addEventListener('pointercancel', clearHold, {capture:true, passive:true});
+
   return {wrap, text, open, setText, isEditing};
 }
-
 function newStamItem(intervalMin){
   return { id: uid(), type:'stam', name:'', current:0, max:100, intervalMin, start: Date.now() };
 }
