@@ -65,9 +65,8 @@
   .name-edit-input{
     position:absolute; inset:0; width:100%; height:100%; box-sizing:border-box;
     background:transparent; border:none; color:inherit; font:inherit; font-weight:inherit;
-    padding:0; margin:0; outline:none;
-    caret-color:transparent; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
-    touch-action:none;
+    padding:0; margin:0; outline:1px solid #d8d8d8; outline-offset:1px;
+    caret-color:transparent;
     appearance:none; -webkit-appearance:none; z-index:2;
   }
   .name-edit-input::placeholder{ color:var(--sub); }
@@ -443,7 +442,7 @@ function clearOnFocus(input){
   input.addEventListener('focus', () => { input.value = ''; });
 }
 // 名前・見出し：普段は span、タップ時だけ input を生成して破棄（雫ハンドルの土台を消す）
-function createInlineText(initialValue, placeholder, onCommit){
+function createAccountNameText(initialValue, placeholder, onCommit){
   const wrap = document.createElement('span');
   wrap.className = 'name';
   const text = document.createElement('span');
@@ -495,7 +494,6 @@ function createInlineText(initialValue, placeholder, onCommit){
       text.style.visibility = '';
       shownValue = value;
       paint();
-      try { window.getSelection()?.removeAllRanges(); } catch (e) {}
       onCommit(value);
     };
     input.addEventListener('blur', finish);
@@ -503,8 +501,7 @@ function createInlineText(initialValue, placeholder, onCommit){
       if (e.key === 'Enter'){ e.preventDefault(); guardBlur = false; input.blur(); }
       else if (e.key === 'Escape'){ e.preventDefault(); input.value = shownValue; guardBlur = false; input.blur(); }
     });
-    // 編集中の長押しはAndroid標準の文字選択へ渡さず、
-    // アカウント名・見出しとも同じく「編集終了」として扱う。
+    // この編集欄専用：520ms以上の長押しはAndroid標準の文字選択へ渡さず編集終了。
     let holdTimer = null, holdPointerId = null, holdX = 0, holdY = 0;
     const cancelHold = ()=>{
       if (holdTimer !== null){ clearTimeout(holdTimer); holdTimer = null; }
@@ -521,7 +518,102 @@ function createInlineText(initialValue, placeholder, onCommit){
         holdTimer = null;
         holdPointerId = null;
         if (editor === input){
-          // 520ms以上の長押しはAndroidの選択UIを出す前に編集を閉じる。
+          try { input.blur(); } catch (err) {}
+        }
+      }, 520);
+    }, {capture:true, passive:false});
+    input.addEventListener('pointermove', e=>{
+      if (e.pointerId !== holdPointerId) return;
+      if (Math.hypot(e.clientX - holdX, e.clientY - holdY) > 12) cancelHold();
+    }, {capture:true, passive:true});
+    input.addEventListener('pointerup', e=>{
+      if (e.pointerId === holdPointerId) cancelHold();
+    }, {capture:true, passive:true});
+    input.addEventListener('pointercancel', cancelHold, {capture:true, passive:true});
+    try {
+      input.focus({preventScroll:true});
+    } catch (e) {}
+  };
+  bindTapDown(wrap, ()=>{ open(); });
+  return { wrap, text, open, setText, setColor, isEditing: ()=> !!editor };
+}
+
+function createHeaderNameText(initialValue, placeholder, onCommit){
+  const wrap = document.createElement('span');
+  wrap.className = 'name';
+  const text = document.createElement('span');
+  text.className = 'name-text';
+  let shownValue = String(initialValue || '');
+  const paint = ()=>{
+    if (shownValue){
+      text.textContent = shownValue;
+      text.classList.remove('is-placeholder');
+    } else {
+      text.textContent = placeholder || '';
+      text.classList.add('is-placeholder');
+    }
+  };
+  paint();
+  wrap.appendChild(text);
+
+  let editor = null;
+  const setText = v => {
+    shownValue = String(v == null ? '' : v);
+    if (!editor) paint();
+  };
+  const setColor = c => { wrap.style.color = c || ''; };
+  const open = ()=>{
+    if (editor) return;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'name-edit-input';
+    input.placeholder = placeholder || '';
+    input.value = shownValue;
+    input.autocomplete = 'off';
+    input.spellcheck = false;
+    editor = input;
+    text.style.visibility = 'hidden';
+    wrap.appendChild(input);
+
+    let guardBlur = true;
+    setTimeout(()=>{ guardBlur = false; }, 350);
+
+    const finish = ()=>{
+      if (editor !== input) return;
+      if (guardBlur){
+        try { input.focus({preventScroll:true}); } catch (e) {}
+        return;
+      }
+      const value = input.value;
+      editor = null;
+      input.remove();
+      text.style.visibility = '';
+      shownValue = value;
+      paint();
+      onCommit(value);
+    };
+    input.addEventListener('blur', finish);
+    input.addEventListener('keydown', e=>{
+      if (e.key === 'Enter'){ e.preventDefault(); guardBlur = false; input.blur(); }
+      else if (e.key === 'Escape'){ e.preventDefault(); input.value = shownValue; guardBlur = false; input.blur(); }
+    });
+    // この編集欄専用：520ms以上の長押しはAndroid標準の文字選択へ渡さず編集終了。
+    let holdTimer = null, holdPointerId = null, holdX = 0, holdY = 0;
+    const cancelHold = ()=>{
+      if (holdTimer !== null){ clearTimeout(holdTimer); holdTimer = null; }
+      holdPointerId = null;
+    };
+    input.addEventListener('pointerdown', e=>{
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.isPrimary === false) return;
+      cancelHold();
+      holdPointerId = e.pointerId;
+      holdX = e.clientX; holdY = e.clientY;
+      holdTimer = setTimeout(()=>{
+        holdTimer = null;
+        holdPointerId = null;
+        if (editor === input){
           try { input.blur(); } catch (err) {}
         }
       }, 520);
@@ -588,7 +680,6 @@ function createInlineRank(initialRank, onOpen, onCommit){
       const next = raw === '' ? rank : Math.max(1, Math.min(200, Math.floor(Number(raw.replace(/\D/g, '')) || rank)));
       rank = next;
       paint();
-      try { window.getSelection()?.removeAllRanges(); } catch (e) {}
       onCommit(next);
     };
     input.addEventListener('input', ()=>{
@@ -662,7 +753,6 @@ function createInlineNumber(initialValue, onCommit, editKey){
       wrap.classList.remove('editing');
       if (parentHit) parentHit.classList.remove('is-editing');
       if (editKey != null && editingId === editKey) editingId = null;
-      try { window.getSelection()?.removeAllRanges(); } catch (e) {}
       onCommit(value);
     };
     input.addEventListener('input', () => {
@@ -1163,7 +1253,7 @@ function buildGroupCard(it){
     <div class="group-body" data-role="body"></div>
   `;
   const nameRowEl = wrap.querySelector('[data-role="namerow"]');
-  const nameEditor = createInlineText(it.name || '', 'アカウント', (value)=>{
+  const nameEditor = createAccountNameText(it.name || '', 'アカウント', (value)=>{
     if (it.name !== value){ it.name = value; save(); }
   });
   nameRowEl.appendChild(nameEditor.wrap);
@@ -1203,7 +1293,7 @@ function buildRuleCard(it){
 function buildHeaderCard(it){
   const wrap = document.createElement('div');
   wrap.className = 'divider';
-  const nameEditor = createInlineText(it.name || '', '見出し(ゲーム名など)', (value)=>{
+  const nameEditor = createHeaderNameText(it.name || '', '見出し(ゲーム名など)', (value)=>{
     if (it.name !== value){ it.name = value; save(); }
   });
   nameEditor.setColor(it.color || 'var(--accent)');
@@ -1257,13 +1347,6 @@ function cancelClaim(it){
 // 動作しないことがあるため使わない。
 
 document.addEventListener('pointerdown', (e) => {
-  // 実際に選択状態があるときだけ解除する。通常のカードタップでは不要な処理を省く。
-  try {
-    if (document.activeElement !== e.target && window.getSelection){
-      const sel = window.getSelection();
-      if (sel && sel.rangeCount) sel.removeAllRanges();
-    }
-  } catch(err){}
   if (claimId != null){
     const claimed = findItemById(claimId);
     const r = claimed ? getTimerRef(claimId) : null;
@@ -1627,15 +1710,6 @@ document.addEventListener('visibilitychange', ()=>{
 window.addEventListener('pageshow', (e)=>{
   if (e.persisted) resumePipeline();
 });
-// 入力外タップで選択解除（キーボード専用の viewport ハックは外した）
-document.addEventListener('pointerdown', (e)=>{
-  clearResumeVeil();
-  const t = e.target;
-  if (!t || !t.closest || !t.closest('input, textarea, [contenteditable]')){
-    try { window.getSelection()?.removeAllRanges(); } catch (err) {}
-  }
-}, true);
-
 render();
 startTicking(true);
 
