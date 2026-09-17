@@ -512,8 +512,11 @@ function createPersistentInlineEditor({
     try { window.getSelection()?.removeAllRanges(); } catch (e) {}
   };
 
+  // 表示テキストは focus 直前まで消さない（pointerdown 直後の空白チラつき防止）
   const focusEditor = ()=>{
     if (editor !== input) return;
+    text.style.visibility = 'hidden';
+    wrap.classList.add('editing');
     input.style.visibility = 'visible';
     input.style.pointerEvents = 'auto';
     input.tabIndex = 0;
@@ -547,11 +550,9 @@ function createPersistentInlineEditor({
     originalValue = shownValue;
     if (typeof onOpen === 'function') onOpen();
     if (editKey != null) editingId = editKey;
-    input.value = String(shownValue ?? '');
     editor = input;
     guardBlur = true;
-    text.style.visibility = 'hidden';
-    wrap.classList.add('editing');
+    // ここでは text を隠さない。短押し確定（pointerup→focusEditor）まで表示を維持
     setTimeout(()=>{ guardBlur = false; }, 350);
   };
 
@@ -626,7 +627,10 @@ function createPersistentInlineEditor({
   wrap.addEventListener('pointercancel', clearHold, {capture:true, passive:true});
 
   return {
-    wrap, text, input, open, setText, setValue, setColor: c => {
+    wrap, text, input, open, setText, setValue,
+    // 互換: updateTimerCard などが setRank を呼ぶ
+    setRank: setValue,
+    setColor: c => {
       wrap.style.color = c || '';
       if (typeof setColor === 'function') setColor(c, wrap);
     },
@@ -650,7 +654,7 @@ function createInlineText(initialValue, placeholder, onCommit){
 
 function createInlineRank(initialRank, onOpen, onCommit){
   const clampRank = v => Math.max(1, Math.min(200, Math.floor(Number(v) || 1)));
-  return createPersistentInlineEditor({
+  const ed = createPersistentInlineEditor({
     initialValue: clampRank(initialRank),
     wrapClass: 'rank',
     textClass: 'rank-text',
@@ -664,6 +668,8 @@ function createInlineRank(initialRank, onOpen, onCommit){
     onOpen,
     onCommit: v => onCommit(clampRank(v)),
   });
+  ed.setRank = ed.setValue;
+  return ed;
 }
 
 function createInlineNumber(initialValue, onCommit, editKey){
@@ -1421,7 +1427,10 @@ function updateTimerCard(it, r, now){
     r.el.classList.toggle('full', info.isFull);
     r.el.classList.toggle('claim', wait40);
     renderClock(r.clockEl, info.remainMs, info.isFull, now, info.fullAt);
-    if (r.rankEditor && !r.rankEditor.isEditing()) r.rankEditor.setRank(it.rank || 1);
+    if (r.rankEditor && !r.rankEditor.isEditing()){
+      const set = r.rankEditor.setRank || r.rankEditor.setValue || r.rankEditor.setText;
+      if (set) set.call(r.rankEditor, it.rank || 1);
+    }
     if (r.curEl && !r.curEl.isEditing()) r.curEl.setText(wait40 ? remainingAfter40(info.cur) : info.cur);
     if (r.maxLabel){
       const v = String(it.max);
