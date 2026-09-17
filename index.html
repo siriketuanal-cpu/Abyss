@@ -688,28 +688,40 @@ function bindLongPressDelete(el, id, shortAction){
     active = false; moved = false; longFired = false; pid = null; nameInput = null;
   };
 
+  // 編集欄（数字・ランク・名前・編集中input）は長押し削除に入れない。
+  // ここに入ると「編集開始 → 直後に削除確認」が同時発火して壊れる。
+  const isEditTarget = (target)=>{
+    if (!target || !target.closest) return false;
+    return !!(
+      target.closest('.inline-edit-input') ||
+      target.closest('[data-role="curWrap"]') ||
+      target.closest('[data-role="maxWrap"]') ||
+      target.closest('.rank') ||
+      target.closest('input.name') ||
+      target.closest('.name')
+    );
+  };
+
   el.addEventListener('pointerdown', e=>{
-    // 編集欄でも長押し禁止はしない（ユーザー要望）。短押し編集はそのまま動く。
     if (!isPrimary(e) || active) return;
+    // 編集欄上ではタイマーを張らない（編集専用。削除・40計算と分離）
+    if (isEditTarget(e.target)) return;
+    if (editingId != null) return;
+    if (el.querySelector && el.querySelector('.inline-edit-input')) return;
+
     active = true; moved = false; longFired = false;
     sx = e.clientX; sy = e.clientY; pid = e.pointerId;
-
-    if (isGroupName(e.target)){
-      nameInput = e.target.closest('.group .name');
-    }
+    nameInput = null;
 
     timer = setTimeout(()=>{
       if (!active || moved) return;
       timer = null;
       longFired = true;
       clearSelection();
-      // 長押し確定時だけフォーカスを外す（削除確認へ）
       try {
         const ae = document.activeElement;
         if (ae && el.contains(ae) && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')){
           ae.blur();
-        } else if (nameInput) {
-          nameInput.blur();
         }
       } catch (err) {}
       suppressNextClick = true;
@@ -729,21 +741,17 @@ function bindLongPressDelete(el, id, shortAction){
 
   el.addEventListener('pointerup', e=>{
     if (!active || e.pointerId !== pid) return;
-    const wasLong = longFired, wasMoved = moved, input = nameInput;
+    const wasLong = longFired, wasMoved = moved;
     if (timer !== null){ clearTimeout(timer); timer = null; }
 
     if (wasLong){
-      // 長押し後に発生するclickだけを抑止する。
       e.preventDefault();
       e.stopPropagation();
     } else if (!wasMoved && typeof shortAction === 'function'){
-      // 短押しは各カード本来の操作へ渡す。
-      // アカウント名行では、入力欄そのものをタップした時だけ編集開始。
-      // 行の余白タップでは名前欄へフォーカスしない。
-      if (!el.classList.contains('group-namerow') || input){
+      // 編集欄上では shortAction（40計算・受取トグル等）を走らせない
+      if (!isEditTarget(e.target)){
         shortAction(e);
       }
-      if (input) e.stopPropagation();
     }
     cleanup();
   }, {capture:true, passive:false});
@@ -914,8 +922,11 @@ function buildAbyssCard(it){
   const curWrap = wrap.querySelector('[data-role="curWrap"]');
   const maxLabel = wrap.querySelector('[data-role="maxWrap"]');
   const curEditor = attachCurrentEditor(curWrap, it, () => { pending40Id = null; });
-  // ランクはインラインのまま。フォーカス時だけ空欄。
+  // ランクはインラインのまま。フォーカス時だけ空欄。選択ハンドルは出さない。
   clearOnFocus(rankInput);
+  ['selectstart','contextmenu'].forEach(ev=>{
+    rankInput.addEventListener(ev, e=>{ e.preventDefault(); });
+  });
   rankInput.setAttribute('autocomplete','off');
   rankInput.setAttribute('autocapitalize','off');
   rankInput.setAttribute('autocorrect','off');
