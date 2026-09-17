@@ -465,11 +465,14 @@ function createInlineText(initialValue, placeholder, onCommit){
   wrap.appendChild(text);
 
   let editor = null;
+  let finishEditor = null;
+  let focusEditor = null;
   const setText = v => {
     shownValue = String(v == null ? '' : v);
     if (!editor) paint();
   };
   const setColor = c => { wrap.style.color = c || ''; };
+
   const open = ()=>{
     if (editor) return;
     const input = document.createElement('input');
@@ -484,49 +487,9 @@ function createInlineText(initialValue, placeholder, onCommit){
     wrap.appendChild(input);
 
     let guardBlur = true;
-    setTimeout(()=>{ guardBlur = false; }, 350);
+    const cancelInitialGuard = () => { guardBlur = false; };
+    setTimeout(cancelInitialGuard, 350);
 
-    const finish = ()=>{
-      if (editor !== input) return;
-      if (guardBlur){
-        try { input.focus({preventScroll:true}); } catch (e) {}
-        return;
-      }
-      const value = input.value;
-      // Android/TWA のネイティブ編集UIを先に閉じてからDOMを破棄する。
-      // 先に見えなくし、readonly化→blur→DOM除去の順にすることで、
-      // 雫型キャレットやフォーカス表示だけが画面に残る経路を抑える。
-      cancelHold();
-      input.style.outline = 'none';
-      input.style.caretColor = 'transparent';
-      input.style.visibility = 'hidden';
-      input.style.pointerEvents = 'none';
-      input.readOnly = true;
-      editor = null;
-      try { input.blur(); } catch (e) {}
-      // live DOMから切り離した一時領域へ移してから完全破棄する。
-      // Android側の編集対象を画面上から先に消すのが目的。
-      const graveyard = document.createDocumentFragment();
-      try { graveyard.appendChild(input); } catch (e) {}
-      try { input.remove(); } catch (e) {}
-      text.style.visibility = '';
-      shownValue = value;
-      paint();
-      // 編集欄をDOMから外した直後にSelectionを明示的に破棄する。
-      // Android/TWA側に残る選択コンテキストを次のタップへ持ち越さない。
-      try {
-        const sel = window.getSelection();
-        if (sel) sel.removeAllRanges();
-      } catch (e) {}
-      onCommit(value);
-    };
-    input.addEventListener('blur', finish);
-    input.addEventListener('keydown', e=>{
-      if (e.key === 'Enter'){ e.preventDefault(); guardBlur = false; input.blur(); }
-      else if (e.key === 'Escape'){ e.preventDefault(); input.value = shownValue; guardBlur = false; input.blur(); }
-    });
-    // Android/TWA のネイティブ文字選択へ渡さない。編集開始後の長押しも
-    // input 自身で完結させ、名前・見出しの外側の長押し処理とは分離する。
     let holdTimer = null;
     let holdPointerId = null;
     let holdX = 0, holdY = 0;
@@ -534,6 +497,40 @@ function createInlineText(initialValue, placeholder, onCommit){
       if (holdTimer !== null){ clearTimeout(holdTimer); holdTimer = null; }
       holdPointerId = null;
     };
+
+    const finish = ()=>{
+      if (editor !== input) return;
+      if (guardBlur){
+        try { input.focus({preventScroll:true}); } catch (e) {}
+        return;
+      }
+      cancelHold();
+      const value = input.value;
+      input.style.outline = 'none';
+      input.style.caretColor = 'transparent';
+      input.style.visibility = 'hidden';
+      input.style.pointerEvents = 'none';
+      input.readOnly = true;
+      editor = null;
+      try { input.blur(); } catch (e) {}
+      try { input.remove(); } catch (e) {}
+      text.style.visibility = '';
+      shownValue = value;
+      paint();
+      try { window.getSelection()?.removeAllRanges(); } catch (e) {}
+      onCommit(value);
+    };
+    finishEditor = finish;
+    focusEditor = ()=>{
+      if (editor !== input || input.readOnly) return;
+      try { input.focus({preventScroll:true}); } catch (e) {}
+    };
+
+    input.addEventListener('blur', finish);
+    input.addEventListener('keydown', e=>{
+      if (e.key === 'Enter'){ e.preventDefault(); guardBlur = false; input.blur(); }
+      else if (e.key === 'Escape'){ e.preventDefault(); input.value = shownValue; guardBlur = false; input.blur(); }
+    });
     input.addEventListener('pointerdown', e=>{
       if (e.isPrimary === false) return;
       e.preventDefault();
@@ -548,7 +545,7 @@ function createInlineText(initialValue, placeholder, onCommit){
         try { window.getSelection()?.removeAllRanges(); } catch (err) {}
         if (editor === input){
           guardBlur = false;
-          try { input.blur(); } catch (err) {}
+          finish();
         }
       }, 450);
     }, {capture:true, passive:false});
@@ -564,15 +561,10 @@ function createInlineText(initialValue, placeholder, onCommit){
       e.preventDefault();
       try { window.getSelection()?.removeAllRanges(); } catch (err) {}
     }, {capture:true});
-    // ここではfocusしない。
-    // Android/TWAはinput.focus()直後からネイティブ編集カーソルを管理するため、
-    // タップと長押しを同じpointerdown内でfocusさせると、長押し終了後に
-    // 雫型カーソルだけが残ることがある。通常タップ時だけpointerupでfocusする。
   };
 
-  // 編集開始そのものをこの要素のpointerdownで完結させる。
-  // pointerdownではinputを作るだけにして、短押し確定後のpointerupで初めてfocusする。
-  // これにより長押し中はAndroidのネイティブ編集状態を作らない。
+  // 編集開始時はinputを作るだけ。短押しが確定したpointerupで初めてfocusする。
+  // 長押しならfocus前に編集を閉じるので、Androidの雫型選択UIを作らせない。
   let wrapHoldTimer = null;
   let wrapPointerId = null;
   let wrapHoldX = 0, wrapHoldY = 0;
@@ -589,19 +581,15 @@ function createInlineText(initialValue, placeholder, onCommit){
     open();
     if (!editor) return;
     wrapPointerId = e.pointerId;
-    wrapHoldX = e.clientX;
-    wrapHoldY = e.clientY;
+    wrapHoldX = e.clientX; wrapHoldY = e.clientY;
     wrapHoldTimer = setTimeout(()=>{
       wrapHoldTimer = null;
       wrapPointerId = null;
       if (editor){
-        // focus前なのでblurを発生させず、そのまま編集欄を終了する。
-        // Androidのネイティブ雫型カーソルを生成する前にDOMを破棄する。
-        guardBlur = false;
-        finish();
+        if (finishEditor) finishEditor();
       }
     }, 450);
-  }, {capture:true});
+  }, {capture:true, passive:false});
   wrap.addEventListener('pointermove', e=>{
     if (e.pointerId !== wrapPointerId) return;
     if (Math.hypot(e.clientX-wrapHoldX, e.clientY-wrapHoldY) > 12) clearWrapHold();
@@ -609,9 +597,7 @@ function createInlineText(initialValue, placeholder, onCommit){
   wrap.addEventListener('pointerup', e=>{
     if (e.pointerId !== wrapPointerId) return;
     clearWrapHold();
-    if (editor === input && !input.readOnly){
-      try { input.focus({preventScroll:true}); } catch (err) {}
-    }
+    if (editor && focusEditor) focusEditor();
   }, {capture:true, passive:false});
   wrap.addEventListener('pointercancel', clearWrapHold, {capture:true, passive:true});
   return { wrap, text, open, setText, setColor, isEditing: ()=> !!editor };
@@ -704,6 +690,8 @@ function createInlineNumber(initialValue, onCommit, editKey){
   wrap.appendChild(text);
 
   let editor = null;
+  let finishEditor = null;
+  let focusEditor = null;
   const setText = v => {
     v = String(v);
     if (v === shownValue) return;
@@ -713,7 +701,7 @@ function createInlineNumber(initialValue, onCommit, editKey){
   const isEditing = () => editor !== null || (editKey != null && editingId === editKey);
   const open = () => {
     if (editor) return;
-    const parentHit = wrap.parentElement; // curWrap / maxWrap
+    const parentHit = wrap.parentElement;
     if (parentHit) parentHit.classList.add('is-editing');
     if (editKey != null) editingId = editKey;
     const input = document.createElement('input');
@@ -731,19 +719,24 @@ function createInlineNumber(initialValue, onCommit, editKey){
     wrap.classList.add('editing');
     wrap.appendChild(input);
 
-    // 開始直後の短時間だけ blur を握りつぶして focus を戻す。
     let guardBlur = true;
     const clearGuard = () => { guardBlur = false; };
     setTimeout(clearGuard, 350);
 
+    let holdTimer = null;
+    let holdPointerId = null;
+    let holdX = 0, holdY = 0;
+    const cancelHold = ()=>{
+      if (holdTimer !== null){ clearTimeout(holdTimer); holdTimer = null; }
+      holdPointerId = null;
+    };
     const finish = () => {
       if (editor !== input) return;
-      if (guardBlur) {
-        try { input.focus({preventScroll:true}); } catch (e) {}
-        return;
-      }
+      if (guardBlur) return;
+      cancelHold();
       const value = input.value;
       editor = null;
+      try { input.blur(); } catch (e) {}
       input.remove();
       wrap.classList.remove('editing');
       if (parentHit) parentHit.classList.remove('is-editing');
@@ -751,6 +744,12 @@ function createInlineNumber(initialValue, onCommit, editKey){
       try { window.getSelection()?.removeAllRanges(); } catch (e) {}
       onCommit(value);
     };
+    finishEditor = finish;
+    focusEditor = ()=>{
+      if (editor !== input) return;
+      try { input.focus({preventScroll:true}); } catch (e) {}
+    };
+
     input.addEventListener('input', () => {
       const v = input.value.replace(/\D/g, '').slice(0,3);
       if (input.value !== v) input.value = v;
@@ -760,9 +759,69 @@ function createInlineNumber(initialValue, onCommit, editKey){
       if (e.key === 'Enter') { e.preventDefault(); clearGuard(); input.blur(); }
       else if (e.key === 'Escape') { e.preventDefault(); input.value = originalValue; clearGuard(); input.blur(); }
     });
-    input.addEventListener('pointerdown', e => e.stopPropagation(), {capture:true});
-    try { input.focus({preventScroll:true}); } catch (e) {}
+    input.addEventListener('pointerdown', e=>{
+      if (e.isPrimary === false) return;
+      e.preventDefault();
+      e.stopPropagation();
+      try { window.getSelection()?.removeAllRanges(); } catch (err) {}
+      cancelHold();
+      holdPointerId = e.pointerId;
+      holdX = e.clientX; holdY = e.clientY;
+      holdTimer = setTimeout(()=>{
+        holdTimer = null;
+        holdPointerId = null;
+        try { window.getSelection()?.removeAllRanges(); } catch (err) {}
+        if (editor === input){
+          clearGuard();
+          finish();
+        }
+      }, 450);
+    }, {capture:true, passive:false});
+    input.addEventListener('pointermove', e=>{
+      if (e.pointerId !== holdPointerId) return;
+      if (Math.hypot(e.clientX-holdX, e.clientY-holdY) > 12) cancelHold();
+    }, {capture:true, passive:true});
+    input.addEventListener('pointerup', e=>{
+      if (e.pointerId === holdPointerId) cancelHold();
+    }, {capture:true, passive:true});
+    input.addEventListener('pointercancel', cancelHold, {capture:true, passive:true});
   };
+
+  // 数字編集も名前と同じく、pointerdownではinputを作るだけにする。
+  // 短押しのpointerupでfocus、長押しならfocus前に編集終了。
+  let wrapHoldTimer = null;
+  let wrapPointerId = null;
+  let wrapHoldX = 0, wrapHoldY = 0;
+  const clearWrapHold = ()=>{
+    if (wrapHoldTimer !== null){ clearTimeout(wrapHoldTimer); wrapHoldTimer = null; }
+    wrapPointerId = null;
+  };
+  wrap.addEventListener('pointerdown', e=>{
+    if (e.isPrimary === false) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    clearWrapHold();
+    open();
+    if (!editor) return;
+    wrapPointerId = e.pointerId;
+    wrapHoldX = e.clientX; wrapHoldY = e.clientY;
+    wrapHoldTimer = setTimeout(()=>{
+      wrapHoldTimer = null;
+      wrapPointerId = null;
+      if (finishEditor) finishEditor();
+    }, 450);
+  }, {capture:true, passive:false});
+  wrap.addEventListener('pointermove', e=>{
+    if (e.pointerId !== wrapPointerId) return;
+    if (Math.hypot(e.clientX-wrapHoldX, e.clientY-wrapHoldY) > 12) clearWrapHold();
+  }, {capture:true, passive:true});
+  wrap.addEventListener('pointerup', e=>{
+    if (e.pointerId !== wrapPointerId) return;
+    clearWrapHold();
+    if (editor && focusEditor) focusEditor();
+  }, {capture:true, passive:false});
+  wrap.addEventListener('pointercancel', clearWrapHold, {capture:true, passive:true});
   return {wrap, text, open, setText, isEditing};
 }
 
@@ -1649,23 +1708,6 @@ bindTapDown(addPanelEl, (e)=>{
 bindTapDown(setupConfirmEl, (e)=>{
   e.stopPropagation();
   confirmSetup();
-});
-
-// スタミナ数字編集は #cards への pointerdown 委譲（ランク・名前は各 editor が bind）
-cardsEl.addEventListener('pointerdown', (e) => {
-  if (e.isPrimary === false) return;
-  if (e.pointerType === 'mouse' && e.button !== 0) return;
-  const t = e.target;
-  if (!t || !t.closest) return;
-  const cur = t.closest('[data-role="curWrap"]');
-  const max = t.closest('[data-role="maxWrap"]');
-  if (!cur && !max) return;
-  const host = (cur || max).closest('[data-id]');
-  if (!host) return;
-  const r = getTimerRef(host.dataset.id);
-  if (!r) return;
-  if (cur && r.curEl && r.curEl.open) r.curEl.open();
-  else if (max && r.maxEl && r.maxEl.open) r.maxEl.open();
 });
 
 const resumeVeilEl = document.getElementById('resumeVeil');
