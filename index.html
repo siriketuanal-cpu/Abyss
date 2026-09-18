@@ -3,7 +3,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no, interactive-widget=resizes-content" name="viewport"/>
+<meta content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no, interactive-widget=overlays-content" name="viewport"/>
 <meta content="#0b0b14" name="theme-color"/>
 <meta content="yes" name="mobile-web-app-capable"/>
 <title>タイマー</title>
@@ -999,8 +999,10 @@ function askRemoveItem(id){
   if (!toastEl){ removeItem(id); return; }
   const canAdd = it && it.type === 'group' && it.children.length < 2;
   const isHeader = it && it.type === 'header';
+  const isRule = it && it.type === 'rule';
+  const colorDefault = isHeader ? (it.color || '#9b8bff') : (isRule ? (it.color || '#52617a') : null);
   const extra =
-    (isHeader ? `<label class="toast-color">色<input type="color" value="${it.color || '#9b8bff'}" aria-label="ゲーム名の色"></label>` : '')
+    (colorDefault ? `<label class="toast-color">色<input type="color" value="${colorDefault}" aria-label="色"></label>` : '')
     + (canAdd ? '<button type="button" data-act="add">タイマー追加</button>' : '');
   showConfirmToast(
     extra
@@ -1017,13 +1019,17 @@ function askRemoveItem(id){
     targetRef.el.classList.add('longpress-target');
     longPressTargetEl = targetRef.el;
   }
-  if (isHeader){
+  if (colorDefault){
     const colorEl = toastEl.querySelector('.toast-color input');
     if (colorEl){
       colorEl.addEventListener('input', ()=>{
         it.color = colorEl.value;
-        if (refs[id]?.nameEditor) refs[id].nameEditor.setColor(it.color);
-        else if (refs[id]?.nameEl) refs[id].nameEl.style.color = it.color;
+        if (isHeader){
+          if (refs[id]?.nameEditor) refs[id].nameEditor.setColor(it.color);
+          else if (refs[id]?.nameEl) refs[id].nameEl.style.color = it.color;
+        } else if (isRule && refs[id]?.el){
+          refs[id].el.style.borderTopColor = it.color;
+        }
         save();
       });
       colorEl.addEventListener('pointerdown', e=>e.stopPropagation());
@@ -1477,6 +1483,19 @@ function closeSetup(){
   setupType = null;
   setupPanelEl.classList.remove('show');
 }
+const SHARED_COLORS = ['#9b8bff','#b48cff','#6fc7ff','#70d6b0','#ffd166','#ff9f68','#ff7b9c','#d7dbe7','#52617a'];
+function fillColorPalette(defaultColor){
+  const current = defaultColor || SHARED_COLORS[0];
+  setupFieldsEl.innerHTML = `<div class="header-palette">${SHARED_COLORS.map(c=>`<button type="button" class="header-swatch${c===current?' selected':''}" data-color="${c}" style="background:${c}" aria-label="${c}"></button>`).join('')}</div>`;
+  setupFieldsEl.dataset.color = current;
+  setupFieldsEl.querySelectorAll('.header-swatch').forEach(btn=>{
+    bindTapDown(btn, ()=>{
+      setupFieldsEl.querySelectorAll('.header-swatch').forEach(b=>b.classList.remove('selected'));
+      btn.classList.add('selected');
+      setupFieldsEl.dataset.color = btn.dataset.color;
+    });
+  });
+}
 function openSetup(type){
   setupType = type;
   closeAddPanel();
@@ -1484,33 +1503,13 @@ function openSetup(type){
   delete setupFieldsEl.dataset.color;
   if (type === 'header'){
     setupLabelEl.textContent = 'ゲーム名ヘッダーの文字色';
-    const colors = ['#9b8bff','#b48cff','#6fc7ff','#70d6b0','#ffd166','#ff9f68','#ff7b9c','#d7dbe7'];
-    const current = '#9b8bff';
-    setupFieldsEl.innerHTML = `<div class="header-palette">${colors.map(c=>`<button type="button" class="header-swatch${c===current?' selected':''}" data-color="${c}" style="background:${c}" aria-label="${c}"></button>`).join('')}</div>`;
-    setupFieldsEl.dataset.color = current;
-    setupFieldsEl.querySelectorAll('.header-swatch').forEach(btn=>{
-      bindTapDown(btn, ()=>{
-        setupFieldsEl.querySelectorAll('.header-swatch').forEach(b=>b.classList.remove('selected'));
-        btn.classList.add('selected');
-        setupFieldsEl.dataset.color = btn.dataset.color;
-      });
-    });
+    fillColorPalette('#9b8bff');
   } else if (type === 'stam' || type === 'abyss'){
     setupLabelEl.textContent = type === 'abyss' ? 'Abyssスタミナ回復間隔' : 'スタミナ回復間隔';
     setupFieldsEl.innerHTML = `<input type="text" inputmode="numeric" pattern="[0-9]*" id="setupInterval" value="${type==='abyss'?'3':'5'}"><span>分で1回復</span>`;
   } else if (type === 'rule'){
-    setupLabelEl.textContent = '仕切り線の色（#RRGGBB）';
-    setupFieldsEl.innerHTML = `<input type="color" id="setupColorPick" value="#52617a" style="width:42px;height:36px;padding:0;border:1px solid var(--line);background:transparent;">
-      <input type="text" id="setupColor" value="#52617a" maxlength="7" style="width:7em;background:var(--card2);border:1px solid var(--line);border-radius:8px;color:var(--text);font-size:14px;padding:8px;">`;
-    const pick = setupFieldsEl.querySelector('#setupColorPick');
-    const text = setupFieldsEl.querySelector('#setupColor');
-    if (pick && text){
-      pick.addEventListener('input', ()=>{ text.value = pick.value; });
-      text.addEventListener('input', ()=>{
-        const v = text.value.trim();
-        if (/^#[0-9a-fA-F]{6}$/.test(v)) pick.value = v;
-      });
-    }
+    setupLabelEl.textContent = '仕切り線の色';
+    fillColorPalette('#52617a');
   } else {
     setupLabelEl.textContent = '満タンまでの時間';
     setupFieldsEl.innerHTML = `<input type="text" inputmode="numeric" pattern="[0-9]*" id="setupH" value="12"><span>h</span>
@@ -1548,9 +1547,7 @@ function confirmSetup(){
     const interval = clampInt(setupFieldsEl.querySelector('#setupInterval')?.value, 1, 999, 3);
     if (!pushNewTimer(newAbyssItem(interval))) return;
   } else if (setupType === 'rule'){
-    let color = (setupFieldsEl.querySelector('#setupColor')||{}).value || '#52617a';
-    color = String(color).trim();
-    if (!/^#[0-9a-fA-F]{6}$/.test(color)) color = '#52617a';
+    const color = setupFieldsEl.dataset.color || '#52617a';
     state.items.push(newRuleItem(color));
   } else if (setupType === 'idle'){
     const h = clampInt(setupFieldsEl.querySelector('#setupH')?.value, 0, 999, 12);
