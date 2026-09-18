@@ -613,11 +613,12 @@ function createPersistentInlineEditor(opts){
     wrapPointerId = null;
   };
 
+  // 試験的切り分け：stopPropagation を外す（preventDefault は残す）
+  // → 親の長押し削除とイベントが奪い合いしにくくなる。雫対策の核（遅延focus・長押し破棄・caret透明）は維持。
   wrap.addEventListener('pointerdown', e=>{
     if (e.isPrimary === false) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     e.preventDefault();
-    e.stopPropagation();
     clearWrapHold();
     if (!editor) open();
     if (!editor) return;
