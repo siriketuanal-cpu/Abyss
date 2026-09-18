@@ -272,13 +272,14 @@
     content:''; position:absolute; left:0; right:0; top:-10px; bottom:-10px;
   }
   #toast{
-    position:fixed; left:50%; bottom:calc(24px + env(safe-area-inset-bottom));
-    transform:translateX(-50%); max-width:90%;
+    /* 下だとキーボードに隠れるので上寄りに固定 */
+    position:fixed; left:50%; top:18%; bottom:auto;
+    transform:translateX(-50%); max-width:92%;
     background:#1e1e2c; color:var(--text); border:1px solid var(--line);
     border-radius:10px; padding:10px 14px; font-size:13px; z-index:30;
     display:none; box-shadow:0 8px 24px rgba(0,0,0,.35);
   }
-  #toast.show{display:flex; gap:10px; align-items:center;}
+  #toast.show{display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:center;}
   #toast button{
     border:1px solid var(--line); background:var(--card2); color:var(--text);
     border-radius:8px; padding:6px 10px; font-size:12px; font-weight:600;
@@ -287,7 +288,12 @@
   /* 1回目タップで破線（確定待ち）。2回目で実行 */
   #toast button.armed{outline:2px dashed #fff; outline-offset:2px;}
   #toast .toast-color{display:inline-flex;align-items:center;gap:5px;color:var(--text);font-size:12px;}
-  #toast .toast-color input{width:28px;height:24px;padding:1px;border:1px solid var(--line);border-radius:6px;background:transparent;}
+  #toast .toast-color input[type="color"]{width:28px;height:24px;padding:1px;border:1px solid var(--line);border-radius:6px;background:transparent;}
+  #toast .toast-color input[type="text"]{
+    width:2.8em; height:28px; padding:2px 4px; border:1px solid var(--line); border-radius:6px;
+    background:var(--card2); color:var(--text) !important; font-size:14px; font-weight:700;
+    text-align:center; caret-color:var(--text); -webkit-text-fill-color:var(--text);
+  }
   #empty{color:var(--sub); font-size:13px; text-align:center; padding:40px 0;}
   #addPanel{
     position:fixed; left:0; right:0; bottom:0; background:var(--card);
@@ -643,7 +649,9 @@ function createPersistentInlineEditor(opts){
   wrap.addEventListener('pointerdown', e=>{
     if (e.isPrimary === false) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
-    e.preventDefault();
+    // 名前系は preventDefault しない（pointerup が欠落して編集に入れなくなる端末対策）
+    // 数字・ランクは選択・雫抑制のため preventDefault を残す
+    if (!deferOpenUntilUp) e.preventDefault();
     clearWrapHold();
     wrapPointerId = e.pointerId;
     wrapHoldX = e.clientX; wrapHoldY = e.clientY;
@@ -696,6 +704,17 @@ function createPersistentInlineEditor(opts){
       finish(false);
     }
   }, {capture:true, passive:true});
+
+  // 名前系の保険：pointerup が欠落しても click で編集に入れる
+  if (deferOpenUntilUp){
+    wrap.addEventListener('click', e=>{
+      if (editor) return;
+      if (suppressNextClick) return;
+      e.preventDefault();
+      if (!editor) open();
+      focusInput();
+    });
+  }
 
   return {
     wrap, text, input, open,
@@ -1085,7 +1104,7 @@ function askRemoveItem(id){
   const chunkVal = isAbyss ? clampUseChunk(it.useChunk) : null;
   const extra =
     (colorDefault ? `<label class="toast-color">色<input type="color" value="${colorDefault}" aria-label="色"></label>` : '')
-    + (chunkVal != null ? `<label class="toast-color">使い切り<input type="text" inputmode="numeric" pattern="[0-9]*" value="${chunkVal}" maxlength="3" data-role="useChunk" aria-label="使い切り数" style="width:2.8em;text-align:center;"></label>` : '')
+    + (chunkVal != null ? `<label class="toast-color">使い切り<input type="text" inputmode="numeric" pattern="[0-9]*" value="${chunkVal}" maxlength="3" data-role="useChunk" aria-label="使い切り数"></label>` : '')
     + (canAdd ? '<button type="button" data-act="add">タイマー追加</button>' : '');
   showConfirmToast(
     extra
@@ -1121,14 +1140,21 @@ function askRemoveItem(id){
   if (isAbyss){
     const chunkEl = toastEl.querySelector('input[data-role="useChunk"]');
     if (chunkEl){
+      const origChunk = clampUseChunk(it.useChunk);
+      chunkEl.addEventListener('focus', ()=>{ chunkEl.value = ''; });
       const applyChunk = ()=>{
-        it.useChunk = clampUseChunk(chunkEl.value);
+        const raw = String(chunkEl.value || '').replace(/\D/g, '');
+        // 空のまま閉じたら元の値を維持（他の数字編集と同じ）
+        it.useChunk = raw === '' ? origChunk : clampUseChunk(raw);
         chunkEl.value = String(it.useChunk);
         if (pending40Id === it.id) paintAbyssFortyPreview(it.id);
         save();
       };
       chunkEl.addEventListener('change', applyChunk);
       chunkEl.addEventListener('blur', applyChunk);
+      chunkEl.addEventListener('keydown', e=>{
+        if (e.key === 'Enter'){ e.preventDefault(); chunkEl.blur(); }
+      });
       chunkEl.addEventListener('pointerdown', e=>e.stopPropagation());
     }
   }
@@ -1411,7 +1437,13 @@ document.addEventListener('pointerdown', (e) => {
     pendingAddGroupId = null;
   }
   if (toastEl && toastEl.classList.contains('show') && !toastEl.contains(e.target)){
-    closeToast();
+    // トースト内inputフォーカス中の枠外タップはキーボード閉じだけ（メニューは残す）
+    const ae = document.activeElement;
+    if (ae && toastEl.contains(ae) && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')){
+      try { ae.blur(); } catch (err) {}
+    } else {
+      closeToast();
+    }
   }
   // 作成パネルは基本、枠外タップで閉じない（数字入力中にキーボードを閉じただけで
   // 誤キャンセルされるのを防ぐため）。ただし仕切り線の色選択にはキャンセル手段が
