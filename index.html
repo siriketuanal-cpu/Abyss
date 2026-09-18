@@ -686,7 +686,7 @@ function createInlineNumber(initialValue, onCommit, editKey){
     sanitize: v => String(v).replace(/\D/g, '').slice(0, 3),
     format: v => String(v),
     emptyKeepsValue: true,
-    clearOnFocus: false,
+    clearOnFocus: true,
     maxLength: 3,
     inputMode: 'numeric',
     editKey,
@@ -884,7 +884,6 @@ function bindLongPressDelete(el, id, shortAction){
     // 編集欄上ではタイマーを張らない（編集専用。削除・40計算と分離）
     if (isEditTarget(e.target)) return;
     if (editingId != null) return;
-    if (el.querySelector && el.querySelector('.inline-edit-input')) return;
 
     active = true; moved = false; longFired = false;
     sx = e.clientX; sy = e.clientY; pid = e.pointerId;
