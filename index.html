@@ -391,6 +391,15 @@ function normalizeIdleClaim(it){
   // 再起動後も「受取」のまま固まる。読み込み時は必ず running に戻す。
   if (it && it.type === 'idle' && it.state === 'claim') it.state = 'running';
 }
+function normalizeAbyssItem(it){
+  if (!it || it.type !== 'abyss') return;
+  if (!it.rank) it.rank = 1;
+  // max はランクから再計算（旧データの手編集maxは捨てる）
+  it.max = 240 + (Math.max(1, Math.min(200, it.rank|0)) - 1) * 5;
+  if (it.useChunk == null) it.useChunk = 40;
+  else it.useChunk = clampUseChunk(it.useChunk);
+  if (it.current > it.max) it.current = it.max;
+}
 function load(){
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -399,15 +408,13 @@ function load(){
       if (data && Array.isArray(data.items)){
         data.items.forEach(it=>{
           if (!it) return;
-          if (it.type === 'abyss'){
-            if (!it.rank) it.rank = 1;
-            // max はランクから再計算（旧データの手編集maxは捨てる）
-            it.max = 240 + (Math.max(1, Math.min(200, it.rank|0)) - 1) * 5;
-            if (it.current > it.max) it.current = it.max;
-          }
+          normalizeAbyssItem(it);
           normalizeIdleClaim(it);
           if (it.type === 'group' && Array.isArray(it.children)){
-            it.children.forEach(normalizeIdleClaim);
+            it.children.forEach(ch=>{
+              normalizeAbyssItem(ch);
+              normalizeIdleClaim(ch);
+            });
           }
         });
       }
@@ -575,6 +582,8 @@ function createPersistentInlineEditor(opts){
     if (editKey != null && editingId === editKey) editingId = null;
     try { window.getSelection()?.removeAllRanges(); } catch (e) {}
     closeInput();
+    // 編集終了後のタップが拾われにくくなるのを防ぐ
+    try { clearWrapHold(); } catch (err) {}
     shownValue = next;
     paint();
     if (commit && typeof onCommit === 'function') onCommit(next);
@@ -617,13 +626,19 @@ function createPersistentInlineEditor(opts){
   let wrapHoldTimer = null;
   let wrapPointerId = null;
   let wrapHoldX = 0, wrapHoldY = 0;
+  let wrapHoldAt = 0;
+  let wrapMoved = false;
+  // 名前の短押し判定。削除長押し(520ms)より短く、ゆっくりタップでも拾える幅
+  const NAME_SHORT_MS = 480;
   const clearWrapHold = ()=>{
     if (wrapHoldTimer !== null){ clearTimeout(wrapHoldTimer); wrapHoldTimer = null; }
     wrapPointerId = null;
+    wrapMoved = false;
+    wrapHoldAt = 0;
   };
 
   // 試験的切り分け：stopPropagation なし（preventDefault は残す）
-  // 名前系は deferOpenUntilUp で「Upまで開かない」→ 長押し削除と干渉しにくい
+  // 名前系は deferOpenUntilUp → Up時の押下時間で短押し判定（タイマーで pointerId を消さない）
   // 数字・ランクは従来どおり Downでopen、長押しで破棄（雫対策）
   wrap.addEventListener('pointerdown', e=>{
     if (e.isPrimary === false) return;
@@ -632,6 +647,8 @@ function createPersistentInlineEditor(opts){
     clearWrapHold();
     wrapPointerId = e.pointerId;
     wrapHoldX = e.clientX; wrapHoldY = e.clientY;
+    wrapHoldAt = Date.now();
+    wrapMoved = false;
     if (!deferOpenUntilUp){
       if (!editor) open();
       if (!editor) return;
@@ -644,34 +661,31 @@ function createPersistentInlineEditor(opts){
           finish(false);
         }
       }, 450);
-    } else {
-      // 名前系：長押し判定だけ。開くのは短押しの pointerup
-      wrapHoldTimer = setTimeout(()=>{
-        wrapHoldTimer = null;
-        wrapPointerId = null; // 長押し扱い → pointerup で開かない
-      }, 450);
     }
+    // 名前系：タイマーで pointerId を消さない。短/長は pointerup の経過時間で判定
   }, {capture:true, passive:false});
 
   wrap.addEventListener('pointermove', e=>{
     if (e.pointerId !== wrapPointerId) return;
-    // 少し動いただけでは編集開始をキャンセルしない（指の震えで反応しなくなるのを防ぐ）
-    // 長押しタイマーだけ止める
-    if (Math.hypot(e.clientX-wrapHoldX, e.clientY-wrapHoldY) > 12){
+    if (Math.hypot(e.clientX-wrapHoldX, e.clientY-wrapHoldY) > 14){
+      wrapMoved = true;
+      // 数字・ランク用の長押し破棄タイマーだけ止める（編集開始は pointerup で継続可）
       if (wrapHoldTimer !== null){ clearTimeout(wrapHoldTimer); wrapHoldTimer = null; }
     }
   }, {capture:true, passive:true});
 
   wrap.addEventListener('pointerup', e=>{
     if (e.pointerId !== wrapPointerId) return;
-    const wasTracking = wrapPointerId != null;
+    const heldMs = wrapHoldAt ? (Date.now() - wrapHoldAt) : 0;
+    const moved = wrapMoved;
     clearWrapHold();
-    if (!wasTracking) return;
     if (deferOpenUntilUp){
+      // 大きく動いた／長押し（削除側に任せる）→ 編集しない
+      if (moved || heldMs >= NAME_SHORT_MS) return;
       if (!editor) open();
       focusInput();
     } else {
-      // 短押し（または軽い移動）で focus
+      // 数字・ランク：短押し（または軽い移動）で focus
       focusInput();
     }
   }, {capture:true, passive:false});
@@ -730,7 +744,7 @@ function createInlineRank(initialRank, onOpen, onCommit){
   });
 }
 
-function createInlineNumber(initialValue, onCommit, editKey){
+function createInlineNumber(initialValue, onCommit, editKey, onOpen){
   const normalizeNumber = v => String(Math.max(0, Math.floor(Number(String(v).replace(/\D/g, '')) || Number(v) || 0)));
   return createPersistentInlineEditor({
     initialValue: String(initialValue),
@@ -745,6 +759,7 @@ function createInlineNumber(initialValue, onCommit, editKey){
     maxLength: 3,
     inputMode: 'numeric',
     editKey,
+    onOpen,
     onCommit
   });
 }
@@ -752,10 +767,15 @@ function createInlineNumber(initialValue, onCommit, editKey){
 function newStamItem(intervalMin){
   return { id: uid(), type:'stam', name:'', current:0, max:100, intervalMin, start: Date.now() };
 }
-function newAbyssItem(intervalMin){
-  // Dot Abyss 風: 最大はランク連動。最大値タップで40使い切り。削除は長押し。
+function newAbyssItem(intervalMin, useChunk){
+  // Dot Abyss 風: 最大はランク連動。カードタップで useChunk 使い切り。削除は長押し。
   const rank = 1;
-  return { id: uid(), type:'abyss', name:'', rank, current:0, max: abyssMaxFor(rank), intervalMin, start: Date.now() };
+  return {
+    id: uid(), type:'abyss', name:'', rank,
+    current:0, max: abyssMaxFor(rank),
+    intervalMin, useChunk: clampUseChunk(useChunk != null ? useChunk : 40),
+    start: Date.now()
+  };
 }
 function newIdleItem(durationMin){
   return { id: uid(), type:'idle', name:'', durationMin, state:'running', start: Date.now() };
@@ -811,9 +831,18 @@ function freezeIfFull(it, now){
 }
 // 現在値/上限値を書き換えても「次の1回復までの残り時間」がリセットされないよう、
 // サイクルの位相(既にどれだけ経過しているか)を維持したまま基準時刻だけを進める。
-function remainingAfter40(cur){
+function clampUseChunk(v){
+  const n = Math.floor(Number(v) || 0);
+  return Math.max(1, Math.min(100, n || 40));
+}
+// 使い切り後の残り（例: chunk=40 なら 220→20, 40→0, 39→39）
+function remainingAfterChunk(cur, chunk){
   cur = Math.max(0, Math.floor(Number(cur) || 0));
-  return cur % 40; // 例: 220→20, 40→0, 39→39
+  const c = clampUseChunk(chunk);
+  return cur % c;
+}
+function remainingAfter40(cur, it){
+  return remainingAfterChunk(cur, it && it.useChunk != null ? it.useChunk : 40);
 }
 // Dot Abyss 相当: 基礎240 + (ランク-1)×5（最大は計算のみ・手編集しない）
 function abyssMaxFor(rank){
@@ -823,6 +852,8 @@ function abyssMaxFor(rank){
 function syncAbyssMax(it){
   it.rank = Math.max(1, Math.min(200, Math.floor(Number(it.rank) || 1)));
   it.max = abyssMaxFor(it.rank);
+  if (it.useChunk == null) it.useChunk = 40;
+  else it.useChunk = clampUseChunk(it.useChunk);
   if (it.current > it.max) it.current = it.max;
 }
 function preserveCycle(it, now){
@@ -1049,9 +1080,12 @@ function askRemoveItem(id){
   const canAdd = it && it.type === 'group' && it.children.length < 2;
   const isHeader = it && it.type === 'header';
   const isRule = it && it.type === 'rule';
+  const isAbyss = it && it.type === 'abyss';
   const colorDefault = isHeader ? (it.color || '#9b8bff') : (isRule ? (it.color || '#52617a') : null);
+  const chunkVal = isAbyss ? clampUseChunk(it.useChunk) : null;
   const extra =
     (colorDefault ? `<label class="toast-color">色<input type="color" value="${colorDefault}" aria-label="色"></label>` : '')
+    + (chunkVal != null ? `<label class="toast-color">使い切り<input type="text" inputmode="numeric" pattern="[0-9]*" value="${chunkVal}" maxlength="3" data-role="useChunk" aria-label="使い切り数" style="width:2.8em;text-align:center;"></label>` : '')
     + (canAdd ? '<button type="button" data-act="add">タイマー追加</button>' : '');
   showConfirmToast(
     extra
@@ -1069,7 +1103,7 @@ function askRemoveItem(id){
     longPressTargetEl = targetRef.el;
   }
   if (colorDefault){
-    const colorEl = toastEl.querySelector('.toast-color input');
+    const colorEl = toastEl.querySelector('.toast-color input[type="color"]');
     if (colorEl){
       colorEl.addEventListener('input', ()=>{
         it.color = colorEl.value;
@@ -1082,6 +1116,20 @@ function askRemoveItem(id){
         save();
       });
       colorEl.addEventListener('pointerdown', e=>e.stopPropagation());
+    }
+  }
+  if (isAbyss){
+    const chunkEl = toastEl.querySelector('input[data-role="useChunk"]');
+    if (chunkEl){
+      const applyChunk = ()=>{
+        it.useChunk = clampUseChunk(chunkEl.value);
+        chunkEl.value = String(it.useChunk);
+        if (pending40Id === it.id) paintAbyssFortyPreview(it.id);
+        save();
+      };
+      chunkEl.addEventListener('change', applyChunk);
+      chunkEl.addEventListener('blur', applyChunk);
+      chunkEl.addEventListener('pointerdown', e=>e.stopPropagation());
     }
   }
 }
@@ -1103,6 +1151,12 @@ function valrowStamHtml(){
 }
 // 現在値インライン編集（stam / abyss 共用）
 function attachCurrentEditor(curWrap, it, extraCommit){
+  const clearFortyPreview = ()=>{
+    if (it.type === 'abyss' && pending40Id === it.id){
+      pending40Id = null;
+      paintAbyssFortyPreview(it.id);
+    }
+  };
   const curEditor = createInlineNumber(stamInfo(it, Date.now()).cur, value => {
     const now = Date.now();
     if (it.type === 'abyss') syncAbyssMax(it);
@@ -1115,7 +1169,7 @@ function attachCurrentEditor(curWrap, it, extraCommit){
     updateOneTimer(it);
     startTicking(true);
     saveAfterPaint();
-  }, it.id + ':cur');
+  }, it.id + ':cur', clearFortyPreview);
   curWrap.appendChild(curEditor.wrap);
   return curEditor;
 }
@@ -1187,7 +1241,7 @@ function buildAbyssCard(it){
     const info = stamInfo(it, now);
     if (pending40Id === it.id){
       preserveCycle(it, now);
-      it.current = remainingAfter40(info.cur);
+      it.current = remainingAfter40(info.cur, it);
       freezeIfFull(it, now);
       pending40Id = null;
       paintAbyssFortyPreview(it.id);
@@ -1494,7 +1548,7 @@ function updateTimerCard(it, r, now){
     r.el.classList.toggle('claim', wait40);
     renderClock(r.clockEl, info.remainMs, info.isFull, now, info.fullAt);
     if (r.rankEditor && !r.rankEditor.isEditing()) r.rankEditor.setRank(it.rank || 1);
-    if (r.curEl && !r.curEl.isEditing()) r.curEl.setText(wait40 ? remainingAfter40(info.cur) : info.cur);
+    if (r.curEl && !r.curEl.isEditing()) r.curEl.setText(wait40 ? remainingAfter40(info.cur, it) : info.cur);
     if (r.maxLabel){
       const v = String(it.max);
       if (r.maxLabel.textContent !== v) r.maxLabel.textContent = v;
@@ -1557,9 +1611,14 @@ function openSetup(type){
   if (type === 'header'){
     setupLabelEl.textContent = 'ゲーム名ヘッダーの文字色';
     fillColorPalette('#9b8bff');
-  } else if (type === 'stam' || type === 'abyss'){
-    setupLabelEl.textContent = type === 'abyss' ? 'Abyssスタミナ回復間隔' : 'スタミナ回復間隔';
-    setupFieldsEl.innerHTML = `<input type="text" inputmode="numeric" pattern="[0-9]*" id="setupInterval" value="${type==='abyss'?'3':'5'}"><span>分で1回復</span>`;
+  } else if (type === 'stam'){
+    setupLabelEl.textContent = 'スタミナ回復間隔';
+    setupFieldsEl.innerHTML = `<input type="text" inputmode="numeric" pattern="[0-9]*" id="setupInterval" value="5"><span>分で1回復</span>`;
+  } else if (type === 'abyss'){
+    setupLabelEl.textContent = 'Abyssスタミナ設定';
+    setupFieldsEl.innerHTML = `
+      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupInterval" value="3"><span>分で1回復</span>
+      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupUseChunk" value="40" style="margin-left:8px;"><span>使い切り</span>`;
   } else if (type === 'rule'){
     setupLabelEl.textContent = '仕切り線の色';
     fillColorPalette('#52617a');
@@ -1598,7 +1657,8 @@ function confirmSetup(){
     if (!pushNewTimer(newStamItem(interval))) return;
   } else if (setupType === 'abyss'){
     const interval = clampInt(setupFieldsEl.querySelector('#setupInterval')?.value, 1, 999, 3);
-    if (!pushNewTimer(newAbyssItem(interval))) return;
+    const useChunk = clampUseChunk(setupFieldsEl.querySelector('#setupUseChunk')?.value);
+    if (!pushNewTimer(newAbyssItem(interval, useChunk))) return;
   } else if (setupType === 'rule'){
     const color = setupFieldsEl.dataset.color || '#52617a';
     state.items.push(newRuleItem(color));
