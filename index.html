@@ -11,9 +11,24 @@
     <title>Abyss</title>
     <link rel="manifest" href="/manifest.json" />
     <link rel="icon" href="/icon-192.png" />
+    <script>
+      // Service Worker registration with update detection
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(function (err) {
+            console.warn('SW registration failed:', err);
+          });
+        });
+      }
+    </script>
   </head>
   <body class="bg-[#0b0b14] text-[#eceef2] select-none antialiased overflow-hidden overscroll-none h-full m-0 p-0 font-sans">
     <div id="root" class="h-full w-full flex flex-col"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <noscript>
+      <div style="padding:20px;color:#eceef2;background:#0b0b14;text-align:center;">
+        JavaScriptを有効にしてください。
+      </div>
+    </noscript>
   </body>
 </html>
