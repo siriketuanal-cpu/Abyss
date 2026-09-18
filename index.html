@@ -566,6 +566,12 @@ function createPersistentInlineEditor(opts){
     // テキスト非表示はフォーカス直前にずらす（タップ瞬間の点滅を軽減）
     wrap.classList.add('editing');
     try { input.focus({preventScroll:true}); } catch (e) {}
+    // 全選択・雫ハンドルの温存を避ける（末尾にキャレットだけ）
+    try {
+      const len = String(input.value || '').length;
+      input.setSelectionRange(len, len);
+      window.getSelection()?.removeAllRanges();
+    } catch (err) {}
   };
 
   const finish = (commit=true)=>{
@@ -623,11 +629,20 @@ function createPersistentInlineEditor(opts){
     if (e.isPrimary === false) return;
     e.preventDefault();
     e.stopPropagation();
-    try { window.getSelection()?.removeAllRanges(); } catch (err) {}
+    try {
+      window.getSelection()?.removeAllRanges();
+      // 編集中の長押しで全選択・雫が残らないよう、押下時点で末尾に寄せる
+      const len = String(input.value || '').length;
+      input.setSelectionRange(len, len);
+    } catch (err) {}
   }, {capture:true, passive:false});
   input.addEventListener('selectstart', e=>{
     e.preventDefault();
     try { window.getSelection()?.removeAllRanges(); } catch (err) {}
+  }, {capture:true});
+  input.addEventListener('contextmenu', e=>{
+    e.preventDefault();
+    e.stopPropagation();
   }, {capture:true});
 
   let wrapHoldTimer = null;
