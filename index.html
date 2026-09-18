@@ -481,6 +481,9 @@ function createPersistentInlineEditor(opts){
     onOpen = null,
     onCommit = null,
     usePlaceholderClass = false,
+    // true: pointerdownでは開かず、短押しのpointerupでのみopen+focus（名前・ヘッダー用）
+    // 長押し削除と「Downで開いてすぐ閉じる」がぶつからないようにする
+    deferOpenUntilUp = false,
   } = opts || {};
 
   const wrap = document.createElement('span');
@@ -557,8 +560,14 @@ function createPersistentInlineEditor(opts){
       try { input.focus({preventScroll:true}); } catch (e) {}
       return;
     }
-    const raw = sanitize(input.value);
-    const next = (emptyKeepsValue && raw === '') ? originalValue : normalize(raw);
+    // キャンセル時は必ず元値に戻す（長押し破棄でブランクが残るのを防ぐ）
+    let next;
+    if (!commit){
+      next = originalValue;
+    } else {
+      const raw = sanitize(input.value);
+      next = (emptyKeepsValue && raw === '') ? originalValue : normalize(raw);
+    }
     editor = null;
     wrap.classList.remove('editing');
     const parentHit = wrap.parentElement;
@@ -613,26 +622,35 @@ function createPersistentInlineEditor(opts){
     wrapPointerId = null;
   };
 
-  // 試験的切り分け：stopPropagation を外す（preventDefault は残す）
-  // → 親の長押し削除とイベントが奪い合いしにくくなる。雫対策の核（遅延focus・長押し破棄・caret透明）は維持。
+  // 試験的切り分け：stopPropagation なし（preventDefault は残す）
+  // 名前系は deferOpenUntilUp で「Upまで開かない」→ 長押し削除と干渉しにくい
+  // 数字・ランクは従来どおり Downでopen、長押しで破棄（雫対策）
   wrap.addEventListener('pointerdown', e=>{
     if (e.isPrimary === false) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     e.preventDefault();
     clearWrapHold();
-    if (!editor) open();
-    if (!editor) return;
     wrapPointerId = e.pointerId;
     wrapHoldX = e.clientX; wrapHoldY = e.clientY;
-    wrapHoldTimer = setTimeout(()=>{
-      wrapHoldTimer = null;
-      wrapPointerId = null;
-      // 長押し：focus せず編集破棄 → 雫ハンドルを出さない
-      if (editor === input){
-        guardBlur = false;
-        finish(false);
-      }
-    }, 450);
+    if (!deferOpenUntilUp){
+      if (!editor) open();
+      if (!editor) return;
+      wrapHoldTimer = setTimeout(()=>{
+        wrapHoldTimer = null;
+        wrapPointerId = null;
+        // 長押し：focus せず編集破棄 → 雫ハンドルを出さない
+        if (editor === input){
+          guardBlur = false;
+          finish(false);
+        }
+      }, 450);
+    } else {
+      // 名前系：長押し判定だけ。開くのは短押しの pointerup
+      wrapHoldTimer = setTimeout(()=>{
+        wrapHoldTimer = null;
+        wrapPointerId = null; // 長押し扱い → pointerup で開かない
+      }, 450);
+    }
   }, {capture:true, passive:false});
 
   wrap.addEventListener('pointermove', e=>{
@@ -646,13 +664,20 @@ function createPersistentInlineEditor(opts){
 
   wrap.addEventListener('pointerup', e=>{
     if (e.pointerId !== wrapPointerId) return;
+    const wasTracking = wrapPointerId != null;
     clearWrapHold();
-    // 短押し（または軽い移動）で focus
-    focusInput();
+    if (!wasTracking) return;
+    if (deferOpenUntilUp){
+      if (!editor) open();
+      focusInput();
+    } else {
+      // 短押し（または軽い移動）で focus
+      focusInput();
+    }
   }, {capture:true, passive:false});
   wrap.addEventListener('pointercancel', ()=>{
     clearWrapHold();
-    if (editor === input && input.style.visibility === 'hidden'){
+    if (!deferOpenUntilUp && editor === input && input.style.visibility === 'hidden'){
       guardBlur = false;
       finish(false);
     }
@@ -681,6 +706,7 @@ function createInlineText(initialValue, placeholder, onCommit){
     emptyKeepsValue: true,
     clearOnFocus: false,
     usePlaceholderClass: true,
+    deferOpenUntilUp: true,
     onCommit
   });
 }
