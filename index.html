@@ -272,9 +272,9 @@
     content:''; position:absolute; left:0; right:0; top:-10px; bottom:-10px;
   }
   #toast{
-    /* 下だとキーボードに隠れるので上寄りに固定 */
-    position:fixed; left:50%; top:18%; bottom:auto;
-    transform:translateX(-50%); max-width:92%;
+    /* 画面中央（キーボードにも隠れにくい） */
+    position:fixed; left:50%; top:50%; bottom:auto;
+    transform:translate(-50%, -50%); max-width:92%;
     background:#1e1e2c; color:var(--text); border:1px solid var(--line);
     border-radius:10px; padding:10px 14px; font-size:13px; z-index:30;
     display:none; box-shadow:0 8px 24px rgba(0,0,0,.35);
@@ -494,9 +494,10 @@ function createPersistentInlineEditor(opts){
     onOpen = null,
     onCommit = null,
     usePlaceholderClass = false,
-    // true: pointerdownでは開かず、短押しのpointerupでのみopen+focus（名前・ヘッダー用）
-    // 長押し削除と「Downで開いてすぐ閉じる」がぶつからないようにする
+    // true: pointerdownでは開かず、短押しのpointerupでのみopen+focus（旧・名前用）
     deferOpenUntilUp = false,
+    // true: タップでは開かない。長押しメニュー等から openAndFocus() で開く（名前・ヘッダー用）
+    editViaMenu = false,
   } = opts || {};
 
   const wrap = document.createElement('span');
@@ -643,81 +644,69 @@ function createPersistentInlineEditor(opts){
     wrapHoldAt = 0;
   };
 
-  // 試験的切り分け：stopPropagation なし（preventDefault は残す）
-  // 名前系は deferOpenUntilUp → Up時の押下時間で短押し判定（タイマーで pointerId を消さない）
-  // 数字・ランクは従来どおり Downでopen、長押しで破棄（雫対策）
-  wrap.addEventListener('pointerdown', e=>{
-    if (e.isPrimary === false) return;
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
-    // 名前系は preventDefault しない（pointerup が欠落して編集に入れなくなる端末対策）
-    // 数字・ランクは選択・雫抑制のため preventDefault を残す
-    if (!deferOpenUntilUp) e.preventDefault();
-    clearWrapHold();
-    wrapPointerId = e.pointerId;
-    wrapHoldX = e.clientX; wrapHoldY = e.clientY;
-    wrapHoldAt = Date.now();
-    wrapMoved = false;
-    if (!deferOpenUntilUp){
-      if (!editor) open();
-      if (!editor) return;
-      wrapHoldTimer = setTimeout(()=>{
-        wrapHoldTimer = null;
-        wrapPointerId = null;
-        // 長押し：focus せず編集破棄 → 雫ハンドルを出さない
-        if (editor === input){
-          guardBlur = false;
-          finish(false);
-        }
-      }, 450);
-    }
-    // 名前系：タイマーで pointerId を消さない。短/長は pointerup の経過時間で判定
-  }, {capture:true, passive:false});
-
-  wrap.addEventListener('pointermove', e=>{
-    if (e.pointerId !== wrapPointerId) return;
-    if (Math.hypot(e.clientX-wrapHoldX, e.clientY-wrapHoldY) > 14){
-      wrapMoved = true;
-      // 数字・ランク用の長押し破棄タイマーだけ止める（編集開始は pointerup で継続可）
-      if (wrapHoldTimer !== null){ clearTimeout(wrapHoldTimer); wrapHoldTimer = null; }
-    }
-  }, {capture:true, passive:true});
-
-  wrap.addEventListener('pointerup', e=>{
-    if (e.pointerId !== wrapPointerId) return;
-    const heldMs = wrapHoldAt ? (Date.now() - wrapHoldAt) : 0;
-    const moved = wrapMoved;
-    clearWrapHold();
-    if (deferOpenUntilUp){
-      // 大きく動いた／長押し（削除側に任せる）→ 編集しない
-      if (moved || heldMs >= NAME_SHORT_MS) return;
-      if (!editor) open();
-      focusInput();
-    } else {
-      // 数字・ランク：短押し（または軽い移動）で focus
-      focusInput();
-    }
-  }, {capture:true, passive:false});
-  wrap.addEventListener('pointercancel', ()=>{
-    clearWrapHold();
-    if (!deferOpenUntilUp && editor === input && input.style.visibility === 'hidden'){
-      guardBlur = false;
-      finish(false);
-    }
-  }, {capture:true, passive:true});
-
-  // 名前系の保険：pointerup が欠落しても click で編集に入れる
-  if (deferOpenUntilUp){
-    wrap.addEventListener('click', e=>{
-      if (editor) return;
-      if (suppressNextClick) return;
+  // editViaMenu: 名前・ヘッダーはタップで開かない（長押しメニューから openAndFocus）
+  // 数字・ランク: Downでopen、長押しで破棄（雫対策）
+  if (!editViaMenu){
+    wrap.addEventListener('pointerdown', e=>{
+      if (e.isPrimary === false) return;
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
       e.preventDefault();
-      if (!editor) open();
-      focusInput();
-    });
+      clearWrapHold();
+      wrapPointerId = e.pointerId;
+      wrapHoldX = e.clientX; wrapHoldY = e.clientY;
+      wrapHoldAt = Date.now();
+      wrapMoved = false;
+      if (!deferOpenUntilUp){
+        if (!editor) open();
+        if (!editor) return;
+        wrapHoldTimer = setTimeout(()=>{
+          wrapHoldTimer = null;
+          wrapPointerId = null;
+          if (editor === input){
+            guardBlur = false;
+            finish(false);
+          }
+        }, 450);
+      }
+    }, {capture:true, passive:false});
+
+    wrap.addEventListener('pointermove', e=>{
+      if (e.pointerId !== wrapPointerId) return;
+      if (Math.hypot(e.clientX-wrapHoldX, e.clientY-wrapHoldY) > 14){
+        wrapMoved = true;
+        if (wrapHoldTimer !== null){ clearTimeout(wrapHoldTimer); wrapHoldTimer = null; }
+      }
+    }, {capture:true, passive:true});
+
+    wrap.addEventListener('pointerup', e=>{
+      if (e.pointerId !== wrapPointerId) return;
+      const heldMs = wrapHoldAt ? (Date.now() - wrapHoldAt) : 0;
+      const moved = wrapMoved;
+      clearWrapHold();
+      if (deferOpenUntilUp){
+        if (moved || heldMs >= NAME_SHORT_MS) return;
+        if (!editor) open();
+        focusInput();
+      } else {
+        focusInput();
+      }
+    }, {capture:true, passive:false});
+    wrap.addEventListener('pointercancel', ()=>{
+      clearWrapHold();
+      if (!deferOpenUntilUp && editor === input && input.style.visibility === 'hidden'){
+        guardBlur = false;
+        finish(false);
+      }
+    }, {capture:true, passive:true});
   }
 
+  const openAndFocus = ()=>{
+    if (!editor) open();
+    focusInput();
+  };
+
   return {
-    wrap, text, input, open,
+    wrap, text, input, open, openAndFocus,
     setText: setValue,
     setValue,
     setRank: setValue,
@@ -739,7 +728,8 @@ function createInlineText(initialValue, placeholder, onCommit){
     emptyKeepsValue: true,
     clearOnFocus: false,
     usePlaceholderClass: true,
-    deferOpenUntilUp: true,
+    // 短押しインラインはやめて長押しメニューから編集（雫・タップ不安定の回避）
+    editViaMenu: true,
     onCommit
   });
 }
@@ -1081,8 +1071,8 @@ function showConfirmToast(html, onAct){
       if (typeof onAct === 'function') onAct(act, btn);
       return;
     }
-    // 危険操作は2回タップ確定
-    if (!btn.classList.contains('armed')){
+    // 削除だけ2回タップ確定。編集・追加などは1回で実行
+    if (act === 'yes' && !btn.classList.contains('armed')){
       toastEl.querySelectorAll('button.armed').forEach(b => b.classList.remove('armed'));
       btn.classList.add('armed');
       return;
@@ -1098,13 +1088,16 @@ function askRemoveItem(id){
   if (!toastEl){ removeItem(id); return; }
   const canAdd = it && it.type === 'group' && it.children.length < 2;
   const isHeader = it && it.type === 'header';
+  const isGroup = it && it.type === 'group';
   const isRule = it && it.type === 'rule';
   const isAbyss = it && it.type === 'abyss';
+  const canEditName = isHeader || isGroup;
   const colorDefault = isHeader ? (it.color || '#9b8bff') : (isRule ? (it.color || '#52617a') : null);
   const chunkVal = isAbyss ? clampUseChunk(it.useChunk) : null;
   const extra =
     (colorDefault ? `<label class="toast-color">色<input type="color" value="${colorDefault}" aria-label="色"></label>` : '')
     + (chunkVal != null ? `<label class="toast-color">使い切り<input type="text" inputmode="numeric" pattern="[0-9]*" value="${chunkVal}" maxlength="3" data-role="useChunk" aria-label="使い切り数"></label>` : '')
+    + (canEditName ? `<button type="button" data-act="editName">${isHeader ? '見出し編集' : '名前編集'}</button>` : '')
     + (canAdd ? '<button type="button" data-act="add">タイマー追加</button>' : '');
   showConfirmToast(
     extra
@@ -1113,6 +1106,13 @@ function askRemoveItem(id){
     (act)=>{
       if (act === 'yes') removeItem(id);
       else if (act === 'add') openAddPanel({ groupId: id });
+      else if (act === 'editName'){
+        const ed = refs[id]?.nameEditor;
+        if (ed && typeof ed.openAndFocus === 'function'){
+          // トーストを閉じてからフォーカス（キーボードとメニューの競合を避ける）
+          setTimeout(()=>{ try { ed.openAndFocus(); } catch (err) {} }, 30);
+        }
+      }
     }
   );
   // closeToast の後にハイライトを付け直す
