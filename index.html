@@ -424,9 +424,11 @@ const nameEditInputEl = document.getElementById('nameEditInput');
 const nameEditOkEl = document.getElementById('nameEditOk');
 const nameEditCancelEl = document.getElementById('nameEditCancel');
 let nameEditOnOk = null;
+let nameEditFocusTimer = null;
 
 function closeNameEditPopup(){
   if (!nameEditOverlayEl) return;
+  if (nameEditFocusTimer){ clearTimeout(nameEditFocusTimer); nameEditFocusTimer = null; }
   nameEditOverlayEl.classList.remove('show');
   nameEditOverlayEl.setAttribute('aria-hidden', 'true');
   nameEditOnOk = null;
@@ -435,6 +437,8 @@ function closeNameEditPopup(){
 function openNameEditPopup(opts){
   opts = opts || {};
   if (!nameEditOverlayEl || !nameEditInputEl) return;
+  if (nameEditFocusTimer){ clearTimeout(nameEditFocusTimer); nameEditFocusTimer = null; }
+  // トースト由来の pointer が残っていると focus 直後に blur されることがある
   closeToast();
   nameEditLabelEl.textContent = opts.label || '名前を編集';
   nameEditInputEl.value = opts.value != null ? String(opts.value) : '';
@@ -442,37 +446,43 @@ function openNameEditPopup(opts){
   nameEditOnOk = typeof opts.onOk === 'function' ? opts.onOk : null;
   nameEditOverlayEl.classList.add('show');
   nameEditOverlayEl.setAttribute('aria-hidden', 'false');
-  setTimeout(()=>{
+  // トースト閉鎖・前の pointer が落ち着いてから focus（初回キーボード落ち対策）
+  nameEditFocusTimer = setTimeout(()=>{
+    nameEditFocusTimer = null;
+    if (!nameEditOverlayEl.classList.contains('show')) return;
     try {
       nameEditInputEl.focus({preventScroll:true});
-      const len = nameEditInputEl.value.length;
+      const len = String(nameEditInputEl.value || '').length;
       nameEditInputEl.setSelectionRange(len, len);
     } catch (e) {}
-  }, 40);
+  }, 120);
+}
+function confirmNameEdit(){
+  const v = nameEditInputEl ? nameEditInputEl.value : '';
+  const cb = nameEditOnOk;
+  closeNameEditPopup();
+  if (cb) cb(v);
 }
 if (nameEditOkEl){
-  nameEditOkEl.addEventListener('pointerdown', e=>{
+  // pointerdown だと focus を奪ってキーボードが先に閉じることがある → click で確定
+  nameEditOkEl.addEventListener('click', e=>{
     e.preventDefault();
     e.stopPropagation();
-    const v = nameEditInputEl ? nameEditInputEl.value : '';
-    const cb = nameEditOnOk;
-    closeNameEditPopup();
-    if (cb) cb(v);
+    confirmNameEdit();
   });
 }
 if (nameEditCancelEl){
-  nameEditCancelEl.addEventListener('pointerdown', e=>{
+  nameEditCancelEl.addEventListener('click', e=>{
     e.preventDefault();
     e.stopPropagation();
     closeNameEditPopup();
   });
 }
-/* 全画面dimをやめたので、外タップ閉じはしない（やめる/OKのみ） */
 if (nameEditInputEl){
   nameEditInputEl.addEventListener('keydown', e=>{
     if (e.key === 'Enter'){
       e.preventDefault();
-      nameEditOkEl && nameEditOkEl.dispatchEvent(new PointerEvent('pointerdown', {bubbles:true}));
+      confirmNameEdit();
     } else if (e.key === 'Escape'){
       e.preventDefault();
       closeNameEditPopup();
@@ -556,8 +566,6 @@ function bindTapDown(el, handler){
   });
 }
 
-function forceCursorToEnd(_input){ /* no-op: 常時inputには使わない */ }
-function placeCursorOnFocus(_input){ /* no-op */ }
 function clearOnFocus(input){
   input.addEventListener('focus', () => { input.value = ''; });
 }
@@ -1757,7 +1765,6 @@ function openSetup(type){
   }
   setupFieldsEl.querySelectorAll('input').forEach(el=>{
     if (el.type === 'color') return;
-    forceCursorToEnd(el);
     clearOnFocus(el);
   });
   setupPanelEl.classList.add('show');
