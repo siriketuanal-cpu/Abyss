@@ -64,15 +64,7 @@
     -webkit-user-select:none; user-select:none; touch-action:manipulation;
   }
   .name-text.is-placeholder{ color:var(--sub); font-weight:600; }
-  .name-edit-input{
-    position:absolute; inset:0; width:100%; height:100%; box-sizing:border-box;
-    background:transparent; border:none; color:inherit; font:inherit; font-weight:inherit;
-    padding:0; margin:0; outline:none; outline-offset:0;
-    caret-color:transparent; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
-    touch-action:none;
-    appearance:none; -webkit-appearance:none; z-index:2;
-  }
-  .name-edit-input::placeholder{ color:var(--sub); }
+  /* name-edit-input は廃止（ポップアップ編集のみ） */
   /* TWA復帰時の一瞬の再構築を視覚的に隠す。通常起動・通常操作では非表示。 */
   #resumeVeil{position:fixed;inset:0;background:var(--bg);opacity:0;pointer-events:none;z-index:100;transition:opacity 90ms linear;}
   #resumeVeil.show{opacity:1;}
@@ -325,17 +317,18 @@
     padding:12px; border-radius:12px; border:none;
     background:var(--accent); color:#100c26; font-size:14px; font-weight:700;
   }
-  /* 名前・見出し用の軽量ポップアップ入力 */
+  /* 名前・見出し用の軽量ポップアップ（全画面dimなし＝下のカードを再合成しにくい） */
   #nameEditOverlay{
-    display:none; position:fixed; inset:0; z-index:40;
-    background:rgba(0,0,0,.45); align-items:center; justify-content:center;
-    padding:16px;
+    display:none; position:fixed; left:50%; top:50%; z-index:40;
+    transform:translate(-50%, -50%); width:min(92vw, 340px);
+    pointer-events:none;
   }
-  #nameEditOverlay.show{display:flex;}
+  #nameEditOverlay.show{display:block; pointer-events:auto;}
   #nameEditPanel{
-    width:min(92vw, 340px); background:var(--card); border:1px solid var(--line);
+    width:100%; background:var(--card); border:1px solid var(--line);
     border-radius:14px; padding:16px; display:flex; flex-direction:column; gap:12px;
-    box-shadow:0 12px 32px rgba(0,0,0,.4);
+    box-shadow:0 12px 32px rgba(0,0,0,.45);
+    pointer-events:auto;
   }
   #nameEditLabel{font-size:13px; color:var(--sub); text-align:center;}
   #nameEditInput{
@@ -474,11 +467,7 @@ if (nameEditCancelEl){
     closeNameEditPopup();
   });
 }
-if (nameEditOverlayEl){
-  nameEditOverlayEl.addEventListener('pointerdown', e=>{
-    if (e.target === nameEditOverlayEl) closeNameEditPopup();
-  });
-}
+/* 全画面dimをやめたので、外タップ閉じはしない（やめる/OKのみ） */
 if (nameEditInputEl){
   nameEditInputEl.addEventListener('keydown', e=>{
     if (e.key === 'Enter'){
@@ -593,10 +582,6 @@ function createPersistentInlineEditor(opts){
     onOpen = null,
     onCommit = null,
     usePlaceholderClass = false,
-    // true: pointerdownでは開かず、短押しのpointerupでのみopen+focus（旧・名前用）
-    deferOpenUntilUp = false,
-    // true: タップでは開かない。長押しメニュー等から openAndFocus() で開く（名前・ヘッダー用）
-    editViaMenu = false,
   } = opts || {};
 
   const wrap = document.createElement('span');
@@ -609,13 +594,14 @@ function createPersistentInlineEditor(opts){
     const display = format(shownValue);
     if (usePlaceholderClass){
       if (String(shownValue)){
-        text.textContent = display;
+        if (text.textContent !== display) text.textContent = display;
         text.classList.remove('is-placeholder');
       } else {
-        text.textContent = placeholder || '';
+        const ph = placeholder || '';
+        if (text.textContent !== ph) text.textContent = ph;
         text.classList.add('is-placeholder');
       }
-    } else {
+    } else if (text.textContent !== display){
       text.textContent = display;
     }
   };
@@ -744,83 +730,57 @@ function createPersistentInlineEditor(opts){
     e.stopPropagation();
   }, {capture:true});
 
+  // 数字・ランク用：短押しでfocus / 長押しでfocusせず破棄（雫ハンドル抑制）
   let wrapHoldTimer = null;
   let wrapPointerId = null;
   let wrapHoldX = 0, wrapHoldY = 0;
-  let wrapHoldAt = 0;
-  let wrapMoved = false;
-  // 名前の短押し判定。削除長押し(520ms)より短く、ゆっくりタップでも拾える幅
-  const NAME_SHORT_MS = 480;
   const clearWrapHold = ()=>{
     if (wrapHoldTimer !== null){ clearTimeout(wrapHoldTimer); wrapHoldTimer = null; }
     wrapPointerId = null;
-    wrapMoved = false;
-    wrapHoldAt = 0;
   };
 
-  // editViaMenu: 名前・ヘッダーはタップで開かない（長押しメニューから openAndFocus）
-  // 数字・ランク: Downでopen、長押しで破棄（雫対策）
-  if (!editViaMenu){
-    wrap.addEventListener('pointerdown', e=>{
-      if (e.isPrimary === false) return;
-      if (e.pointerType === 'mouse' && e.button !== 0) return;
-      e.preventDefault();
-      clearWrapHold();
-      wrapPointerId = e.pointerId;
-      wrapHoldX = e.clientX; wrapHoldY = e.clientY;
-      wrapHoldAt = Date.now();
-      wrapMoved = false;
-      if (!deferOpenUntilUp){
-        if (!editor) open();
-        if (!editor) return;
-        wrapHoldTimer = setTimeout(()=>{
-          wrapHoldTimer = null;
-          wrapPointerId = null;
-          if (editor === input){
-            guardBlur = false;
-            finish(false);
-          }
-        }, 450);
-      }
-    }, {capture:true, passive:false});
-
-    wrap.addEventListener('pointermove', e=>{
-      if (e.pointerId !== wrapPointerId) return;
-      if (Math.hypot(e.clientX-wrapHoldX, e.clientY-wrapHoldY) > 14){
-        wrapMoved = true;
-        if (wrapHoldTimer !== null){ clearTimeout(wrapHoldTimer); wrapHoldTimer = null; }
-      }
-    }, {capture:true, passive:true});
-
-    wrap.addEventListener('pointerup', e=>{
-      if (e.pointerId !== wrapPointerId) return;
-      const heldMs = wrapHoldAt ? (Date.now() - wrapHoldAt) : 0;
-      const moved = wrapMoved;
-      clearWrapHold();
-      if (deferOpenUntilUp){
-        if (moved || heldMs >= NAME_SHORT_MS) return;
-        if (!editor) open();
-        focusInput();
-      } else {
-        focusInput();
-      }
-    }, {capture:true, passive:false});
-    wrap.addEventListener('pointercancel', ()=>{
-      clearWrapHold();
-      if (!deferOpenUntilUp && editor === input && input.style.visibility === 'hidden'){
+  wrap.addEventListener('pointerdown', e=>{
+    if (e.isPrimary === false) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+    clearWrapHold();
+    wrapPointerId = e.pointerId;
+    wrapHoldX = e.clientX; wrapHoldY = e.clientY;
+    if (!editor) open();
+    if (!editor) return;
+    wrapHoldTimer = setTimeout(()=>{
+      wrapHoldTimer = null;
+      wrapPointerId = null;
+      if (editor === input){
         guardBlur = false;
         finish(false);
       }
-    }, {capture:true, passive:true});
-  }
+    }, 450);
+  }, {capture:true, passive:false});
 
-  const openAndFocus = ()=>{
-    if (!editor) open();
+  wrap.addEventListener('pointermove', e=>{
+    if (e.pointerId !== wrapPointerId) return;
+    if (Math.hypot(e.clientX-wrapHoldX, e.clientY-wrapHoldY) > 14){
+      if (wrapHoldTimer !== null){ clearTimeout(wrapHoldTimer); wrapHoldTimer = null; }
+    }
+  }, {capture:true, passive:true});
+
+  wrap.addEventListener('pointerup', e=>{
+    if (e.pointerId !== wrapPointerId) return;
+    clearWrapHold();
     focusInput();
-  };
+  }, {capture:true, passive:false});
+
+  wrap.addEventListener('pointercancel', ()=>{
+    clearWrapHold();
+    if (editor === input && input.style.visibility === 'hidden'){
+      guardBlur = false;
+      finish(false);
+    }
+  }, {capture:true, passive:true});
 
   return {
-    wrap, text, input, open, openAndFocus,
+    wrap, text, input, open,
     setText: setValue,
     setValue,
     setRank: setValue,
@@ -829,23 +789,37 @@ function createPersistentInlineEditor(opts){
   };
 }
 
-function createInlineText(initialValue, placeholder, onCommit){
-  return createPersistentInlineEditor({
-    initialValue: String(initialValue || ''),
-    wrapClass: 'name',
-    textClass: 'name-text',
-    inputClass: 'name-edit-input',
-    placeholder: placeholder || '',
-    normalize: v => String(v == null ? '' : v),
-    sanitize: v => String(v == null ? '' : v),
-    format: v => String(v == null ? '' : v),
-    emptyKeepsValue: true,
-    clearOnFocus: false,
-    usePlaceholderClass: true,
-    // 短押しインラインはやめて長押しメニューから編集（雫・タップ不安定の回避）
-    editViaMenu: true,
-    onCommit
-  });
+// 名前・見出しは表示専用（編集はポップアップ）。input も雫対策も持たない。
+function createInlineText(initialValue, placeholder, _onCommit){
+  const wrap = document.createElement('span');
+  wrap.className = 'name';
+  const text = document.createElement('span');
+  text.className = 'name-text';
+  wrap.appendChild(text);
+  let shownValue = String(initialValue == null ? '' : initialValue);
+  const paint = ()=>{
+    if (shownValue){
+      if (text.textContent !== shownValue) text.textContent = shownValue;
+      text.classList.remove('is-placeholder');
+    } else {
+      const ph = placeholder || '';
+      if (text.textContent !== ph) text.textContent = ph;
+      text.classList.add('is-placeholder');
+    }
+  };
+  paint();
+  const setValue = v => {
+    shownValue = String(v == null ? '' : v);
+    paint();
+  };
+  return {
+    wrap, text, input: null,
+    open: ()=>{},
+    setText: setValue,
+    setValue,
+    setColor: c => { wrap.style.color = c || ''; },
+    isEditing: () => false
+  };
 }
 
 function createInlineRank(initialRank, onOpen, onCommit){
@@ -1079,7 +1053,6 @@ function bindLongPressDelete(el, id, shortAction){
     // （数字・ランク編集欄だけを「削除/40計算と分離」する）
     return !!(
       target.closest('.inline-edit-input') ||
-      target.closest('.name-edit-input') ||
       target.closest('.rank-edit-input') ||
       target.closest('.rank-text') ||
       target.closest('[data-role="curWrap"]') ||
@@ -1228,12 +1201,11 @@ function askRemoveItem(id){
           placeholder: isHeader ? '見出し(ゲーム名など)' : 'アカウント',
           onOk: (v)=>{
             const next = String(v == null ? '' : v);
-            if (it.name !== next){
-              it.name = next;
-              save();
-            }
+            if (it.name === next) return; // 変更なし＝DOMも触らない
+            it.name = next;
             if (ed && typeof ed.setText === 'function') ed.setText(next);
             else if (ed && typeof ed.setValue === 'function') ed.setValue(next);
+            save();
           }
         });
       }
