@@ -499,8 +499,10 @@ function normalizeIdleClaim(it){
 function normalizeAbyssItem(it){
   if (!it || it.type !== 'abyss') return;
   if (!it.rank) it.rank = 1;
-  // max はランクから再計算（旧データの手編集maxは捨てる）
-  it.max = 240 + (Math.max(1, Math.min(200, it.rank|0)) - 1) * 5;
+  if (it.abyssBase == null) it.abyssBase = 240;
+  if (it.abyssPerRank == null) it.abyssPerRank = 5;
+  // max はランク＋可変係数から再計算（旧データの手編集maxは捨てる）
+  it.max = abyssMaxFor(it.rank, it);
   if (it.useChunk == null) it.useChunk = 40;
   else it.useChunk = clampUseChunk(it.useChunk);
   if (it.current > it.max) it.current = it.max;
@@ -659,13 +661,23 @@ function createPersistentInlineEditor(opts){
     if (clearOnFocus) input.value = '';
     // テキスト非表示はフォーカス直前にずらす（タップ瞬間の点滅を軽減）
     wrap.classList.add('editing');
+    // removeAllRanges は一部Androidで focus 直後にキーボードを閉じるので使わない
+    const placeCaret = ()=>{
+      try {
+        const len = String(input.value || '').length;
+        if (typeof input.setSelectionRange === 'function') input.setSelectionRange(len, len);
+      } catch (err) {}
+    };
     try { input.focus({preventScroll:true}); } catch (e) {}
-    // 全選択・雫ハンドルの温存を避ける（末尾にキャレットだけ）
-    try {
-      const len = String(input.value || '').length;
-      input.setSelectionRange(len, len);
-      window.getSelection()?.removeAllRanges();
-    } catch (err) {}
+    placeCaret();
+    // ジェスチャ外 focus でキーボードが出ない端末向けの再試行
+    setTimeout(()=>{
+      if (editor !== input) return;
+      try {
+        if (document.activeElement !== input) input.focus({preventScroll:true});
+        placeCaret();
+      } catch (e) {}
+    }, 30);
   };
 
   const finish = (commit=true)=>{
@@ -884,17 +896,22 @@ function newStamItem(intervalMin, max, useChunk){
 }
 // 実験：既存スタミナ計算のまま、最大少なめ・1個使い切りのプリセット
 function newOrbItem(intervalMin, max){
-  return newStamItem(intervalMin, max != null ? max : 4, 1);
+  const item = newStamItem(intervalMin, max != null ? max : 4, 1);
+  item.lockedMax = true; // オーブは最大をカード上で編集しない
+  return item;
 }
 function newAbyssItem(intervalMin, useChunk){
-  // Dot Abyss 風: 最大はランク連動。カードタップで useChunk 使い切り。削除は長押し。
+  // Dot Abyss 風: 最大はランク連動（基礎・+/Lvはトーストで変更可）。カードタップで useChunk 使い切り。
   const rank = 1;
-  return {
+  const item = {
     id: uid(), type:'abyss', name:'', rank,
-    current:0, max: abyssMaxFor(rank),
+    abyssBase: 240, abyssPerRank: 5,
+    current:0, max: 0,
     intervalMin, useChunk: clampUseChunk(useChunk != null ? useChunk : 40),
     start: Date.now()
   };
+  item.max = abyssMaxFor(rank, item);
+  return item;
 }
 function hasUseChunk(it){
   return !!(it && (it.type === 'abyss' || it.type === 'stam') && it.useChunk != null && Number(it.useChunk) > 0);
@@ -968,13 +985,21 @@ function remainingAfter40(cur, it){
   return remainingAfterChunk(cur, it && it.useChunk != null ? it.useChunk : fallback);
 }
 // Dot Abyss 相当: 基礎240 + (ランク-1)×5（最大は計算のみ・手編集しない）
-function abyssMaxFor(rank){
+function abyssBaseOf(it){
+  return clampInt(it && it.abyssBase, 1, 9999, 240);
+}
+function abyssPerRankOf(it){
+  return clampInt(it && it.abyssPerRank, 0, 999, 5);
+}
+function abyssMaxFor(rank, it){
   const r = Math.max(1, Math.min(200, Math.floor(Number(rank) || 1)));
-  return 240 + (r - 1) * 5;
+  return abyssBaseOf(it) + (r - 1) * abyssPerRankOf(it);
 }
 function syncAbyssMax(it){
   it.rank = Math.max(1, Math.min(200, Math.floor(Number(it.rank) || 1)));
-  it.max = abyssMaxFor(it.rank);
+  if (it.abyssBase == null) it.abyssBase = 240;
+  if (it.abyssPerRank == null) it.abyssPerRank = 5;
+  it.max = abyssMaxFor(it.rank, it);
   if (it.useChunk == null) it.useChunk = 40;
   else it.useChunk = clampUseChunk(it.useChunk);
   if (it.current > it.max) it.current = it.max;
@@ -1210,8 +1235,13 @@ function askRemoveItem(id){
   // Abyssは常時、スタミナは設定済み or 後から付けられるよう空欄でも出す
   const showChunk = isAbyss || isStam;
   const chunkVal = isAbyss ? clampUseChunk(it.useChunk) : (isStam ? (it.useChunk != null ? clampUseChunk(it.useChunk) : '') : null);
+  const abyssFormula = isAbyss
+    ? `<label class="toast-color">基礎<input type="text" inputmode="numeric" pattern="[0-9]*" value="${abyssBaseOf(it)}" maxlength="4" data-role="abyssBase" aria-label="基礎最大" style="width:3.2em;text-align:center;"></label>`
+      + `<label class="toast-color">+/Lv<input type="text" inputmode="numeric" pattern="[0-9]*" value="${abyssPerRankOf(it)}" maxlength="3" data-role="abyssPer" aria-label="ランクごとの増加" style="width:2.6em;text-align:center;"></label>`
+    : '';
   const extra =
     (colorDefault ? `<label class="toast-color">色<input type="color" value="${colorDefault}" aria-label="色"></label>` : '')
+    + abyssFormula
     + (showChunk ? `<label class="toast-color">使い切り<input type="text" inputmode="numeric" pattern="[0-9]*" value="${chunkVal}" maxlength="3" data-role="useChunk" aria-label="使い切り数" placeholder="なし"></label>` : '')
     + (canEditName ? `<button type="button" data-act="editName">${isHeader ? '見出し編集' : '名前編集'}</button>` : '')
     + (canAdd ? '<button type="button" data-act="add">タイマー追加</button>' : '');
@@ -1261,6 +1291,34 @@ function askRemoveItem(id){
       });
       colorEl.addEventListener('pointerdown', e=>e.stopPropagation());
     }
+  }
+  if (isAbyss){
+    const bindNum = (role, apply)=>{
+      const el = toastEl.querySelector(`input[data-role="${role}"]`);
+      if (!el) return;
+      el.addEventListener('focus', ()=>{ el.value = ''; });
+      const run = ()=>{
+        apply(el);
+        syncAbyssMax(it);
+        updateOneTimer(it);
+        startTicking(true);
+        save();
+      };
+      el.addEventListener('change', run);
+      el.addEventListener('blur', run);
+      el.addEventListener('keydown', e=>{ if (e.key === 'Enter'){ e.preventDefault(); el.blur(); } });
+      el.addEventListener('pointerdown', e=>e.stopPropagation());
+    };
+    bindNum('abyssBase', (el)=>{
+      const raw = String(el.value || '').replace(/\D/g, '');
+      it.abyssBase = raw === '' ? abyssBaseOf(it) : clampInt(raw, 1, 9999, 240);
+      el.value = String(it.abyssBase);
+    });
+    bindNum('abyssPer', (el)=>{
+      const raw = String(el.value || '').replace(/\D/g, '');
+      it.abyssPerRank = raw === '' ? abyssPerRankOf(it) : clampInt(raw, 0, 999, 5);
+      el.value = String(it.abyssPerRank);
+    });
   }
   if (showChunk){
     const chunkEl = toastEl.querySelector('input[data-role="useChunk"]');
@@ -1369,22 +1427,28 @@ function buildStamCard(it){
   const curWrap = wrap.querySelector('[data-role="curWrap"]');
   const maxWrap = wrap.querySelector('[data-role="maxWrap"]');
   const curEditor = attachCurrentEditor(curWrap, it, () => { pending40Id = null; });
-  const maxEditor = createInlineNumber(it.max, value => {
-    const now = Date.now();
-    const curNow = stamInfo(it, now).cur;
-    const newMax = clampInt(value, 1, 999, it.max);
-    preserveCycle(it, now);
-    it.max = newMax;
-    it.current = Math.min(curNow, newMax);
-    freezeIfFull(it, now);
-    if (pending40Id === it.id) pending40Id = null;
-    updateOneTimer(it);
-    startTicking(true);
-    saveAfterPaint();
-  }, it.id + ':max');
-  maxWrap.appendChild(maxEditor.wrap);
+  let maxEditor = null;
+  if (it.lockedMax){
+    maxWrap.textContent = String(it.max);
+    maxWrap.classList.add('stammax');
+  } else {
+    maxEditor = createInlineNumber(it.max, value => {
+      const now = Date.now();
+      const curNow = stamInfo(it, now).cur;
+      const newMax = clampInt(value, 1, 999, it.max);
+      preserveCycle(it, now);
+      it.max = newMax;
+      it.current = Math.min(curNow, newMax);
+      freezeIfFull(it, now);
+      if (pending40Id === it.id) pending40Id = null;
+      updateOneTimer(it);
+      startTicking(true);
+      saveAfterPaint();
+    }, it.id + ':max');
+    maxWrap.appendChild(maxEditor.wrap);
+  }
 
-  refs[it.id] = { el: wrap, curEl: curEditor, maxEl: maxEditor,
+  refs[it.id] = { el: wrap, curEl: curEditor, maxEl: maxEditor, maxLabel: it.lockedMax ? maxWrap : null,
     clockEl: wrap.querySelector('[data-role="clock"]') };
   // 使い切り設定があるときだけカード短押しでプレビュー/確定（オーブ実験含む）
   bindLongPressDelete(wrap, it.id, hasUseChunk(it) ? (e) => onUseChunkTap(it, e) : null);
@@ -1708,6 +1772,10 @@ function updateTimerCard(it, r, now){
     renderClock(r.clockEl, info.remainMs, info.isFull, now, info.fullAt);
     if (r.curEl && !r.curEl.isEditing()) r.curEl.setText(waitChunk ? remainingAfter40(info.cur, it) : info.cur);
     if (r.maxEl && !r.maxEl.isEditing()) r.maxEl.setText(it.max);
+    if (r.maxLabel){
+      const v = String(it.max);
+      if (r.maxLabel.textContent !== v) r.maxLabel.textContent = v;
+    }
     setNearOnCurrent(r.curEl, isNearFull(info.remainMs, info.isFull));
   } else if (it.type==='abyss'){
     let info = stamInfo(it, now);
@@ -1786,10 +1854,9 @@ function openSetup(type){
     setupLabelEl.textContent = 'ゲーム名ヘッダーの文字色';
     fillColorPalette('#9b8bff');
   } else if (type === 'stam'){
-    setupLabelEl.textContent = 'スタミナ設定';
+    setupLabelEl.textContent = 'スタミナ設定（最大はカードで変更可）';
     setupFieldsEl.innerHTML = `
       <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupInterval" value="5"><span>分で1</span>
-      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupMax" value="100" style="margin-left:6px;"><span>最大</span>
       <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupUseChunk" value="" style="margin-left:6px;" placeholder="—"><span>使い切り</span>`;
   } else if (type === 'orb'){
     setupLabelEl.textContent = 'オーブ（実験・スタミナと同じ計算）';
@@ -1835,10 +1902,9 @@ function confirmSetup(){
     state.items.push(item);
   } else if (setupType === 'stam'){
     const interval = clampInt(setupFieldsEl.querySelector('#setupInterval')?.value, 1, 999, 5);
-    const max = clampInt(setupFieldsEl.querySelector('#setupMax')?.value, 1, 999, 100);
     const chunkRaw = String(setupFieldsEl.querySelector('#setupUseChunk')?.value || '').replace(/\D/g, '');
     const useChunk = chunkRaw === '' ? null : clampUseChunk(chunkRaw);
-    if (!pushNewTimer(newStamItem(interval, max, useChunk))) return;
+    if (!pushNewTimer(newStamItem(interval, 100, useChunk))) return;
   } else if (setupType === 'orb'){
     const hours = clampInt(setupFieldsEl.querySelector('#setupOrbHours')?.value, 1, 999, 6);
     const max = clampInt(setupFieldsEl.querySelector('#setupMax')?.value, 1, 99, 4);
