@@ -2,33 +2,15 @@
 <html lang="ja">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no, interactive-widget=resizes-content" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#0b0b14" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="description" content="ゲームのスタミナや放置報酬を管理するタイマートラッカー" />
+    <meta name="description" content="Abyss Timer" />
     <meta property="og:title" content="Abyss" />
-    <meta property="og:description" content="ゲームのスタミナや放置報酬を管理するタイマートラッカー" />
+    <meta property="og:description" content="Abyss Timer" />
     <title>Abyss</title>
-    <link rel="manifest" href="/manifest.json" />
-    <link rel="icon" href="/icon-192.png" />
-    <script>
-      // Service Worker registration with update detection
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', function () {
-          navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(function (err) {
-            console.warn('SW registration failed:', err);
-          });
-        });
-      }
-    </script>
   </head>
-  <body class="bg-[#0b0b14] text-[#eceef2] select-none antialiased overflow-hidden overscroll-none h-full m-0 p-0 font-sans">
-    <div id="root" class="h-full w-full flex flex-col"></div>
+  <body class="bg-[#0b0b14] text-[#eceef2] m-0 p-0 font-sans">
+    <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    <noscript>
-      <div style="padding:20px;color:#eceef2;background:#0b0b14;text-align:center;">
-        JavaScriptを有効にしてください。
-      </div>
-    </noscript>
   </body>
 </html>
