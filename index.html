@@ -386,6 +386,11 @@ const setupFieldsEl = document.getElementById('setupFields');
 const setupConfirmEl = document.getElementById('setupConfirm');
 const toastEl = document.getElementById('toast');
 
+function normalizeIdleClaim(it){
+  // 「受取」は一時的なUI状態。永続化されると claimId（メモリのみ）とズレて
+  // 再起動後も「受取」のまま固まる。読み込み時は必ず running に戻す。
+  if (it && it.type === 'idle' && it.state === 'claim') it.state = 'running';
+}
 function load(){
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -393,11 +398,16 @@ function load(){
       const data = JSON.parse(raw);
       if (data && Array.isArray(data.items)){
         data.items.forEach(it=>{
-          if (it && it.type === 'abyss'){
+          if (!it) return;
+          if (it.type === 'abyss'){
             if (!it.rank) it.rank = 1;
             // max はランクから再計算（旧データの手編集maxは捨てる）
             it.max = 240 + (Math.max(1, Math.min(200, it.rank|0)) - 1) * 5;
             if (it.current > it.max) it.current = it.max;
+          }
+          normalizeIdleClaim(it);
+          if (it.type === 'group' && Array.isArray(it.children)){
+            it.children.forEach(normalizeIdleClaim);
           }
         });
       }
@@ -1464,6 +1474,10 @@ function updateTimerCard(it, r, now){
     }
     setNearOnCurrent(r.curEl, isNearFull(info.remainMs, info.isFull));
   } else if (it.type==='idle'){
+    // claimId と state のズレ（再起動・途中操作など）で「受取」が固まるのを自己修復
+    if (it.state === 'claim' && claimId !== it.id){
+      it.state = 'running';
+    }
     const info = idleInfo(it, now);
     r.el.classList.toggle('claim', it.state==='claim');
     r.el.classList.toggle('full', info.isFull && it.state!=='claim');
