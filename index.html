@@ -235,13 +235,14 @@
   [data-role="curWrap"], [data-role="maxWrap"]{ position:relative; }
   .divider{
     grid-column:1 / -1; display:flex; align-items:center; gap:6px;
-    padding:3px 2px; border-bottom:1px solid var(--line); position:relative;
+    padding:1px 2px 3px; border-bottom:1px solid var(--line); position:relative;
     touch-action:pan-y; -webkit-touch-callout:none;
   }
   .divider .name{
     touch-action:none;
     -webkit-user-select:none; user-select:none;
-    width:65%; max-width:260px; flex:0 1 auto; font-size:13px; font-weight:700; color:var(--accent); padding:0 0 2px;
+    width:65%; max-width:260px; flex:0 1 auto; font-size:13px; font-weight:700; color:var(--accent);
+    padding:0; line-height:1.25; min-height:0;
   }
   .header-palette{display:flex; gap:5px; flex-wrap:wrap; justify-content:center; margin:4px 0 2px;}
   .header-swatch{width:26px; height:26px; padding:0; border-radius:50%; border:2px solid var(--line); box-shadow:none;}
@@ -523,6 +524,8 @@ function createPersistentInlineEditor(opts){
     input.tabIndex = 0;
     input.removeAttribute('aria-hidden');
     if (clearOnFocus) input.value = '';
+    // テキスト非表示はフォーカス直前にずらす（タップ瞬間の点滅を軽減）
+    wrap.classList.add('editing');
     try { input.focus({preventScroll:true}); } catch (e) {}
   };
 
@@ -556,8 +559,7 @@ function createPersistentInlineEditor(opts){
     input.value = clearOnFocus ? '' : String(shownValue ?? '');
     editor = input;
     guardBlur = true;
-    wrap.classList.add('editing');
-    // focus はしない。長押し判定が先。
+    // focus はしない。長押し判定が先。editing クラス（テキスト非表示）は focusInput 側で付ける
     setTimeout(()=>{ guardBlur = false; }, 350);
   };
 
@@ -866,16 +868,16 @@ function bindLongPressDelete(el, id, shortAction){
   // ここに入ると「編集開始 → 直後に削除確認」が同時発火して壊れる。
   const isEditTarget = (target)=>{
     if (!target || !target.closest) return false;
+    // .name / .name-text は意図的に除外：ヘッダー・グループ名は名前自体が長押し削除の対象
+    // （数字・ランク編集欄だけを「削除/40計算と分離」する）
     return !!(
       target.closest('.inline-edit-input') ||
       target.closest('.name-edit-input') ||
-      target.closest('.name-text') ||
       target.closest('.rank-edit-input') ||
       target.closest('.rank-text') ||
       target.closest('[data-role="curWrap"]') ||
       target.closest('[data-role="maxWrap"]') ||
-      target.closest('.rank') ||
-      target.closest('.name')
+      target.closest('.rank')
     );
   };
 
