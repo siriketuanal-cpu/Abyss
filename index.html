@@ -5,12 +5,51 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#0b0b14" />
     <meta name="description" content="Abyss Timer" />
-    <meta property="og:title" content="Abyss" />
-    <meta property="og:description" content="Abyss Timer" />
     <title>Abyss</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: #0b0b14;
+        color: #eceef2;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        text-align: center;
+      }
+      .card {
+        background: #15151f;
+        border: 1px solid #2a2a3a;
+        border-radius: 16px;
+        padding: 32px 24px;
+        max-width: 440px;
+        width: 90%;
+      }
+      h1 { font-size: 1.25rem; color: #9b8bff; margin: 0 0 12px; }
+      p { font-size: 0.875rem; color: #8a8ea3; line-height: 1.6; margin: 0 0 16px; }
+      .badge {
+        font-size: 0.75rem;
+        background: #1b1b28;
+        color: #5aa9ff;
+        border: 1px solid #2a2a3a;
+        padding: 8px 12px;
+        border-radius: 8px;
+        display: inline-block;
+      }
+    </style>
   </head>
-  <body class="bg-[#0b0b14] text-[#eceef2] m-0 p-0 font-sans">
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+  <body>
+    <div class="card">
+      <h1>PWA / TWA 静的配置モードに移行しました</h1>
+      <p>
+        srcフォルダを削除し、ルート直下にファイルを置くだけで動くシンプルな構成に設定しました。
+      </p>
+      <div class="badge">
+        お持ちの index.html などをルート直下に上書き・配置してください
+      </div>
+    </div>
   </body>
 </html>
