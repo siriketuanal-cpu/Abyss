@@ -325,6 +325,30 @@
     padding:12px; border-radius:12px; border:none;
     background:var(--accent); color:#100c26; font-size:14px; font-weight:700;
   }
+  /* 名前・見出し用の軽量ポップアップ入力 */
+  #nameEditOverlay{
+    display:none; position:fixed; inset:0; z-index:40;
+    background:rgba(0,0,0,.45); align-items:center; justify-content:center;
+    padding:16px;
+  }
+  #nameEditOverlay.show{display:flex;}
+  #nameEditPanel{
+    width:min(92vw, 340px); background:var(--card); border:1px solid var(--line);
+    border-radius:14px; padding:16px; display:flex; flex-direction:column; gap:12px;
+    box-shadow:0 12px 32px rgba(0,0,0,.4);
+  }
+  #nameEditLabel{font-size:13px; color:var(--sub); text-align:center;}
+  #nameEditInput{
+    width:100%; box-sizing:border-box; background:var(--card2); border:1px solid var(--line);
+    border-radius:10px; color:var(--text); font-size:16px; padding:12px 10px;
+    caret-color:var(--text);
+  }
+  #nameEditActions{display:flex; gap:8px;}
+  #nameEditActions button{
+    flex:1; padding:12px; border-radius:10px; border:1px solid var(--line);
+    background:var(--card2); color:var(--text); font-size:14px; font-weight:700;
+  }
+  #nameEditOk{background:var(--accent) !important; color:#100c26 !important; border-color:transparent !important;}
 </style>
 </head>
 <body>
@@ -349,6 +373,16 @@
 <div class="setupLabel" id="setupLabel"></div>
 <div id="setupFields"></div>
 <button id="setupConfirm">追加</button>
+</div>
+<div id="nameEditOverlay" aria-hidden="true">
+  <div id="nameEditPanel" role="dialog" aria-modal="true">
+    <div id="nameEditLabel">名前を編集</div>
+    <input type="text" id="nameEditInput" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+    <div id="nameEditActions">
+      <button type="button" id="nameEditCancel">やめる</button>
+      <button type="button" id="nameEditOk">OK</button>
+    </div>
+  </div>
 </div>
 <script>
 const STORAGE_KEY = 'freetimer:v1';
@@ -391,6 +425,71 @@ const setupLabelEl = document.getElementById('setupLabel');
 const setupFieldsEl = document.getElementById('setupFields');
 const setupConfirmEl = document.getElementById('setupConfirm');
 const toastEl = document.getElementById('toast');
+const nameEditOverlayEl = document.getElementById('nameEditOverlay');
+const nameEditLabelEl = document.getElementById('nameEditLabel');
+const nameEditInputEl = document.getElementById('nameEditInput');
+const nameEditOkEl = document.getElementById('nameEditOk');
+const nameEditCancelEl = document.getElementById('nameEditCancel');
+let nameEditOnOk = null;
+
+function closeNameEditPopup(){
+  if (!nameEditOverlayEl) return;
+  nameEditOverlayEl.classList.remove('show');
+  nameEditOverlayEl.setAttribute('aria-hidden', 'true');
+  nameEditOnOk = null;
+  try { nameEditInputEl && nameEditInputEl.blur(); } catch (e) {}
+}
+function openNameEditPopup(opts){
+  opts = opts || {};
+  if (!nameEditOverlayEl || !nameEditInputEl) return;
+  closeToast();
+  nameEditLabelEl.textContent = opts.label || '名前を編集';
+  nameEditInputEl.value = opts.value != null ? String(opts.value) : '';
+  nameEditInputEl.placeholder = opts.placeholder || '';
+  nameEditOnOk = typeof opts.onOk === 'function' ? opts.onOk : null;
+  nameEditOverlayEl.classList.add('show');
+  nameEditOverlayEl.setAttribute('aria-hidden', 'false');
+  setTimeout(()=>{
+    try {
+      nameEditInputEl.focus({preventScroll:true});
+      const len = nameEditInputEl.value.length;
+      nameEditInputEl.setSelectionRange(len, len);
+    } catch (e) {}
+  }, 40);
+}
+if (nameEditOkEl){
+  nameEditOkEl.addEventListener('pointerdown', e=>{
+    e.preventDefault();
+    e.stopPropagation();
+    const v = nameEditInputEl ? nameEditInputEl.value : '';
+    const cb = nameEditOnOk;
+    closeNameEditPopup();
+    if (cb) cb(v);
+  });
+}
+if (nameEditCancelEl){
+  nameEditCancelEl.addEventListener('pointerdown', e=>{
+    e.preventDefault();
+    e.stopPropagation();
+    closeNameEditPopup();
+  });
+}
+if (nameEditOverlayEl){
+  nameEditOverlayEl.addEventListener('pointerdown', e=>{
+    if (e.target === nameEditOverlayEl) closeNameEditPopup();
+  });
+}
+if (nameEditInputEl){
+  nameEditInputEl.addEventListener('keydown', e=>{
+    if (e.key === 'Enter'){
+      e.preventDefault();
+      nameEditOkEl && nameEditOkEl.dispatchEvent(new PointerEvent('pointerdown', {bubbles:true}));
+    } else if (e.key === 'Escape'){
+      e.preventDefault();
+      closeNameEditPopup();
+    }
+  });
+}
 
 function normalizeIdleClaim(it){
   // 「受取」は一時的なUI状態。永続化されると claimId（メモリのみ）とズレて
@@ -1123,10 +1222,20 @@ function askRemoveItem(id){
       else if (act === 'add') openAddPanel({ groupId: id });
       else if (act === 'editName'){
         const ed = refs[id]?.nameEditor;
-        if (ed && typeof ed.openAndFocus === 'function'){
-          // トーストを閉じてからフォーカス（キーボードとメニューの競合を避ける）
-          setTimeout(()=>{ try { ed.openAndFocus(); } catch (err) {} }, 30);
-        }
+        openNameEditPopup({
+          label: isHeader ? '見出し（ゲーム名など）' : 'アカウント名',
+          value: it.name || '',
+          placeholder: isHeader ? '見出し(ゲーム名など)' : 'アカウント',
+          onOk: (v)=>{
+            const next = String(v == null ? '' : v);
+            if (it.name !== next){
+              it.name = next;
+              save();
+            }
+            if (ed && typeof ed.setText === 'function') ed.setText(next);
+            else if (ed && typeof ed.setValue === 'function') ed.setValue(next);
+          }
+        });
       }
     }
   );
