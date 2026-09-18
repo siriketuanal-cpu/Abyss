@@ -356,6 +356,7 @@
 <div id="toast" role="status"></div>
 <div id="addPanel">
 <button class="timerType" data-type="stam">スタミナ</button>
+<button class="timerType" data-type="orb">オーブ</button>
 <button class="timerType" data-type="abyss">Abyssスタミナ</button>
 <button class="timerType" data-type="idle">放置報酬</button>
 <button class="onlyTop" data-type="group">アカウント枠</button>
@@ -869,8 +870,21 @@ function createInlineNumber(initialValue, onCommit, editKey, onOpen){
   });
 }
 
-function newStamItem(intervalMin){
-  return { id: uid(), type:'stam', name:'', current:0, max:100, intervalMin, start: Date.now() };
+function newStamItem(intervalMin, max, useChunk){
+  const m = clampInt(max, 1, 999, 100);
+  const item = {
+    id: uid(), type:'stam', name:'',
+    current: m, max: m,
+    intervalMin: clampInt(intervalMin, 1, 99999, 5),
+    start: Date.now()
+  };
+  // useChunk あり → カード短押しで使い切りプレビュー/確定（Abyssと同系統）
+  if (useChunk != null && Number(useChunk) > 0) item.useChunk = clampUseChunk(useChunk);
+  return item;
+}
+// 実験：既存スタミナ計算のまま、最大少なめ・1個使い切りのプリセット
+function newOrbItem(intervalMin, max){
+  return newStamItem(intervalMin, max != null ? max : 4, 1);
 }
 function newAbyssItem(intervalMin, useChunk){
   // Dot Abyss 風: 最大はランク連動。カードタップで useChunk 使い切り。削除は長押し。
@@ -881,6 +895,9 @@ function newAbyssItem(intervalMin, useChunk){
     intervalMin, useChunk: clampUseChunk(useChunk != null ? useChunk : 40),
     start: Date.now()
   };
+}
+function hasUseChunk(it){
+  return !!(it && (it.type === 'abyss' || it.type === 'stam') && it.useChunk != null && Number(it.useChunk) > 0);
 }
 function newIdleItem(durationMin){
   return { id: uid(), type:'idle', name:'', durationMin, state:'running', start: Date.now() };
@@ -947,7 +964,8 @@ function remainingAfterChunk(cur, chunk){
   return cur % c;
 }
 function remainingAfter40(cur, it){
-  return remainingAfterChunk(cur, it && it.useChunk != null ? it.useChunk : 40);
+  const fallback = it && it.type === 'abyss' ? 40 : 1;
+  return remainingAfterChunk(cur, it && it.useChunk != null ? it.useChunk : fallback);
 }
 // Dot Abyss 相当: 基礎240 + (ランク-1)×5（最大は計算のみ・手編集しない）
 function abyssMaxFor(rank){
@@ -1186,12 +1204,15 @@ function askRemoveItem(id){
   const isGroup = it && it.type === 'group';
   const isRule = it && it.type === 'rule';
   const isAbyss = it && it.type === 'abyss';
+  const isStam = it && it.type === 'stam';
   const canEditName = isHeader || isGroup;
   const colorDefault = isHeader ? (it.color || '#9b8bff') : (isRule ? (it.color || '#52617a') : null);
-  const chunkVal = isAbyss ? clampUseChunk(it.useChunk) : null;
+  // Abyssは常時、スタミナは設定済み or 後から付けられるよう空欄でも出す
+  const showChunk = isAbyss || isStam;
+  const chunkVal = isAbyss ? clampUseChunk(it.useChunk) : (isStam ? (it.useChunk != null ? clampUseChunk(it.useChunk) : '') : null);
   const extra =
     (colorDefault ? `<label class="toast-color">色<input type="color" value="${colorDefault}" aria-label="色"></label>` : '')
-    + (chunkVal != null ? `<label class="toast-color">使い切り<input type="text" inputmode="numeric" pattern="[0-9]*" value="${chunkVal}" maxlength="3" data-role="useChunk" aria-label="使い切り数"></label>` : '')
+    + (showChunk ? `<label class="toast-color">使い切り<input type="text" inputmode="numeric" pattern="[0-9]*" value="${chunkVal}" maxlength="3" data-role="useChunk" aria-label="使い切り数" placeholder="なし"></label>` : '')
     + (canEditName ? `<button type="button" data-act="editName">${isHeader ? '見出し編集' : '名前編集'}</button>` : '')
     + (canAdd ? '<button type="button" data-act="add">タイマー追加</button>' : '');
   showConfirmToast(
@@ -1241,18 +1262,31 @@ function askRemoveItem(id){
       colorEl.addEventListener('pointerdown', e=>e.stopPropagation());
     }
   }
-  if (isAbyss){
+  if (showChunk){
     const chunkEl = toastEl.querySelector('input[data-role="useChunk"]');
     if (chunkEl){
-      const origChunk = clampUseChunk(it.useChunk);
+      const origChunk = it.useChunk != null ? clampUseChunk(it.useChunk) : null;
       chunkEl.addEventListener('focus', ()=>{ chunkEl.value = ''; });
       const applyChunk = ()=>{
         const raw = String(chunkEl.value || '').replace(/\D/g, '');
-        // 空のまま閉じたら元の値を維持（他の数字編集と同じ）
-        it.useChunk = raw === '' ? origChunk : clampUseChunk(raw);
-        chunkEl.value = String(it.useChunk);
-        if (pending40Id === it.id) paintAbyssFortyPreview(it.id);
-        save();
+        if (raw === ''){
+          // スタミナは空で「使い切りなし」。Abyssは元値維持
+          if (isStam){
+            delete it.useChunk;
+            chunkEl.value = '';
+            if (pending40Id === it.id){ pending40Id = null; paintAbyssFortyPreview(it.id); }
+          } else {
+            it.useChunk = origChunk != null ? origChunk : 40;
+            chunkEl.value = String(it.useChunk);
+          }
+        } else {
+          it.useChunk = clampUseChunk(raw);
+          chunkEl.value = String(it.useChunk);
+          if (pending40Id === it.id) paintAbyssFortyPreview(it.id);
+        }
+        // カードの短押しバインドは再renderが必要なので、スタミナは軽く再構築
+        if (isStam){ save(); render(); startTicking(true); }
+        else save();
       };
       chunkEl.addEventListener('change', applyChunk);
       chunkEl.addEventListener('blur', applyChunk);
@@ -1282,7 +1316,7 @@ function valrowStamHtml(){
 // 現在値インライン編集（stam / abyss 共用）
 function attachCurrentEditor(curWrap, it, extraCommit){
   const clearFortyPreview = ()=>{
-    if (it.type === 'abyss' && pending40Id === it.id){
+    if (hasUseChunk(it) && pending40Id === it.id){
       pending40Id = null;
       paintAbyssFortyPreview(it.id);
     }
@@ -1303,6 +1337,30 @@ function attachCurrentEditor(curWrap, it, extraCommit){
   curWrap.appendChild(curEditor.wrap);
   return curEditor;
 }
+function onUseChunkTap(it, e){
+  if (e){ e.stopPropagation(); e.preventDefault(); }
+  if (!hasUseChunk(it)) return;
+  const now = Date.now();
+  if (it.type === 'abyss') syncAbyssMax(it);
+  const info = stamInfo(it, now);
+  if (pending40Id === it.id){
+    preserveCycle(it, now);
+    it.current = remainingAfter40(info.cur, it);
+    freezeIfFull(it, now);
+    pending40Id = null;
+    paintAbyssFortyPreview(it.id);
+    startTicking(true);
+    saveAfterPaint();
+  } else {
+    if (pending40Id && pending40Id !== it.id){
+      const prev = pending40Id;
+      pending40Id = null;
+      paintAbyssFortyPreview(prev);
+    }
+    pending40Id = it.id;
+    paintAbyssFortyPreview(it.id);
+  }
+}
 function buildStamCard(it){
   const wrap = makeCardEl('stam', it.id, `
     <div class="clockstack stam-clock" data-role="clock"></div>
@@ -1310,7 +1368,7 @@ function buildStamCard(it){
   `);
   const curWrap = wrap.querySelector('[data-role="curWrap"]');
   const maxWrap = wrap.querySelector('[data-role="maxWrap"]');
-  const curEditor = attachCurrentEditor(curWrap, it);
+  const curEditor = attachCurrentEditor(curWrap, it, () => { pending40Id = null; });
   const maxEditor = createInlineNumber(it.max, value => {
     const now = Date.now();
     const curNow = stamInfo(it, now).cur;
@@ -1319,6 +1377,7 @@ function buildStamCard(it){
     it.max = newMax;
     it.current = Math.min(curNow, newMax);
     freezeIfFull(it, now);
+    if (pending40Id === it.id) pending40Id = null;
     updateOneTimer(it);
     startTicking(true);
     saveAfterPaint();
@@ -1327,7 +1386,8 @@ function buildStamCard(it){
 
   refs[it.id] = { el: wrap, curEl: curEditor, maxEl: maxEditor,
     clockEl: wrap.querySelector('[data-role="clock"]') };
-  bindLongPressDelete(wrap, it.id);
+  // 使い切り設定があるときだけカード短押しでプレビュー/確定（オーブ実験含む）
+  bindLongPressDelete(wrap, it.id, hasUseChunk(it) ? (e) => onUseChunkTap(it, e) : null);
   return wrap;
 }
 
@@ -1363,35 +1423,11 @@ function buildAbyssCard(it){
   );
   head.appendChild(rankEditor.wrap);
   const clockEl = wrap.querySelector('[data-role="clock"]');
-  const onForty = (e)=>{
-    e.stopPropagation();
-    e.preventDefault();
-    const now = Date.now();
-    syncAbyssMax(it);
-    const info = stamInfo(it, now);
-    if (pending40Id === it.id){
-      preserveCycle(it, now);
-      it.current = remainingAfter40(info.cur, it);
-      freezeIfFull(it, now);
-      pending40Id = null;
-      paintAbyssFortyPreview(it.id);
-      startTicking(true);
-      saveAfterPaint();
-    } else {
-      if (pending40Id && pending40Id !== it.id){
-        const prev = pending40Id;
-        pending40Id = null;
-        paintAbyssFortyPreview(prev);
-      }
-      pending40Id = it.id;
-      paintAbyssFortyPreview(it.id);
-    }
-  };
   const info0 = stamInfo(it, Date.now());
   curEditor.setText(info0.cur);
   maxLabel.textContent = String(it.max);
   refs[it.id] = { el: wrap, rankEditor, curEl: curEditor, maxLabel, clockEl };
-  bindLongPressDelete(wrap, it.id, (e) => onForty(e));
+  bindLongPressDelete(wrap, it.id, (e) => onUseChunkTap(it, e));
   return wrap;
 }
 
@@ -1529,7 +1565,7 @@ document.addEventListener('pointerdown', (e) => {
     if (!claimed || !r || !r.el.contains(e.target)) cancelClaim(claimed || {id:claimId});
   }
   if (pending40Id != null){
-    const r = refs[pending40Id];
+    const r = getTimerRef(pending40Id);
     if (!r || !r.el.contains(e.target)){
       const id = pending40Id;
       pending40Id = null;
@@ -1609,7 +1645,7 @@ function findItemById(id){
 // 40プレビューの見た目更新は updateTimerCard に任せる（重複ロジック削減）
 function paintAbyssFortyPreview(id){
   const it = findItemById(id);
-  if (it && it.type === 'abyss') updateOneTimer(it);
+  if (it && (it.type === 'abyss' || it.type === 'stam')) updateOneTimer(it);
 }
 function render(){
   const now = Date.now();
@@ -1666,9 +1702,11 @@ function updateTimerCard(it, r, now){
       info = stamInfo(it, now);
       saveAfterPaint();
     }
+    const waitChunk = hasUseChunk(it) && pending40Id === it.id;
     r.el.classList.toggle('full', info.isFull);
+    r.el.classList.toggle('claim', waitChunk);
     renderClock(r.clockEl, info.remainMs, info.isFull, now, info.fullAt);
-    if (r.curEl && !r.curEl.isEditing()) r.curEl.setText(info.cur);
+    if (r.curEl && !r.curEl.isEditing()) r.curEl.setText(waitChunk ? remainingAfter40(info.cur, it) : info.cur);
     if (r.maxEl && !r.maxEl.isEditing()) r.maxEl.setText(it.max);
     setNearOnCurrent(r.curEl, isNearFull(info.remainMs, info.isFull));
   } else if (it.type==='abyss'){
@@ -1748,8 +1786,16 @@ function openSetup(type){
     setupLabelEl.textContent = 'ゲーム名ヘッダーの文字色';
     fillColorPalette('#9b8bff');
   } else if (type === 'stam'){
-    setupLabelEl.textContent = 'スタミナ回復間隔';
-    setupFieldsEl.innerHTML = `<input type="text" inputmode="numeric" pattern="[0-9]*" id="setupInterval" value="5"><span>分で1回復</span>`;
+    setupLabelEl.textContent = 'スタミナ設定';
+    setupFieldsEl.innerHTML = `
+      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupInterval" value="5"><span>分で1</span>
+      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupMax" value="100" style="margin-left:6px;"><span>最大</span>
+      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupUseChunk" value="" style="margin-left:6px;" placeholder="—"><span>使い切り</span>`;
+  } else if (type === 'orb'){
+    setupLabelEl.textContent = 'オーブ（実験・スタミナと同じ計算）';
+    setupFieldsEl.innerHTML = `
+      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupOrbHours" value="6"><span>時間で1個</span>
+      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupMax" value="4" style="margin-left:6px;"><span>最大</span>`;
   } else if (type === 'abyss'){
     setupLabelEl.textContent = 'Abyssスタミナ設定';
     setupFieldsEl.innerHTML = `
@@ -1789,7 +1835,14 @@ function confirmSetup(){
     state.items.push(item);
   } else if (setupType === 'stam'){
     const interval = clampInt(setupFieldsEl.querySelector('#setupInterval')?.value, 1, 999, 5);
-    if (!pushNewTimer(newStamItem(interval))) return;
+    const max = clampInt(setupFieldsEl.querySelector('#setupMax')?.value, 1, 999, 100);
+    const chunkRaw = String(setupFieldsEl.querySelector('#setupUseChunk')?.value || '').replace(/\D/g, '');
+    const useChunk = chunkRaw === '' ? null : clampUseChunk(chunkRaw);
+    if (!pushNewTimer(newStamItem(interval, max, useChunk))) return;
+  } else if (setupType === 'orb'){
+    const hours = clampInt(setupFieldsEl.querySelector('#setupOrbHours')?.value, 1, 999, 6);
+    const max = clampInt(setupFieldsEl.querySelector('#setupMax')?.value, 1, 99, 4);
+    if (!pushNewTimer(newOrbItem(hours * 60, max))) return;
   } else if (setupType === 'abyss'){
     const interval = clampInt(setupFieldsEl.querySelector('#setupInterval')?.value, 1, 999, 3);
     const useChunk = clampUseChunk(setupFieldsEl.querySelector('#setupUseChunk')?.value);
