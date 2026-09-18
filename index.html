@@ -235,7 +235,7 @@
   [data-role="curWrap"], [data-role="maxWrap"]{ position:relative; }
   .divider{
     grid-column:1 / -1; display:flex; align-items:center; gap:6px;
-    padding:1px 2px 3px; border-bottom:1px solid var(--line); position:relative;
+    padding:0 2px; border-bottom:1px solid var(--line); position:relative;
     touch-action:pan-y; -webkit-touch-callout:none;
   }
   .divider .name{
@@ -614,13 +614,17 @@ function createPersistentInlineEditor(opts){
 
   wrap.addEventListener('pointermove', e=>{
     if (e.pointerId !== wrapPointerId) return;
-    if (Math.hypot(e.clientX-wrapHoldX, e.clientY-wrapHoldY) > 12) clearWrapHold();
+    // 少し動いただけでは編集開始をキャンセルしない（指の震えで反応しなくなるのを防ぐ）
+    // 長押しタイマーだけ止める
+    if (Math.hypot(e.clientX-wrapHoldX, e.clientY-wrapHoldY) > 12){
+      if (wrapHoldTimer !== null){ clearTimeout(wrapHoldTimer); wrapHoldTimer = null; }
+    }
   }, {capture:true, passive:true});
 
   wrap.addEventListener('pointerup', e=>{
     if (e.pointerId !== wrapPointerId) return;
     clearWrapHold();
-    // 短押しだけ focus
+    // 短押し（または軽い移動）で focus
     focusInput();
   }, {capture:true, passive:false});
   wrap.addEventListener('pointercancel', ()=>{
@@ -1224,7 +1228,8 @@ function buildHeaderCard(it){
   nameEditor.setColor(it.color || 'var(--accent)');
   wrap.appendChild(nameEditor.wrap);
   refs[it.id] = { el: wrap, nameEl: nameEditor.wrap, nameEditor };
-  bindLongPressDelete(nameEditor.wrap, it.id);
+  // 名前要素ではなく divider 本体に長押しを付ける（子の stopPropagation の影響を受けない）
+  bindLongPressDelete(wrap, it.id);
   return wrap;
 }
 
