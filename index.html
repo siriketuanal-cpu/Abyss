@@ -292,7 +292,7 @@
   #toast{
     /* 画面中央。中身は「設定欄→操作欄」の2段に固定して配置を崩さない。 */
     position:fixed; left:50%; top:50%; bottom:auto;
-    transform:translate(-50%, -50%); width:min(92vw, 360px); max-width:92%;
+    transform:translate(-50%, -50%); width:min(86vw, 310px); max-width:86%;
     background:#26272d; color:var(--text); border:1px solid var(--line);
     border-radius:10px; padding:12px; font-size:13px; z-index:30;
     display:none; box-shadow:0 8px 24px rgba(0,0,0,.35);
@@ -1256,6 +1256,17 @@ function bindTimerShortAction(el, shortAction){
 }
 let toastTapDownHandler = null;
 let longPressTargetEl = null;
+// 付箋タブから開いた直後、指がそのままトースト内の入力欄へ着地して
+// 意図せずフォーカス／キーボード表示されるのを短時間だけ防ぐ。
+let suppressToastInputFocusUntil = 0;
+document.addEventListener('pointerdown', e=>{
+  if (Date.now() >= suppressToastInputFocusUntil) return;
+  if (e.target && e.target.closest && e.target.closest('#toast input, #toast textarea')){
+    e.preventDefault();
+    e.stopPropagation();
+    try { e.target.blur(); } catch (err) {}
+  }
+}, {capture:true, passive:false});
 function clearLongPressTarget(){
   if (longPressTargetEl){
     longPressTargetEl.classList.remove('longpress-target');
@@ -1488,6 +1499,7 @@ function makeCardEl(type, id, innerHtml){
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       e.preventDefault();
       e.stopPropagation();
+      suppressToastInputFocusUntil = Date.now() + 500;
       askRemoveItem(id);
     }, {capture:false, passive:false});
     tab.addEventListener('pointerup', e=>{ e.preventDefault(); e.stopPropagation(); }, {capture:false, passive:false});
