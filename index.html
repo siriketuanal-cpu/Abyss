@@ -1124,13 +1124,27 @@ function startTicking(force){
   if (!tickId && needsTicking()) scheduleTick(tickGen);
 }
 
+// タイマー／長押し系で共通して使うポインタ判定。
+const TAP_MOVE_PX = 24;
+const isPrimaryPointer = e => e.isPrimary !== false && !(e.pointerType === 'mouse' && e.button !== 0);
+const isTimerEditTarget = (target)=>{
+  if (!target || !target.closest) return false;
+  return !!(
+    target.closest('.inline-edit-input') ||
+    target.closest('.rank-edit-input') ||
+    target.closest('.rank-text') ||
+    target.closest('[data-role="curWrap"]') ||
+    target.closest('.rank') ||
+    target.closest('.timer-menu-tab')
+  );
+};
+
 // 長押し削除＋短押しアクション（使い切り・受取など）
 function bindLongPressDelete(el, id, shortAction){
-  const HOLD_MS = 520, MOVE_PX = 24;
+  const HOLD_MS = 520;
   let timer = null, active = false, moved = false, longFired = false;
   let sx = 0, sy = 0, pid = null;
 
-  const isPrimary = e => e.isPrimary !== false && !(e.pointerType==='mouse' && e.button!==0);
   const clearSelection = ()=>{ try{ window.getSelection()?.removeAllRanges(); }catch(e){} };
   const cleanup = ()=>{
     if (timer !== null){ clearTimeout(timer); timer = null; }
@@ -1138,20 +1152,10 @@ function bindLongPressDelete(el, id, shortAction){
   };
 
   // 現在値・ランク編集中は長押し削除／使い切りと分離
-  const isEditTarget = (target)=>{
-    if (!target || !target.closest) return false;
-    return !!(
-      target.closest('.inline-edit-input') ||
-      target.closest('.rank-edit-input') ||
-      target.closest('.rank-text') ||
-      target.closest('[data-role="curWrap"]') ||
-      target.closest('.rank') ||
-      target.closest('.timer-menu-tab')
-    );
-  };
+  const isEditTarget = isTimerEditTarget;
 
   el.addEventListener('pointerdown', e=>{
-    if (!isPrimary(e) || active) return;
+    if (!isPrimaryPointer(e) || active) return;
     if (isEditTarget(e.target)) return;
     if (editingId != null) return;
 
@@ -1175,7 +1179,7 @@ function bindLongPressDelete(el, id, shortAction){
 
   el.addEventListener('pointermove', e=>{
     if (!active || e.pointerId !== pid) return;
-    if (Math.hypot(e.clientX-sx, e.clientY-sy) > MOVE_PX){
+    if (Math.hypot(e.clientX-sx, e.clientY-sy) > TAP_MOVE_PX){
       moved = true;
       if (timer !== null){ clearTimeout(timer); timer = null; }
     }
@@ -1211,40 +1215,28 @@ function targetInGroupName(target, el){
   return !!n && el.contains(n);
 }
 
-// タイマーカード用の通常タップだけを処理。長押しでメニューは開かない。
-// メニューは右上の timer-menu-tab からのみ開く。
+// タイマーカード用の通常タップだけを処理。
+// 長押しでメニューは開かない。メニューは右上の timer-menu-tab からのみ開く。
+// pointerdown で開始位置を確保し、移動を監視して、pointerup でタップ確定する。
 function bindTimerShortAction(el, shortAction){
   let active = false, moved = false, pid = null;
   let sx = 0, sy = 0;
-  const MOVE_PX = 24;
-  const isPrimary = e => e.isPrimary !== false && !(e.pointerType==='mouse' && e.button!==0);
-  const isEditTarget = (target)=>{
-    if (!target || !target.closest) return false;
-    return !!(
-      target.closest('.inline-edit-input') ||
-      target.closest('.rank-edit-input') ||
-      target.closest('.rank-text') ||
-      target.closest('[data-role="curWrap"]') ||
-      target.closest('.rank') ||
-      target.closest('.timer-menu-tab')
-    );
-  };
   const cleanup = ()=>{ active=false; moved=false; pid=null; };
 
   el.addEventListener('pointerdown', e=>{
-    if (!isPrimary(e) || active || editingId != null || isEditTarget(e.target)) return;
+    if (!isPrimaryPointer(e) || active || editingId != null || isTimerEditTarget(e.target)) return;
     active = true; moved = false; pid = e.pointerId;
     sx = e.clientX; sy = e.clientY;
   }, {capture:true, passive:true});
 
   el.addEventListener('pointermove', e=>{
     if (!active || e.pointerId !== pid) return;
-    if (Math.hypot(e.clientX-sx, e.clientY-sy) > MOVE_PX) moved = true;
+    if (Math.hypot(e.clientX-sx, e.clientY-sy) > TAP_MOVE_PX) moved = true;
   }, {capture:true, passive:true});
 
   el.addEventListener('pointerup', e=>{
     if (!active || e.pointerId !== pid) return;
-    const shouldAct = !moved && !isEditTarget(e.target) && typeof shortAction === 'function';
+    const shouldAct = !moved && !isTimerEditTarget(e.target) && typeof shortAction === 'function';
     cleanup();
     if (shouldAct) shortAction(e);
   }, {capture:true, passive:false});
@@ -1483,26 +1475,19 @@ function makeCardEl(type, id, innerHtml){
     tab.className = 'timer-menu-tab';
     tab.setAttribute('aria-label', 'タイマーメニュー');
     tab.title = 'タイマーメニュー';
-    // pointerdownでは開かない。まずネイティブのボタンフォーカスを止め、
-    // pointerupが完了してからトーストを生成する。これなら生成直後の入力欄へ
-    // 同じタップが流れ込む余地を作らない。
+    // pointerdownでは開かない。ここでDOMを差し替えると、同じタップのpointerup/clickが
+    // 新しく出したトースト側へ再ターゲットされ、入力欄へフォーカスが飛ぶことがある。
     tab.addEventListener('pointerdown', e=>{
       if (e.isPrimary === false) return;
       if (e.pointerType === 'mouse' && e.button !== 0) return;
-      e.preventDefault();
       e.stopPropagation();
-    }, {capture:false, passive:false});
-    tab.addEventListener('pointerup', e=>{
-      if (e.isPrimary === false) return;
-      if (e.pointerType === 'mouse' && e.button !== 0) return;
-      e.preventDefault();
-      e.stopPropagation();
-      tab.blur();
-      setTimeout(()=>askRemoveItem(id), 0);
     }, {capture:false, passive:false});
     tab.addEventListener('click', e=>{
+      if (e.isPrimary === false) return;
       e.preventDefault();
       e.stopPropagation();
+      askRemoveItem(id);
+      tab.blur();
     }, {capture:false, passive:false});
     wrap.appendChild(tab);
   }
