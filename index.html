@@ -1483,19 +1483,26 @@ function makeCardEl(type, id, innerHtml){
     tab.className = 'timer-menu-tab';
     tab.setAttribute('aria-label', 'タイマーメニュー');
     tab.title = 'タイマーメニュー';
-    // pointerdownでは開かない。ここでDOMを差し替えると、同じタップのpointerup/clickが
-    // 新しく出したトースト側へ再ターゲットされ、入力欄へフォーカスが飛ぶことがある。
+    // pointerdownでは開かない。まずネイティブのボタンフォーカスを止め、
+    // pointerupが完了してからトーストを生成する。これなら生成直後の入力欄へ
+    // 同じタップが流れ込む余地を作らない。
     tab.addEventListener('pointerdown', e=>{
       if (e.isPrimary === false) return;
       if (e.pointerType === 'mouse' && e.button !== 0) return;
-      e.stopPropagation();
-    }, {capture:false, passive:false});
-    tab.addEventListener('click', e=>{
-      if (e.isPrimary === false) return;
       e.preventDefault();
       e.stopPropagation();
-      askRemoveItem(id);
+    }, {capture:false, passive:false});
+    tab.addEventListener('pointerup', e=>{
+      if (e.isPrimary === false) return;
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
       tab.blur();
+      setTimeout(()=>askRemoveItem(id), 0);
+    }, {capture:false, passive:false});
+    tab.addEventListener('click', e=>{
+      e.preventDefault();
+      e.stopPropagation();
     }, {capture:false, passive:false});
     wrap.appendChild(tab);
   }
