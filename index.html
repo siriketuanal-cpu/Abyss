@@ -243,10 +243,11 @@
   }
   /* 放置タイマー本体も下段中央。予定時刻だけ左上へ配置。 */
   .valrow-idle{
-    margin-top:0 !important; align-items:center; min-height:22px; height:22px;
-    justify-content:center; gap:6px; position:absolute; left:6px; right:6px; bottom:5px;
+    margin:0 !important; align-items:center; min-height:22px; height:22px;
+    width:auto; position:absolute; left:6px; right:6px; top:auto; bottom:5px;
+    display:flex; justify-content:center; gap:6px;
   }
-  .valrow-idle .main{min-width:2.6em; text-align:center; padding-left:0; font-size:19px; line-height:1.1;}
+  .valrow-idle .main{min-width:2.6em; flex:0 0 auto; margin:0; text-align:center; padding-left:0; font-size:19px; line-height:1.1;}
   .valrow-idle .clockstack{margin:0; position:absolute; left:0; top:auto;}
   .card.idle .valrow-idle .clockstack{position:absolute; left:0; bottom:22px; top:auto;}
   /* 数字の操作は透明な ::before ヒットボックスを使わず、実際の数字要素で受ける。 */
@@ -264,13 +265,14 @@
   }
   .header-menu-button{
     margin-left:auto; flex:0 0 22px; width:22px; height:22px;
-    padding:0; border:1px solid var(--line); border-radius:50%;
-    background:var(--card2); color:var(--sub); font-size:14px; line-height:20px;
+    padding:0; border:2px solid var(--header-color, var(--accent)); border-radius:50%;
+    background:var(--header-color, var(--accent));
+    color:transparent; font-size:0; line-height:0;
     display:flex; align-items:center; justify-content:center;
     appearance:none; -webkit-appearance:none; outline:none; box-shadow:none;
     touch-action:manipulation; -webkit-tap-highlight-color:transparent;
   }
-  .header-menu-button:active{background:var(--card2); color:var(--text);}
+  .header-menu-button:active{opacity:.78;}
   .header-palette{display:flex; gap:5px; flex-wrap:wrap; justify-content:center; margin:4px 0 2px;}
   .header-swatch{width:26px; height:26px; padding:0; border-radius:50%; border:2px solid var(--line); box-shadow:none;}
   .header-swatch.selected{border-color:#fff; outline:1px solid var(--accent);}
@@ -1255,6 +1257,7 @@ function askRemoveItem(id){
   const it = findItemById(id);
   if (!toastEl){ removeItem(id); return; }
   const canAdd = it && it.type === 'group' && it.children.length < 2;
+  const canAddAccountBelowHeader = isHeader;
   const isHeader = it && it.type === 'header';
   const isGroup = it && it.type === 'group';
   const isRule = it && it.type === 'rule';
@@ -1273,7 +1276,8 @@ function askRemoveItem(id){
     + (showChunk ? `<label class="toast-field"><span class="toast-color"><span class="toast-label">使い切り</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${chunkVal}" maxlength="3" data-role="useChunk" aria-label="使い切り数" placeholder="なし"></span></label>` : '')
     + (stamMaxRow ? `<label class="toast-field">${stamMaxRow}</label>` : '')
     + (canEditName ? `<button type="button" data-act="editName">${isHeader ? '見出し編集' : '名前編集'}</button>` : '')
-    + (canAdd ? '<button type="button" data-act="add">タイマー追加</button>' : '');
+    + (canAdd ? '<button type="button" data-act="add">タイマー追加</button>' : '')
+    + (canAddAccountBelowHeader ? '<button type="button" data-act="addAccountBelow">アカウント追加</button>' : '');
   const extra = fields ? `<div class="toast-fields">${fields}</div>` : '';
   showConfirmToast(
     extra
@@ -1284,6 +1288,15 @@ function askRemoveItem(id){
     (act)=>{
       if (act === 'yes') removeItem(id);
       else if (act === 'add') openAddPanel({ groupId: id });
+      else if (act === 'addAccountBelow' && isHeader){
+        const idx = state.items.findIndex(x => x.id === id);
+        if (idx !== -1){
+          state.items.splice(idx + 1, 0, newGroupItem());
+          save();
+          render();
+          startTicking(true);
+        }
+      }
       else if (act === 'editName'){
         const ed = refs[id]?.nameEditor;
         openNameEditPopup({
@@ -1316,6 +1329,7 @@ function askRemoveItem(id){
         if (isHeader){
           if (refs[id]?.nameEditor) refs[id].nameEditor.setColor(it.color);
           else if (refs[id]?.nameEl) refs[id].nameEl.style.color = it.color;
+          if (refs[id]?.menuBtn) refs[id].menuBtn.style.setProperty('--header-color', it.color);
         } else if (isRule && refs[id]?.el){
           refs[id].el.style.borderTopColor = it.color;
         }
@@ -1627,9 +1641,10 @@ function buildHeaderCard(it){
   menuBtn.className = 'header-menu-button';
   menuBtn.setAttribute('aria-label', '見出しメニュー');
   menuBtn.title = '見出しメニュー';
-  menuBtn.textContent = '⋮';
+  menuBtn.style.setProperty('--header-color', it.color || '#9b8bff');
+  menuBtn.textContent = '';
   wrap.appendChild(menuBtn);
-  refs[it.id] = { el: wrap, nameEl: nameEditor.wrap, nameEditor };
+  refs[it.id] = { el: wrap, nameEl: nameEditor.wrap, nameEditor, menuBtn };
   // 既存のヘッダー長押しは残す。丸型ボタンだけは別経路でトーストを開く。
   bindLongPressDelete(wrap, it.id);
   return wrap;
