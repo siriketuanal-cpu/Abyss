@@ -290,22 +290,22 @@
     content:''; position:absolute; left:0; right:0; top:-10px; bottom:-10px;
   }
   #toast{
-    /* 画面中央。中身は「設定欄→操作欄」の2段に固定して配置を崩さない。 */
+    /* 画面中央。必要な設定だけを横並びにして、従来よりかなり小さく。 */
     position:fixed; left:50%; top:50%; bottom:auto;
-    transform:translate(-50%, -50%); width:min(86vw, 310px); max-width:86%;
+    transform:translate(-50%, -50%); width:min(72vw, 250px); max-width:72%;
     background:#26272d; color:var(--text); border:1px solid var(--line);
-    border-radius:10px; padding:12px; font-size:13px; z-index:30;
-    display:none; box-shadow:0 8px 24px rgba(0,0,0,.35);
+    border-radius:9px; padding:8px; font-size:12px; z-index:30;
+    display:none; box-shadow:0 6px 18px rgba(0,0,0,.3);
   }
   #toast.show{display:block;}
   #toast .toast-fields{
     display:grid; grid-template-columns:repeat(2, minmax(0, 1fr));
-    gap:7px; width:100%;
+    gap:5px; width:100%;
   }
   #toast .toast-field{
-    min-width:0; min-height:48px; padding:7px 8px;
-    display:flex; align-items:center; justify-content:space-between; gap:7px;
-    border:1px solid var(--line); border-radius:8px; background:var(--card2);
+    min-width:0; min-height:36px; padding:5px 6px;
+    display:flex; align-items:center; justify-content:space-between; gap:5px;
+    border:1px solid var(--line); border-radius:7px; background:var(--card2);
   }
   #toast .toast-field.wide{grid-column:1 / -1;}
   #toast .toast-label{
@@ -317,21 +317,21 @@
     border-radius:8px; padding:7px 10px; font-size:12px; font-weight:600;
   }
   #toast .toast-actions{
-    display:grid; grid-template-columns:1fr 1fr; gap:7px;
-    margin-top:9px; padding-top:9px; border-top:1px solid var(--line);
+    display:grid; grid-template-columns:1fr 1fr; gap:5px;
+    margin-top:6px; padding-top:6px; border-top:1px solid var(--line);
   }
-  #toast .toast-actions button{width:100%; min-height:34px;}
+  #toast .toast-actions button{width:100%; min-height:28px; padding:5px 7px;}
   #toast button.ok{background:var(--danger); border-color:transparent; color:#fff;}
   /* 1回目タップで破線（確定待ち）。2回目で実行 */
   #toast button.armed{outline:2px dashed #fff; outline-offset:2px;}
   #toast .toast-color{
-    display:flex; align-items:center; justify-content:space-between; gap:7px;
+    display:flex; align-items:center; justify-content:space-between; gap:5px;
     min-width:0; width:100%; height:100%; color:var(--text); font-size:12px;
   }
-  #toast .toast-color input[type="color"]{width:28px;height:24px;padding:1px;border:1px solid var(--line);border-radius:6px;background:transparent;}
+  #toast .toast-color input[type="color"]{width:24px;height:21px;padding:1px;border:1px solid var(--line);border-radius:5px;background:transparent;}
   #toast .toast-color input[type="text"]{
-    width:2.8em; height:28px; padding:2px 4px; border:1px solid var(--line); border-radius:6px;
-    background:var(--card2); color:var(--text) !important; font-size:14px; font-weight:700;
+    width:2.8em; height:24px; padding:1px 3px; border:1px solid var(--line); border-radius:5px;
+    background:var(--card2); color:var(--text) !important; font-size:13px; font-weight:700;
     text-align:center; caret-color:var(--text); -webkit-text-fill-color:var(--text);
   }
   #empty{color:var(--sub); font-size:13px; text-align:center; padding:40px 0;}
@@ -1256,17 +1256,6 @@ function bindTimerShortAction(el, shortAction){
 }
 let toastTapDownHandler = null;
 let longPressTargetEl = null;
-// 付箋タブから開いた直後、指がそのままトースト内の入力欄へ着地して
-// 意図せずフォーカス／キーボード表示されるのを短時間だけ防ぐ。
-let suppressToastInputFocusUntil = 0;
-document.addEventListener('pointerdown', e=>{
-  if (Date.now() >= suppressToastInputFocusUntil) return;
-  if (e.target && e.target.closest && e.target.closest('#toast input, #toast textarea')){
-    e.preventDefault();
-    e.stopPropagation();
-    try { e.target.blur(); } catch (err) {}
-  }
-}, {capture:true, passive:false});
 function clearLongPressTarget(){
   if (longPressTargetEl){
     longPressTargetEl.classList.remove('longpress-target');
@@ -1330,13 +1319,13 @@ function askRemoveItem(id){
       + `<label class="toast-color"><span class="toast-label">+/Lv</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${abyssPerRankOf(it)}" maxlength="3" data-role="abyssPer" aria-label="ランクごとの増加" style="width:2.6em;text-align:center;"></label>`
     : '';
   const stamMaxRow = showStamMax
-    ? `<label class="toast-color toast-max-row"><span class="toast-label">最大スタミナ</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${it.max}" maxlength="3" data-role="stamMax" aria-label="最大スタミナ" style="width:3.2em;text-align:center;"></label>`
+    ? `<label class="toast-color toast-max-row"><span class="toast-label">最大</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${it.max}" maxlength="3" data-role="stamMax" aria-label="最大スタミナ" style="width:3.2em;text-align:center;"></label>`
     : '';
   const fields =
     (colorDefault ? `<label class="toast-field"><span class="toast-color"><span class="toast-label">色</span><input type="color" value="${colorDefault}" aria-label="色"></span></label>` : '')
     + (abyssFormula ? `<div class="toast-field wide">${abyssFormula}</div>` : '')
     + (showChunk ? `<label class="toast-field"><span class="toast-color"><span class="toast-label">使い切り</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${chunkVal}" maxlength="3" data-role="useChunk" aria-label="使い切り数" placeholder="なし"></span></label>` : '')
-    + (stamMaxRow ? `<div class="toast-field wide">${stamMaxRow}</div>` : '')
+    + (stamMaxRow ? `<label class="toast-field">${stamMaxRow}</label>` : '')
     + (canEditName ? `<button type="button" data-act="editName">${isHeader ? '見出し編集' : '名前編集'}</button>` : '')
     + (canAdd ? '<button type="button" data-act="add">タイマー追加</button>' : '');
   const extra = fields ? `<div class="toast-fields">${fields}</div>` : '';
@@ -1494,16 +1483,20 @@ function makeCardEl(type, id, innerHtml){
     tab.className = 'timer-menu-tab';
     tab.setAttribute('aria-label', 'タイマーメニュー');
     tab.title = 'タイマーメニュー';
+    // pointerdownでは開かない。ここでDOMを差し替えると、同じタップのpointerup/clickが
+    // 新しく出したトースト側へ再ターゲットされ、入力欄へフォーカスが飛ぶことがある。
     tab.addEventListener('pointerdown', e=>{
       if (e.isPrimary === false) return;
       if (e.pointerType === 'mouse' && e.button !== 0) return;
+      e.stopPropagation();
+    }, {capture:false, passive:false});
+    tab.addEventListener('click', e=>{
+      if (e.isPrimary === false) return;
       e.preventDefault();
       e.stopPropagation();
-      suppressToastInputFocusUntil = Date.now() + 500;
       askRemoveItem(id);
+      tab.blur();
     }, {capture:false, passive:false});
-    tab.addEventListener('pointerup', e=>{ e.preventDefault(); e.stopPropagation(); }, {capture:false, passive:false});
-    tab.addEventListener('click', e=>{ e.preventDefault(); e.stopPropagation(); }, {capture:false, passive:false});
     wrap.appendChild(tab);
   }
   return wrap;
