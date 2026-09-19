@@ -41,7 +41,6 @@
   .stamval .inline-number-text{ text-align:right; }
   .stammax .inline-number-text{ text-align:left; }
   .inline-number.editing .inline-number-text{visibility:hidden;}
-  .name.editing .name-text,
   .rank.editing .rank-text{visibility:hidden;}
   .inline-edit-input{
     position:absolute; top:0; left:0; width:100%; height:100%; box-sizing:border-box;
@@ -52,8 +51,7 @@
     z-index:3; caret-color:transparent;
   }
   .stamval .inline-edit-input{ text-align:right; }
-  .stammax .inline-edit-input{ text-align:left; }
-  /* 名前・見出し：普段は span。編集中だけ input が載る */
+  /* 名前・見出し：表示専用（編集はポップアップ） */
   .name{
     position:relative; display:inline-block; min-width:0;
     -webkit-tap-highlight-color:transparent; -webkit-touch-callout:none; touch-action:manipulation;
@@ -64,7 +62,6 @@
     -webkit-user-select:none; user-select:none; touch-action:manipulation;
   }
   .name-text.is-placeholder{ color:var(--sub); font-weight:600; }
-  /* name-edit-input は廃止（ポップアップ編集のみ） */
   /* TWA復帰時の一瞬の再構築を視覚的に隠す。通常起動・通常操作では非表示。 */
   #resumeVeil{position:fixed;inset:0;background:var(--bg);opacity:0;pointer-events:none;z-index:100;transition:opacity 90ms linear;}
   #resumeVeil.show{opacity:1;}
@@ -589,9 +586,7 @@ function bindTapDown(el, handler){
 function clearOnFocus(input){
   input.addEventListener('focus', () => { input.value = ''; });
 }
-// 名前・見出し：普段は span、タップ時だけ input を生成して破棄（雫ハンドルの土台を消す）
-// 編集ライフサイクル共通基盤（スタミナ方式を基準）
-// 短押し→focus / 長押し→focusせず閉じる / 空欄確定→元値維持
+// 数字・ランク用インライン編集（短押しfocus / 長押しは破棄して雫抑制）
 function createPersistentInlineEditor(opts){
   const {
     initialValue = '',
@@ -713,13 +708,10 @@ function createPersistentInlineEditor(opts){
     }
     editor = null;
     wrap.classList.remove('editing');
-    const parentHit = wrap.parentElement;
-    if (parentHit) parentHit.classList.remove('is-editing');
     if (editKey != null && editingId === editKey) editingId = null;
     try { window.getSelection()?.removeAllRanges(); } catch (e) {}
     closeInput();
-    // 編集終了後のタップが拾われにくくなるのを防ぐ
-    try { clearWrapHold(); } catch (err) {}
+    clearWrapHold();
     shownValue = next;
     paint();
     if (commit && typeof onCommit === 'function') onCommit(next);
@@ -729,13 +721,11 @@ function createPersistentInlineEditor(opts){
     if (editor) return;
     originalValue = shownValue;
     if (typeof onOpen === 'function') onOpen();
-    const parentHit = wrap.parentElement;
-    if (parentHit) parentHit.classList.add('is-editing');
     if (editKey != null) editingId = editKey;
     input.value = clearOnFocus ? '' : String(shownValue ?? '');
     editor = input;
     guardBlur = true;
-    // focus はしない。長押し判定が先。editing クラス（テキスト非表示）は focusInput 側で付ける
+    // focus は pointerup 側。editing クラスは focusInput で付与
     setTimeout(()=>{ guardBlur = false; }, 350);
   };
 
@@ -992,22 +982,14 @@ function clampUseChunk(v){
   const n = Math.floor(Number(v) || 0);
   return Math.max(1, Math.min(100, n || 40));
 }
-// 使い切り後の残り（例: chunk=40 なら 220→20, 40→0, 39→39）
-function remainingAfterChunk(cur, chunk){
-  cur = Math.max(0, Math.floor(Number(cur) || 0));
-  const c = clampUseChunk(chunk);
-  return cur % c;
-}
-// mod: 220→20（Abyss等のまとめて使い切り）/ sub: 4→3（オーブの1個消費）
-// useChunk=1 の mod は常に0になるので、orb/sub は引き算にする
-function remainingAfter40(cur, it){
+// 使い切り後の残り。mod: 220→20 / sub（オーブ）: 4→3
+function remainingAfterUse(cur, it){
   cur = Math.max(0, Math.floor(Number(cur) || 0));
   const fallback = it && it.type === 'abyss' ? 40 : 1;
   const c = clampUseChunk(it && it.useChunk != null ? it.useChunk : fallback);
   if (it && (it.useMode === 'sub' || it.lockedMax)) return Math.max(0, cur - c);
   return cur % c;
 }
-// Dot Abyss 相当: 基礎240 + (ランク-1)×5（最大は計算のみ・手編集しない）
 function abyssBaseOf(it){
   return clampInt(it && it.abyssBase, 1, 9999, 240);
 }
@@ -1097,33 +1079,22 @@ function startTicking(force){
   if (!tickId && needsTicking()) scheduleTick(tickGen);
 }
 
-// 長押し削除は全カードで共通化。
-// 重要：pointerdown では通常のクリックを潰さない。短押しはブラウザ/既存の click 処理へ渡し、
-// 長押しだけ削除トーストを開いて直後の click を1回だけ抑止する。
-let suppressNextClick = false;
-let suppressClearTimer = null;
-
+// 長押し削除＋短押しアクション（使い切り・受取など）
 function bindLongPressDelete(el, id, shortAction){
-  const HOLD_MS = 520, MOVE_PX = 24; // 指の震え等で長押しが途中キャンセルされにくいよう少し広めに
+  const HOLD_MS = 520, MOVE_PX = 24;
   let timer = null, active = false, moved = false, longFired = false;
-  let sx = 0, sy = 0, pid = null, nameInput = null;
+  let sx = 0, sy = 0, pid = null;
 
   const isPrimary = e => e.isPrimary !== false && !(e.pointerType==='mouse' && e.button!==0);
   const clearSelection = ()=>{ try{ window.getSelection()?.removeAllRanges(); }catch(e){} };
-  const isGroupName = target => {
-    const n = target && target.closest ? target.closest('.group .name') : null;
-    return !!n && el.contains(n);
-  };
   const cleanup = ()=>{
     if (timer !== null){ clearTimeout(timer); timer = null; }
-    active = false; moved = false; longFired = false; pid = null; nameInput = null;
+    active = false; moved = false; longFired = false; pid = null;
   };
 
-  // 編集欄（数字・ランク・名前・編集中input）は長押し削除に入れない。
-  // ここに入ると「編集開始 → 直後に削除確認」が同時発火して壊れる。
+  // 現在値・ランク編集中は長押し削除／使い切りと分離
   const isEditTarget = (target)=>{
     if (!target || !target.closest) return false;
-    // 現在値・ランク編集だけ分離。最大は表示のみなので maxWrap は使い切りに通す
     return !!(
       target.closest('.inline-edit-input') ||
       target.closest('.rank-edit-input') ||
@@ -1135,13 +1106,11 @@ function bindLongPressDelete(el, id, shortAction){
 
   el.addEventListener('pointerdown', e=>{
     if (!isPrimary(e) || active) return;
-    // 編集欄上ではタイマーを張らない（編集専用。削除・40計算と分離）
     if (isEditTarget(e.target)) return;
     if (editingId != null) return;
 
     active = true; moved = false; longFired = false;
     sx = e.clientX; sy = e.clientY; pid = e.pointerId;
-    nameInput = null;
 
     timer = setTimeout(()=>{
       if (!active || moved) return;
@@ -1154,9 +1123,6 @@ function bindLongPressDelete(el, id, shortAction){
           ae.blur();
         }
       } catch (err) {}
-      suppressNextClick = true;
-      if (suppressClearTimer) clearTimeout(suppressClearTimer);
-      suppressClearTimer = setTimeout(()=>{ suppressNextClick=false; suppressClearTimer=null; }, 1000);
       askRemoveItem(id);
     }, HOLD_MS);
   }, {capture:true, passive:false});
@@ -1178,10 +1144,7 @@ function bindLongPressDelete(el, id, shortAction){
       e.preventDefault();
       e.stopPropagation();
     } else if (!wasMoved && typeof shortAction === 'function'){
-      // 編集欄上では shortAction（40計算・受取トグル等）を走らせない
-      if (!isEditTarget(e.target)){
-        shortAction(e);
-      }
+      if (!isEditTarget(e.target)) shortAction(e);
     }
     cleanup();
   }, {capture:true, passive:false});
@@ -1192,10 +1155,14 @@ function bindLongPressDelete(el, id, shortAction){
   }, {capture:true, passive:true});
 
   el.addEventListener('contextmenu', e=>{
-    if (isGroupName(e.target)){
+    if (targetInGroupName(e.target, el)){
       e.preventDefault(); e.stopPropagation(); clearSelection();
     }
   });
+}
+function targetInGroupName(target, el){
+  const n = target && target.closest ? target.closest('.group .name') : null;
+  return !!n && el.contains(n);
 }
 let toastTapDownHandler = null;
 let longPressTargetEl = null;
@@ -1358,7 +1325,7 @@ function askRemoveItem(id){
           if (isStam){
             delete it.useChunk;
             chunkEl.value = '';
-            if (pending40Id === it.id){ pending40Id = null; paintAbyssFortyPreview(it.id); }
+            if (pending40Id === it.id){ pending40Id = null; paintUseChunkPreview(it.id); }
           } else {
             it.useChunk = origChunk != null ? origChunk : 40;
             chunkEl.value = String(it.useChunk);
@@ -1366,7 +1333,7 @@ function askRemoveItem(id){
         } else {
           it.useChunk = clampUseChunk(raw);
           chunkEl.value = String(it.useChunk);
-          if (pending40Id === it.id) paintAbyssFortyPreview(it.id);
+          if (pending40Id === it.id) paintUseChunkPreview(it.id);
         }
         // カードの短押しバインドは再renderが必要なので、スタミナは軽く再構築
         if (isStam){ save(); render(); startTicking(true); }
@@ -1429,7 +1396,7 @@ function attachCurrentEditor(curWrap, it, extraCommit){
   const clearFortyPreview = ()=>{
     if (hasUseChunk(it) && pending40Id === it.id){
       pending40Id = null;
-      paintAbyssFortyPreview(it.id);
+      paintUseChunkPreview(it.id);
     }
   };
   const curEditor = createInlineNumber(stamInfo(it, Date.now()).cur, value => {
@@ -1456,20 +1423,20 @@ function onUseChunkTap(it, e){
   const info = stamInfo(it, now);
   if (pending40Id === it.id){
     preserveCycle(it, now);
-    it.current = remainingAfter40(info.cur, it);
+    it.current = remainingAfterUse(info.cur, it);
     freezeIfFull(it, now);
     pending40Id = null;
-    paintAbyssFortyPreview(it.id);
+    paintUseChunkPreview(it.id);
     startTicking(true);
     saveAfterPaint();
   } else {
     if (pending40Id && pending40Id !== it.id){
       const prev = pending40Id;
       pending40Id = null;
-      paintAbyssFortyPreview(prev);
+      paintUseChunkPreview(prev);
     }
     pending40Id = it.id;
-    paintAbyssFortyPreview(it.id);
+    paintUseChunkPreview(it.id);
   }
 }
 function buildStamCard(it){
@@ -1503,7 +1470,7 @@ function buildAbyssCard(it){
   const curEditor = attachCurrentEditor(curWrap, it, () => { pending40Id = null; });
   const rankEditor = createInlineRank(it.rank || 1,
     ()=>{
-      if (pending40Id === it.id){ pending40Id = null; paintAbyssFortyPreview(it.id); }
+      if (pending40Id === it.id){ pending40Id = null; paintUseChunkPreview(it.id); }
     },
     (next)=>{
       const now = Date.now();
@@ -1667,7 +1634,7 @@ document.addEventListener('pointerdown', (e) => {
     if (!r || !r.el.contains(e.target)){
       const id = pending40Id;
       pending40Id = null;
-      paintAbyssFortyPreview(id);
+      paintUseChunkPreview(id);
     }
   }
   if (addPanelEl.classList.contains('show') && !addPanelEl.contains(e.target) && e.target !== addBtnEl){
@@ -1729,7 +1696,6 @@ function renderClock(el, remainMs, isFull, now, fullAt){
 }
 
 
-// 40計算プレビュー/確定は当該Abyssカードだけ触る（全renderしない）
 function findItemById(id){
   for (const it of state.items){
     if (it.id === id) return it;
@@ -1740,8 +1706,7 @@ function findItemById(id){
   }
   return null;
 }
-// 40プレビューの見た目更新は updateTimerCard に任せる（重複ロジック削減）
-function paintAbyssFortyPreview(id){
+function paintUseChunkPreview(id){
   const it = findItemById(id);
   if (it && (it.type === 'abyss' || it.type === 'stam')) updateOneTimer(it);
 }
@@ -1804,7 +1769,7 @@ function updateTimerCard(it, r, now){
     r.el.classList.toggle('full', info.isFull);
     r.el.classList.toggle('claim', waitChunk);
     renderClock(r.clockEl, info.remainMs, info.isFull, now, info.fullAt);
-    if (r.curEl && !r.curEl.isEditing()) r.curEl.setText(waitChunk ? remainingAfter40(info.cur, it) : info.cur);
+    if (r.curEl && !r.curEl.isEditing()) r.curEl.setText(waitChunk ? remainingAfterUse(info.cur, it) : info.cur);
     if (r.maxLabel){
       const v = String(it.max);
       if (r.maxLabel.textContent !== v) r.maxLabel.textContent = v;
@@ -1823,7 +1788,7 @@ function updateTimerCard(it, r, now){
     r.el.classList.toggle('claim', wait40);
     renderClock(r.clockEl, info.remainMs, info.isFull, now, info.fullAt);
     if (r.rankEditor && !r.rankEditor.isEditing()) r.rankEditor.setRank(it.rank || 1);
-    if (r.curEl && !r.curEl.isEditing()) r.curEl.setText(wait40 ? remainingAfter40(info.cur, it) : info.cur);
+    if (r.curEl && !r.curEl.isEditing()) r.curEl.setText(wait40 ? remainingAfterUse(info.cur, it) : info.cur);
     if (r.maxLabel){
       const v = String(it.max);
       if (r.maxLabel.textContent !== v) r.maxLabel.textContent = v;
