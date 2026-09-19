@@ -94,8 +94,8 @@
   .timer-menu-tab{
     position:absolute;
     top:-13px;
-    right:6px;
-    width:28px;
+    right:12px;
+    width:22px;
     height:13px;
     box-sizing:border-box;
     padding:0;
@@ -290,28 +290,44 @@
     content:''; position:absolute; left:0; right:0; top:-10px; bottom:-10px;
   }
   #toast{
-    /* 画面中央（キーボードにも隠れにくい） */
+    /* 画面中央。中身は「設定欄→操作欄」の2段に固定して配置を崩さない。 */
     position:fixed; left:50%; top:50%; bottom:auto;
-    transform:translate(-50%, -50%); max-width:92%;
-    background:#1e1e2c; color:var(--text); border:1px solid var(--line);
-    border-radius:10px; padding:10px 14px; font-size:13px; z-index:30;
+    transform:translate(-50%, -50%); width:min(92vw, 360px); max-width:92%;
+    background:#26272d; color:var(--text); border:1px solid var(--line);
+    border-radius:10px; padding:12px; font-size:13px; z-index:30;
     display:none; box-shadow:0 8px 24px rgba(0,0,0,.35);
   }
-  #toast.show{display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:center;}
+  #toast.show{display:block;}
+  #toast .toast-fields{
+    display:grid; grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:7px; width:100%;
+  }
+  #toast .toast-field{
+    min-width:0; min-height:48px; padding:7px 8px;
+    display:flex; align-items:center; justify-content:space-between; gap:7px;
+    border:1px solid var(--line); border-radius:8px; background:var(--card2);
+  }
+  #toast .toast-field.wide{grid-column:1 / -1;}
+  #toast .toast-label{
+    min-width:0; color:var(--sub); font-size:11px; line-height:1.2;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
   #toast button{
     border:1px solid var(--line); background:var(--card2); color:var(--text);
-    border-radius:8px; padding:6px 10px; font-size:12px; font-weight:600;
+    border-radius:8px; padding:7px 10px; font-size:12px; font-weight:600;
   }
-  /* 削除・やめるは小さめ＆一段下（最大スタミナ編集の邪魔にしない） */
-  #toast button.ok,
-  #toast button[data-act="no"]{
-    padding:4px 8px; font-size:11px; font-weight:600;
-    margin-top:6px; opacity:.92;
+  #toast .toast-actions{
+    display:grid; grid-template-columns:1fr 1fr; gap:7px;
+    margin-top:9px; padding-top:9px; border-top:1px solid var(--line);
   }
+  #toast .toast-actions button{width:100%; min-height:34px;}
   #toast button.ok{background:var(--danger); border-color:transparent; color:#fff;}
   /* 1回目タップで破線（確定待ち）。2回目で実行 */
   #toast button.armed{outline:2px dashed #fff; outline-offset:2px;}
-  #toast .toast-color{display:inline-flex;align-items:center;gap:5px;color:var(--text);font-size:12px;}
+  #toast .toast-color{
+    display:flex; align-items:center; justify-content:space-between; gap:7px;
+    min-width:0; width:100%; height:100%; color:var(--text); font-size:12px;
+  }
   #toast .toast-color input[type="color"]{width:28px;height:24px;padding:1px;border:1px solid var(--line);border-radius:6px;background:transparent;}
   #toast .toast-color input[type="text"]{
     width:2.8em; height:28px; padding:2px 4px; border:1px solid var(--line); border-radius:6px;
@@ -1194,6 +1210,50 @@ function targetInGroupName(target, el){
   const n = target && target.closest ? target.closest('.group .name') : null;
   return !!n && el.contains(n);
 }
+
+// タイマーカード用の通常タップだけを処理。長押しでメニューは開かない。
+// メニューは右上の timer-menu-tab からのみ開く。
+function bindTimerShortAction(el, shortAction){
+  let active = false, moved = false, pid = null;
+  let sx = 0, sy = 0;
+  const MOVE_PX = 24;
+  const isPrimary = e => e.isPrimary !== false && !(e.pointerType==='mouse' && e.button!==0);
+  const isEditTarget = (target)=>{
+    if (!target || !target.closest) return false;
+    return !!(
+      target.closest('.inline-edit-input') ||
+      target.closest('.rank-edit-input') ||
+      target.closest('.rank-text') ||
+      target.closest('[data-role="curWrap"]') ||
+      target.closest('.rank') ||
+      target.closest('.timer-menu-tab')
+    );
+  };
+  const cleanup = ()=>{ active=false; moved=false; pid=null; };
+
+  el.addEventListener('pointerdown', e=>{
+    if (!isPrimary(e) || active || editingId != null || isEditTarget(e.target)) return;
+    active = true; moved = false; pid = e.pointerId;
+    sx = e.clientX; sy = e.clientY;
+  }, {capture:true, passive:true});
+
+  el.addEventListener('pointermove', e=>{
+    if (!active || e.pointerId !== pid) return;
+    if (Math.hypot(e.clientX-sx, e.clientY-sy) > MOVE_PX) moved = true;
+  }, {capture:true, passive:true});
+
+  el.addEventListener('pointerup', e=>{
+    if (!active || e.pointerId !== pid) return;
+    const shouldAct = !moved && !isEditTarget(e.target) && typeof shortAction === 'function';
+    cleanup();
+    if (shouldAct) shortAction(e);
+  }, {capture:true, passive:false});
+
+  el.addEventListener('pointercancel', e=>{
+    if (!active || e.pointerId !== pid) return;
+    cleanup();
+  }, {capture:true, passive:true});
+}
 let toastTapDownHandler = null;
 let longPressTargetEl = null;
 function clearLongPressTarget(){
@@ -1255,23 +1315,26 @@ function askRemoveItem(id){
   const chunkVal = isAbyss ? clampUseChunk(it.useChunk) : (isStam ? (it.useChunk != null ? clampUseChunk(it.useChunk) : '') : null);
   const showStamMax = isStam && !it.lockedMax;
   const abyssFormula = isAbyss
-    ? `<label class="toast-color">基礎<input type="text" inputmode="numeric" pattern="[0-9]*" value="${abyssBaseOf(it)}" maxlength="4" data-role="abyssBase" aria-label="基礎最大" style="width:3.2em;text-align:center;"></label>`
-      + `<label class="toast-color">+/Lv<input type="text" inputmode="numeric" pattern="[0-9]*" value="${abyssPerRankOf(it)}" maxlength="3" data-role="abyssPer" aria-label="ランクごとの増加" style="width:2.6em;text-align:center;"></label>`
+    ? `<label class="toast-color"><span class="toast-label">基礎</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${abyssBaseOf(it)}" maxlength="4" data-role="abyssBase" aria-label="基礎最大" style="width:3.2em;text-align:center;"></label>`
+      + `<label class="toast-color"><span class="toast-label">+/Lv</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${abyssPerRankOf(it)}" maxlength="3" data-role="abyssPer" aria-label="ランクごとの増加" style="width:2.6em;text-align:center;"></label>`
     : '';
   const stamMaxRow = showStamMax
-    ? `<label class="toast-color toast-max-row" style="flex:1 1 100%;justify-content:center;margin-top:2px;">最大スタミナ<input type="text" inputmode="numeric" pattern="[0-9]*" value="${it.max}" maxlength="3" data-role="stamMax" aria-label="最大スタミナ" style="width:3.2em;text-align:center;"></label>`
+    ? `<label class="toast-color toast-max-row"><span class="toast-label">最大スタミナ</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${it.max}" maxlength="3" data-role="stamMax" aria-label="最大スタミナ" style="width:3.2em;text-align:center;"></label>`
     : '';
-  const extra =
-    (colorDefault ? `<label class="toast-color">色<input type="color" value="${colorDefault}" aria-label="色"></label>` : '')
-    + abyssFormula
-    + (showChunk ? `<label class="toast-color">使い切り<input type="text" inputmode="numeric" pattern="[0-9]*" value="${chunkVal}" maxlength="3" data-role="useChunk" aria-label="使い切り数" placeholder="なし"></label>` : '')
-    + stamMaxRow
+  const fields =
+    (colorDefault ? `<label class="toast-field"><span class="toast-color"><span class="toast-label">色</span><input type="color" value="${colorDefault}" aria-label="色"></span></label>` : '')
+    + (abyssFormula ? `<div class="toast-field wide">${abyssFormula}</div>` : '')
+    + (showChunk ? `<label class="toast-field"><span class="toast-color"><span class="toast-label">使い切り</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${chunkVal}" maxlength="3" data-role="useChunk" aria-label="使い切り数" placeholder="なし"></span></label>` : '')
+    + (stamMaxRow ? `<div class="toast-field wide">${stamMaxRow}</div>` : '')
     + (canEditName ? `<button type="button" data-act="editName">${isHeader ? '見出し編集' : '名前編集'}</button>` : '')
     + (canAdd ? '<button type="button" data-act="add">タイマー追加</button>' : '');
+  const extra = fields ? `<div class="toast-fields">${fields}</div>` : '';
   showConfirmToast(
     extra
+    + `<div class="toast-actions">`
     + '<button type="button" class="ok" data-act="yes">削除</button>'
-    + '<button type="button" data-act="no">やめる</button>',
+    + '<button type="button" data-act="no">やめる</button>'
+    + '</div>',
     (act)=>{
       if (act === 'yes') removeItem(id);
       else if (act === 'add') openAddPanel({ groupId: id });
@@ -1502,7 +1565,7 @@ function buildStamCard(it){
   refs[it.id] = { el: wrap, curEl: curEditor, maxLabel: maxWrap,
     clockEl: wrap.querySelector('[data-role="clock"]') };
   // 使い切り設定があるときだけカード短押しでプレビュー/確定（Abyssと共通）
-  bindLongPressDelete(wrap, it.id, hasUseChunk(it) ? (e) => onUseChunkTap(it, e) : null);
+  bindTimerShortAction(wrap, hasUseChunk(it) ? (e) => onUseChunkTap(it, e) : null);
   return wrap;
 }
 
@@ -1542,7 +1605,7 @@ function buildAbyssCard(it){
   curEditor.setText(info0.cur);
   maxLabel.textContent = String(it.max);
   refs[it.id] = { el: wrap, rankEditor, curEl: curEditor, maxLabel, clockEl };
-  bindLongPressDelete(wrap, it.id, (e) => onUseChunkTap(it, e));
+  bindTimerShortAction(wrap, (e) => onUseChunkTap(it, e));
   return wrap;
 }
 
@@ -1556,7 +1619,7 @@ function buildIdleCard(it){
   refs[it.id] = { el: wrap,
     curEl: wrap.querySelector('[data-role="cur"]'), clockEl: wrap.querySelector('[data-role="clock"]') };
   // 受取トグルは短押し(pointerup)。pointerdown にすると長押し削除と同時発火する。
-  bindLongPressDelete(wrap, it.id, ()=>toggleIdle(it));
+  bindTimerShortAction(wrap, ()=>toggleIdle(it));
   return wrap;
 }
 
