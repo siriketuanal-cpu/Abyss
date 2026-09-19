@@ -327,6 +327,7 @@
     background:var(--card2); color:var(--text) !important; font-size:13px; font-weight:700;
     text-align:center; caret-color:var(--text); -webkit-text-fill-color:var(--text);
   }
+  #toast .toast-hm{display:flex; align-items:center; gap:3px; color:var(--sub); font-size:11px;}
   #empty{color:var(--sub); font-size:13px; text-align:center; padding:40px 0;}
   #addPanel{
     position:fixed; left:0; right:0; bottom:0; background:var(--card);
@@ -1254,6 +1255,7 @@ function askRemoveItem(id){
   const isGroup = it && it.type === 'group';
   const isRule = it && it.type === 'rule';
   const isStam = it && it.type === 'stam';
+  const isIdle = it && it.type === 'idle';
   const canEditName = isHeader || isGroup;
   const colorDefault = isHeader ? (it.color || '#9b8bff') : (isRule ? (it.color || '#52617a') : null);
   // スタミナは設定済み or 後から付けられるよう空欄でも出す
@@ -1269,7 +1271,8 @@ function askRemoveItem(id){
     + (stamMaxRow ? `<label class="toast-field">${stamMaxRow}</label>` : '')
     + (canEditName ? `<button type="button" data-act="editName">${isHeader ? '見出し編集' : '名前編集'}</button>` : '')
     + (canAdd ? '<button type="button" data-act="add">タイマー追加</button>' : '')
-    + (canAddAccountBelowHeader ? '<button type="button" data-act="addAccountBelow">アカウント追加</button>' : '');
+    + (canAddAccountBelowHeader ? '<button type="button" data-act="addAccountBelow">アカウント追加</button>' : '')
+    + (isIdle ? idleToastRowsHtml(it) : '');   // 放置：設定時間／残り時間の入力行
   const extra = fields ? `<div class="toast-fields">${fields}</div>` : '';
   showConfirmToast(
     extra
@@ -1388,7 +1391,79 @@ function askRemoveItem(id){
       maxEl.addEventListener('pointerdown', e=>e.stopPropagation());
     }
   }
+  if (isIdle) bindIdleToastRows(it);
 }
+
+/* ═══════════ 放置トースト：設定時間／残り時間（ここから）═══════════
+   ・設定 …… 設置時と同じ h / m。変えても開始時刻は据え置き（経過時間はそのまま）。
+   ・残り …… 今の残り時間を h / m で手合わせ。上限は設定時間。開始時刻を逆算して合わせる。
+   ・リスナーはトーストを開いた時に入力欄の親へ1回だけ付ける（常駐なし・測定なし）。
+   取り外し：このブロック／askRemoveItem 内の idleToastRowsHtml 行と bindIdleToastRows 行／
+             CSS の .toast-hm を削除。
+   ═══════════════════════════════════════════════════ */
+function idleHm(min){
+  min = Math.max(0, Math.floor(min));
+  return [Math.floor(min / 60), min % 60];
+}
+function idleToastRowsHtml(it){
+  const [dh, dm] = idleHm(it.durationMin);
+  const [rh, rm] = idleHm(Math.ceil(idleInfo(it, Date.now()).remainMs / 60000));
+  const row = (key, label, h, m) =>
+    `<div class="toast-field wide"><span class="toast-color"><span class="toast-label">${label}</span><span class="toast-hm">`
+    + `<input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" value="${h}" data-idle="${key}H" aria-label="${label}(時間)"><span>h</span>`
+    + `<input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="${m}" data-idle="${key}M" aria-label="${label}(分)"><span>m</span>`
+    + `</span></span></div>`;
+  return row('dur', '設定', dh, dm) + row('rem', '残り', rh, rm);
+}
+function bindIdleToastRows(it){
+  const box = toastEl && toastEl.querySelector('.toast-fields');
+  if (!box) return;
+  const dirty = { dur:false, rem:false };
+  const q = k => box.querySelector(`[data-idle="${k}"]`);
+  const rowOf = el => (el && el.dataset && el.dataset.idle) ? el.dataset.idle.slice(0, 3) : null;
+  const read = (hk, mk) => clampInt(q(hk).value, 0, 999, 0) * 60 + clampInt(q(mk).value, 0, 59, 0);
+  // 確定後の実際の値を表示へ戻す（上限で丸められた時などもここで揃う）
+  const sync = ()=>{
+    const [dh, dm] = idleHm(it.durationMin);
+    const [rh, rm] = idleHm(Math.ceil(idleInfo(it, Date.now()).remainMs / 60000));
+    for (const [k, v] of [['durH', dh], ['durM', dm], ['remH', rh], ['remM', rm]]){
+      const el = q(k);
+      if (el){ el.value = String(v); el.defaultValue = String(v); }
+    }
+  };
+  const commit = row => {
+    const now = Date.now();
+    if (row === 'dur'){
+      const total = Math.max(1, read('durH', 'durM'));
+      if (total === it.durationMin) return;
+      it.durationMin = total;
+    } else {
+      const durMs = Math.max(1, it.durationMin) * 60000;
+      const remainMs = Math.min(durMs, read('remH', 'remM') * 60000);
+      it.start = now - (durMs - remainMs);
+      // 手動で合わせたら「受取」待ちは解除して通常カウントに戻す
+      if (it.state === 'claim'){ it.state = 'running'; if (claimId === it.id) claimId = null; }
+    }
+    updateOneTimer(it);
+    startTicking(true);
+    save();
+  };
+  // 外側（受取キャンセル等）へ届かせない。既存の入力欄と同じ扱い。
+  box.addEventListener('pointerdown', e=>e.stopPropagation());
+  box.addEventListener('focusin', e=>{ if (rowOf(e.target)) e.target.value = ''; });
+  box.addEventListener('input', e=>{ const r = rowOf(e.target); if (r) dirty[r] = true; });
+  box.addEventListener('focusout', e=>{
+    const t = e.target, row = rowOf(t);
+    if (!row) return;
+    if (t.value.trim() === '') t.value = t.defaultValue;      // 空のまま離れたら元に戻す
+    if (rowOf(e.relatedTarget) === row) return;              // 同じ行の h⇄m 移動中は確定しない
+    if (dirty[row]){ dirty[row] = false; commit(row); sync(); }
+  });
+  box.addEventListener('keydown', e=>{
+    if (e.key === 'Enter' && rowOf(e.target)){ e.preventDefault(); e.target.blur(); }
+  });
+}
+/* ═══════════ 放置トースト：設定時間／残り時間（ここまで）═══════════ */
 // カード外枠の共通生成（stam / idle）
 function makeCardEl(type, id, innerHtml){
   const wrap = document.createElement('div');
