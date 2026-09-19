@@ -253,7 +253,6 @@
     touch-action:pan-y; -webkit-touch-callout:none;
   }
   .divider .name{
-    touch-action:none;
     -webkit-user-select:none; user-select:none;
     width:65%; max-width:260px; flex:0 1 auto; font-size:13px; font-weight:700; color:var(--accent);
     padding:0; line-height:1.25; min-height:0;
@@ -1093,8 +1092,7 @@ function bindLongPressDelete(el, id, shortAction){
       target.closest('.rank-text') ||
       target.closest('[data-role="curWrap"]') ||
       target.closest('.rank') ||
-      target.closest('.timer-menu-tab') ||
-      target.closest('.header-menu-button')
+      target.closest('.timer-menu-tab')
     );
   };
 
@@ -1174,8 +1172,7 @@ function bindTimerShortAction(el, shortAction){
       target.closest('.rank-text') ||
       target.closest('[data-role="curWrap"]') ||
       target.closest('.rank') ||
-      target.closest('.timer-menu-tab') ||
-      target.closest('.header-menu-button')
+      target.closest('.timer-menu-tab')
     );
   };
   const cleanup = ()=>{ active=false; moved=false; pid=null; };
@@ -1616,8 +1613,7 @@ function buildHeaderCard(it){
   menuBtn.textContent = '';
   wrap.appendChild(menuBtn);   // イベントは #cards の委譲側で処理
   refs[it.id] = { el: wrap, nameEl: nameEditor.wrap, nameEditor, menuBtn };
-  // 既存のヘッダー長押しは残す。丸型ボタンだけは別経路でトーストを開く。
-  bindLongPressDelete(wrap, it.id);
+  // 見出し本体の長押しは無し。メニュー（編集・色・削除など）は丸ボタンからのみ開く。
   return wrap;
 }
 
