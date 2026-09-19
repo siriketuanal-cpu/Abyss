@@ -127,18 +127,14 @@
   .timer-menu-tab{
     position:absolute; top:-15px; right:6px; z-index:6;
     width:26px; height:14px; padding:0; margin:0;
-    border:1px solid currentColor; border-bottom:0; border-radius:3px 3px 0 0;
-    display:flex; align-items:center; justify-content:center;
-    background:currentColor; color:#5aa9ff;
-    font-size:0; line-height:1;
+    border:2px solid currentColor; border-bottom:0; border-radius:3px 3px 0 0;
+    display:block;
+    background:transparent; color:#5aa9ff;
+    font-size:0; line-height:0;
     touch-action:manipulation; -webkit-tap-highlight-color:transparent;
     box-sizing:border-box;
   }
   .card.idle .timer-menu-tab{color:#f0a85a;}
-  .timer-menu-tab::after{
-    content:'⋮'; color:#11131a; font-size:12px; line-height:1; font-weight:900;
-    transform:translateY(-.5px);
-  }
   .timer-menu-tab:active{filter:brightness(1.08);}
   .name{
     width:100%; background:transparent; border:none; color:var(--text);
@@ -1342,9 +1338,33 @@ function attachCurrentEditor(curWrap, it, extraCommit){
   curWrap.appendChild(curEditor.wrap);
   return curEditor;
 }
+function onUseChunkTap(it, e){
+  if (e){ e.stopPropagation(); e.preventDefault(); }
+  if (!hasUseChunk(it)) return;
+  const now = Date.now();
+  const info = stamInfo(it, now);
+  if (pending40Id === it.id){
+    preserveCycle(it, now);
+    it.current = remainingAfterUse(info.cur, it);
+    freezeIfFull(it, now);
+    pending40Id = null;
+    paintUseChunkPreview(it.id);
+    startTicking(true);
+    saveAfterPaint();
+  } else {
+    if (pending40Id && pending40Id !== it.id){
+      const prev = pending40Id;
+      pending40Id = null;
+      paintUseChunkPreview(prev);
+    }
+    pending40Id = it.id;
+    paintUseChunkPreview(it.id);
+  }
+}
+
 function buildStamCard(it){
   const wrap = makeCardEl('stam', it.id, `
-    <button type="button" class="timer-menu-tab" data-role="timerMenu" aria-label="タイマーメニュー">⋮</button>
+    <button type="button" class="timer-menu-tab" data-role="timerMenu" aria-label="タイマーメニュー"></button>
     <div class="clockstack stam-clock" data-role="clock"></div>
     ${valrowStamHtml()}
   `);
@@ -1369,7 +1389,7 @@ function buildStamCard(it){
 
 function buildIdleCard(it){
   const wrap = makeCardEl('idle', it.id, `
-    <button type="button" class="timer-menu-tab" data-role="timerMenu" aria-label="タイマーメニュー">⋮</button>
+    <button type="button" class="timer-menu-tab" data-role="timerMenu" aria-label="タイマーメニュー"></button>
     <div class="clockstack idle-clock" data-role="clock"></div>
     <div class="row valrow-idle">
       <div class="main" data-role="cur"></div>
