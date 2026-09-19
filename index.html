@@ -237,10 +237,6 @@
   .card.idle > .idle-clock{
     position:absolute; right:6px; left:auto; top:0; margin:0; transform:none; height:18px; line-height:18px;
   }
-    margin:0; min-width:0; flex-direction:row; align-items:center; justify-content:flex-start;
-    gap:0; font-size:9.5px; line-height:18px; letter-spacing:.01em; transform:none;
-    position:absolute; right:6px; left:auto; top:0; height:18px;
-  }
   /* 放置タイマー本体も下段中央。予定時刻だけ左上へ配置。 */
   .valrow-idle{
     margin-top:0 !important; align-items:center; min-height:22px; height:22px;
@@ -1256,8 +1252,8 @@ function askRemoveItem(id){
   const it = findItemById(id);
   if (!toastEl){ removeItem(id); return; }
   const canAdd = it && it.type === 'group' && it.children.length < 2;
-  const canAddAccountBelowHeader = isHeader;
   const isHeader = it && it.type === 'header';
+  const canAddAccountBelowHeader = isHeader;
   const isGroup = it && it.type === 'group';
   const isRule = it && it.type === 'rule';
   const isStam = it && it.type === 'stam';
@@ -1403,13 +1399,12 @@ function makeCardEl(type, id, innerHtml){
   wrap.dataset.id = id;
   wrap.innerHTML = innerHtml;
 
-  // 付箋型メニューボタン自体は各カードへ置くが、イベントは共通の親で委譲する。
+  // 付箋型メニューボタンは各カードへ置くだけ。イベントは #cards で1回だけ委譲（bindMenuButtonDelegation）。
   const tab = document.createElement('button');
   tab.type = 'button';
   tab.className = 'timer-menu-tab';
   tab.setAttribute('aria-label', 'タイマーメニュー');
   tab.title = 'タイマーメニュー';
-  bindTimerMenuButton(tab, id);
   wrap.appendChild(tab);
   return wrap;
 }
@@ -1569,49 +1564,39 @@ function buildRuleCard(it){
   bindLongPressDelete(wrap, it.id);
   return wrap;
 }
-function bindTimerMenuButton(tab, id){
-  if (!tab || tab.dataset.menuBound) return;
-  tab.dataset.menuBound = '1';
+// ── メニューボタン（タイマーの付箋タブ／見出しの丸ボタン）のイベント委譲 ──
+// ボタン個別にはリスナーを付けず、#cards で pointerdown / pointerup / click を1回だけ受ける。
+// ・capture で先に受けて stopPropagation するので、カード側の長押し・短押し処理とは競合しない
+//   （従来と同じく、ボタン上の操作はカード側に届かない）。
+// ・対象のIDは、ボタンが属する要素(タイマーカード or 見出し)の data-id から引く。
+// ・ボタンを増やす時は class を付けて MENU_BTN_SEL に足すだけ。個別の bind は不要。
+const MENU_BTN_SEL = '.timer-menu-tab, .header-menu-button';
+function bindMenuButtonDelegation(){
+  if (!cardsEl) return;
   const isPrimary = e => e.isPrimary !== false && !(e.pointerType === 'mouse' && e.button !== 0);
-  tab.addEventListener('pointerdown', e=>{
-    if (!isPrimary(e)) return;
+  const menuBtnOf = e => (e.target && e.target.closest) ? e.target.closest(MENU_BTN_SEL) : null;
+  cardsEl.addEventListener('pointerdown', e=>{
+    if (!menuBtnOf(e) || !isPrimary(e)) return;
     e.preventDefault();
     e.stopPropagation();
-  }, {capture:false, passive:false});
-  tab.addEventListener('pointerup', e=>{
-    if (!isPrimary(e)) return;
-    e.preventDefault();
-    e.stopPropagation();
-    tab.blur();
-    setTimeout(()=>askRemoveItem(id), 0);
-  }, {capture:false, passive:false});
-  tab.addEventListener('click', e=>{
-    e.preventDefault();
-    e.stopPropagation();
-  }, {capture:false, passive:false});
-}
-
-function bindHeaderMenuButton(btn, id){
-  if (!btn || btn.dataset.menuBound) return;
-  btn.dataset.menuBound = '1';
-  const isPrimary = e => e.isPrimary !== false && !(e.pointerType === 'mouse' && e.button !== 0);
-  btn.addEventListener('pointerdown', e=>{
-    if (!isPrimary(e)) return;
-    e.preventDefault();
-    e.stopPropagation();
-  }, {capture:false, passive:false});
-  btn.addEventListener('pointerup', e=>{
-    if (!isPrimary(e)) return;
+  }, {capture:true, passive:false});
+  cardsEl.addEventListener('pointerup', e=>{
+    const btn = menuBtnOf(e);
+    if (!btn || !isPrimary(e)) return;
     e.preventDefault();
     e.stopPropagation();
     btn.blur();
-    setTimeout(()=>askRemoveItem(id), 0);
-  }, {capture:false, passive:false});
-  btn.addEventListener('click', e=>{
+    const host = btn.closest('[data-id]');
+    const id = host ? host.dataset.id : null;
+    if (id != null) setTimeout(()=>askRemoveItem(id), 0);
+  }, {capture:true, passive:false});
+  cardsEl.addEventListener('click', e=>{
+    if (!menuBtnOf(e)) return;
     e.preventDefault();
     e.stopPropagation();
-  }, {capture:false, passive:false});
+  }, {capture:true, passive:false});
 }
+bindMenuButtonDelegation();
 
 function buildHeaderCard(it){
   const wrap = document.createElement('div');
@@ -1629,8 +1614,7 @@ function buildHeaderCard(it){
   menuBtn.title = '見出しメニュー';
   menuBtn.style.setProperty('--header-color', it.color || '#9b8bff');
   menuBtn.textContent = '';
-  bindHeaderMenuButton(menuBtn, it.id);
-  wrap.appendChild(menuBtn);
+  wrap.appendChild(menuBtn);   // イベントは #cards の委譲側で処理
   refs[it.id] = { el: wrap, nameEl: nameEditor.wrap, nameEditor, menuBtn };
   // 既存のヘッダー長押しは残す。丸型ボタンだけは別経路でトーストを開く。
   bindLongPressDelete(wrap, it.id);
@@ -2044,6 +2028,96 @@ document.addEventListener('pointerdown', (e)=>{
     try { window.getSelection()?.removeAllRanges(); } catch (err) {}
   }
 }, true);
+
+/* ═══════════════ 機種差フィット（ここから）═══════════════
+   目的：端末ごとのフォント・画面幅の違いで、スタミナの数字が枠からあふれる
+         場合「だけ」文字サイズを縮めて枠内に収める。
+   方針：枠・「/」・カードの位置や大きさ、タップ判定には一切触れない。
+         枠に収まる端末では何もしない（font-size を上書きしない＝従来のまま）。
+   測定：実行中にレイアウトを測り直さない。
+         ・数字1桁ぶんの幅は、起動後に1回だけ測って固定する（フォントは途中で変わらないため）
+         ・枠の幅は ResizeObserver の通知をもらう（強制レイアウトなし・幅が変わった時だけ）
+         ・あとは「桁数 × 数字幅」の計算だけで決める（毎分の更新でも測定しない）
+   取り外し：このブロック（ここから〜ここまで）を丸ごと削除するだけ。他の箇所は無改造。
+   ═══════════════════════════════════════════════════ */
+(function(){
+  if (typeof ResizeObserver === 'undefined') return;   // 非対応環境では何もしない（従来どおり）
+
+  const MIN_FONT  = 11;    // これより小さくはしない(px)
+  const SAFETY    = 0.98;  // 収まりぎりぎりを避ける余裕
+  const TOLERANCE = 0.5;   // この程度(px)のはみ出しは無視（元の表示を優先）
+
+  let digitEm  = 0;        // 数字1桁の最大幅（em換算）。1回測ったら固定
+  let baseFont = 18;       // 元のフォントサイズ(px)。CSS の値を1回だけ読んで固定
+
+  // 実際の数字と同じフォントで、0〜9のうち一番広い数字の幅を1回だけ測る
+  function calibrate(slot){
+    const cs = getComputedStyle(slot);
+    baseFont = parseFloat(cs.fontSize) || 18;
+    const probe = document.createElement('span');
+    probe.textContent = '0123456789';
+    probe.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden;white-space:nowrap;line-height:1;font-size:100px;font-variant-numeric:tabular-nums;';
+    probe.style.fontFamily = cs.fontFamily;
+    probe.style.fontWeight = cs.fontWeight;
+    document.body.appendChild(probe);
+    const node = probe.firstChild, rg = document.createRange();
+    let w = 0;
+    for (let i = 0; i < 10; i++){
+      rg.setStart(node, i); rg.setEnd(node, i + 1);
+      w = Math.max(w, rg.getBoundingClientRect().width);
+    }
+    probe.remove();
+    digitEm = w / 100;
+  }
+
+  // 桁数と枠幅から文字サイズを決めて反映（測定なし・計算のみ）
+  function apply(card){
+    const slotW = card._slotW;
+    if (!slotW) return;
+    const cur = card.querySelector('.stamval');
+    const max = card.querySelector('.stammax');
+    const curText = cur && cur.querySelector('.inline-number-text');
+    if (!cur || !max || !curText) return;
+    if (!digitEm){ calibrate(cur); if (!digitEm) return; }
+
+    const lc = curText.textContent.length, lm = max.textContent.length;
+    const key = slotW + '|' + lc + '|' + lm;
+    if (card._fitKey === key) return;      // 桁数も枠幅も同じなら何もしない
+    card._fitKey = key;
+
+    const need = Math.max(lc, lm) * digitEm * baseFont;   // 文字サイズ据え置き時に必要な幅
+    let px = '';                                          // '' ＝ 上書きなし（元のまま）
+    if (need > slotW + TOLERANCE){
+      px = Math.max(MIN_FONT, Math.floor(baseFont * (slotW / need) * SAFETY * 10) / 10) + 'px';
+    }
+    if (cur.style.fontSize !== px){ cur.style.fontSize = px; max.style.fontSize = px; }
+  }
+
+  // 枠（現在値スロット）の幅が変わった時だけブラウザから通知が来る
+  const ro = new ResizeObserver(entries => {
+    for (const e of entries){
+      const card = e.target.closest && e.target.closest('.card');
+      if (!card) continue;
+      card._slotW = e.contentRect.width;
+      apply(card);
+    }
+  });
+
+  // updateTimerCard の後ろに乗せる（本体は無改造）。対象はスタミナカードのみ。
+  const seen = new WeakSet();
+  const orig = updateTimerCard;
+  updateTimerCard = function(it, r, now){
+    orig(it, r, now);
+    if (!it || !r || it.type !== 'stam' || !r.el) return;
+    const card = r.el;
+    if (!seen.has(card)){
+      const slot = card.querySelector('.stamval');
+      if (slot){ seen.add(card); ro.observe(slot); }
+    }
+    apply(card);
+  };
+})();
+/* ═══════════════ 機種差フィット（ここまで）═══════════════ */
 
 render();
 startTicking(true);
