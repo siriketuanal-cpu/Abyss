@@ -130,28 +130,22 @@
   .row + .row{margin-top:3px;}
   .namerow{margin-bottom:4px;}
   /* タイマーカードは種類に関係なく同じ外寸に揃える。中身だけ配置を変える。 */
-  .card.stam, .card.abyss, .card.idle{height:56px; min-height:56px;} 
-  .card.abyss{border:1px solid #b48cff; padding:6px 6px;}
+  .card.stam, .card.idle{height:56px; min-height:56px;}
   /* claim / full は種類別 border より後に書き、特異性を上げて破線・色が消えないようにする。
-     （.card.abyss の border 短縮記法が後勝ちで破線を潰していた） */
+     （種類別のborderより後に共通状態を適用） */
   .card.claim,
   .card.stam.claim,
-  .card.abyss.claim,
   .card.idle.claim{
     border-style:dashed !important;
     border-color:var(--ok) !important;
   }
   .card.full,
   .card.stam.full,
-  .card.abyss.full,
   .card.idle.full{
     border-color:var(--orange) !important;
   }
-  /* Abyss／スタミナ・オーブ：最大・時計はヒット透過。入力欄以外で使い切り。 */
-  .card.abyss .clockstack, .card.abyss .stammax, .card.abyss .slash,
+  /* スタミナ：最大・時計はヒット透過。入力欄以外で使い切り。 */
   .card.stam .clockstack, .card.stam .stammax, .card.stam .slash{pointer-events:none;}
-  .card.abyss .abyss-head{justify-content:space-between; min-height:18px; height:18px; margin-bottom:2px; position:static;}
-  .card.abyss .rank{position:absolute; top:0; left:6px; right:auto; width:4.5em; max-width:none; text-align:left;}
   .card.stam, .card.idle{
     padding:6px; display:flex; flex-direction:column; justify-content:center;
   }
@@ -159,7 +153,7 @@
     width:100%; background:transparent; border:none; color:var(--text);
     font-size:11px; font-weight:600; padding:2px 0; min-width:0;
   }
-  /* ランク：普段は span、編集時だけ input（名前と同じ方式） */
+  /* ランク：普段は span、編集時だけ input（現在は見出し系で使用） */
   .rank{
     position:absolute; top:2px; right:2px; width:4.5em; max-width:45%;
     height:18px; line-height:18px; min-height:0; max-height:18px;
@@ -203,7 +197,6 @@
   .group-body:empty{display:none;}
   .group-empty-slot{height:56px; min-height:56px; box-sizing:border-box; border:1px dashed var(--line); border-radius:10px; display:flex; align-items:center; justify-content:center; background:var(--card); touch-action:pan-y; -webkit-tap-highlight-color:transparent;}
   .group-empty-add{border:0; background:transparent; color:var(--muted); font-size:22px; line-height:1; width:100%; height:100%; padding:0; touch-action:pan-y; -webkit-tap-highlight-color:transparent;}
-  /* Abyss「40使い切り」プレビュー中：押した所が分かるよう点線で囲む */
   .main{font-size:16px; line-height:1.1; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:.01em;}
   /* 左右を均等フレックスにし「/」を中央固定。桁数が変わってもスラッシュは動かない。 */
   .valrow-stam{
@@ -241,18 +234,11 @@
   [data-role="curWrap"].near,
   [data-role="curWrap"].near .inline-number-text{color:var(--danger) !important;}
   .main.near{color:var(--danger) !important;}
-  /* 予定時刻は全タイマーカードで右上に統一。Abyssと同じ基準位置に揃える。 */
+  /* 予定時刻はタイマーカードで右上に統一。 */
   .card.stam > .stam-clock,
   .card.idle > .idle-clock{
     position:absolute; right:6px; left:auto; top:0; margin:0; transform:none; height:18px; line-height:18px;
   }
-  /* Abyssも右上。ランクは左上、数値は下段中央。 */
-  .card.abyss .abyss-clock{
-    margin:0; min-width:0; flex-direction:row; align-items:center; justify-content:flex-start;
-    gap:0; font-size:9.5px; line-height:18px; letter-spacing:.01em; transform:none;
-    position:absolute; right:6px; left:auto; top:0; height:18px;
-  }
-  .card.abyss .valrow-stam{bottom:5px;}
   /* 放置タイマー本体も下段中央。予定時刻だけ左上へ配置。 */
   .valrow-idle{
     margin-top:0 !important; align-items:center; min-height:22px; height:22px;
@@ -357,16 +343,12 @@
   }
   #setupPanel.show{display:flex;}
   #setupPanel .setupLabel{font-size:13px; color:var(--sub); text-align:center;}
-  #setupFields{display:flex; flex-direction:column; align-items:stretch; gap:8px; width:100%;}
-  #setupFields .setup-row{display:flex; align-items:center; justify-content:center; gap:7px; min-height:38px;}
-  #setupFields .setup-row.dual{justify-content:space-between; gap:8px;}
-  #setupFields .setup-item{display:flex; align-items:center; justify-content:center; gap:6px; flex:1; min-width:0;}
+  #setupFields{display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:6px;}
   #setupFields input{
-    width:60px; box-sizing:border-box; background:var(--card2); border:1px solid var(--line); border-radius:8px;
+    width:60px; background:var(--card2); border:1px solid var(--line); border-radius:8px;
     color:var(--text); font-size:16px; text-align:center; padding:8px 4px;
   }
-  #setupFields span{color:var(--sub); font-size:13px; white-space:nowrap;}
-  #setupFields .setup-item > span:first-child{color:var(--text); font-weight:600;}
+  #setupFields span{color:var(--sub); font-size:13px;}
   #setupActions{display:flex; gap:8px;}
   #setupActions button{
     flex:1; padding:12px; border-radius:10px; border:1px solid var(--line);
@@ -557,25 +539,14 @@ function normalizeIdleClaim(it){
   // 再起動後も「受取」のまま固まる。読み込み時は必ず running に戻す。
   if (it && it.type === 'idle' && it.state === 'claim') it.state = 'running';
 }
-function normalizeAbyssItem(it){
-  if (!it || it.type !== 'abyss') return;
-  if (!it.rank) it.rank = 1;
-  if (it.abyssBase == null) it.abyssBase = 240;
-  if (it.abyssPerRank == null) it.abyssPerRank = 5;
-  // max はランク＋可変係数から再計算（旧データの手編集maxは捨てる）
-  it.max = abyssMaxFor(it.rank, it);
-  if (it.useChunk == null) it.useChunk = 40;
-  else it.useChunk = clampUseChunk(it.useChunk);
-  if (it.current > it.max) it.current = it.max;
-}
 function load(){
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw){
       const data = JSON.parse(raw);
       if (data && Array.isArray(data.items)){
-        // Abyssタイマー本体だけを読み込み対象から外す。
-        // 40使い切り計算の共通処理は残し、スタミナ／オーブ側では引き続き使用する。
+        // 旧版に残っているAbyssタイマー本体だけを読み込み対象から外す。
+        // 40使い切り計算はスタミナ／オーブ側の共通処理として残す。
         data.items = data.items.filter(it => it && it.type !== 'abyss');
         data.items.forEach(it=>{
           if (!it) return;
@@ -946,7 +917,7 @@ function newStamItem(intervalMin, max, useChunk){
     intervalMin: clampInt(intervalMin, 1, 99999, 5),
     start: Date.now()
   };
-  // useChunk あり → カード短押しで使い切りプレビュー/確定（Abyssと同系統）
+  // useChunk あり → カード短押しで使い切りプレビュー/確定
   if (useChunk != null && Number(useChunk) > 0) item.useChunk = clampUseChunk(useChunk);
   return item;
 }
@@ -957,21 +928,8 @@ function newOrbItem(intervalMin, max){
   item.useMode = 'sub';   // 1タップで1個減らす（modだと %1 で常に0になる）
   return item;
 }
-function newAbyssItem(intervalMin, useChunk){
-  // Dot Abyss 風: 最大はランク連動（基礎・+/Lvはトーストで変更可）。カードタップで useChunk 使い切り。
-  const rank = 1;
-  const item = {
-    id: uid(), type:'abyss', name:'', rank,
-    abyssBase: 240, abyssPerRank: 5,
-    current:0, max: 0,
-    intervalMin, useChunk: clampUseChunk(useChunk != null ? useChunk : 40),
-    start: Date.now()
-  };
-  item.max = abyssMaxFor(rank, item);
-  return item;
-}
 function hasUseChunk(it){
-  return !!(it && (it.type === 'abyss' || it.type === 'stam') && it.useChunk != null && Number(it.useChunk) > 0);
+  return !!(it && it.type === 'stam' && it.useChunk != null && Number(it.useChunk) > 0);
 }
 function newIdleItem(durationMin){
   return { id: uid(), type:'idle', name:'', durationMin, state:'running', start: Date.now() };
@@ -1034,29 +992,10 @@ function clampUseChunk(v){
 // 使い切り後の残り。mod: 220→20 / sub（オーブ）: 4→3
 function remainingAfterUse(cur, it){
   cur = Math.max(0, Math.floor(Number(cur) || 0));
-  const fallback = it && it.type === 'abyss' ? 40 : 1;
+  const fallback = 1;
   const c = clampUseChunk(it && it.useChunk != null ? it.useChunk : fallback);
   if (it && (it.useMode === 'sub' || it.lockedMax)) return Math.max(0, cur - c);
   return cur % c;
-}
-function abyssBaseOf(it){
-  return clampInt(it && it.abyssBase, 1, 9999, 240);
-}
-function abyssPerRankOf(it){
-  return clampInt(it && it.abyssPerRank, 0, 999, 5);
-}
-function abyssMaxFor(rank, it){
-  const r = Math.max(1, Math.min(200, Math.floor(Number(rank) || 1)));
-  return abyssBaseOf(it) + (r - 1) * abyssPerRankOf(it);
-}
-function syncAbyssMax(it){
-  it.rank = Math.max(1, Math.min(200, Math.floor(Number(it.rank) || 1)));
-  if (it.abyssBase == null) it.abyssBase = 240;
-  if (it.abyssPerRank == null) it.abyssPerRank = 5;
-  it.max = abyssMaxFor(it.rank, it);
-  if (it.useChunk == null) it.useChunk = 40;
-  else it.useChunk = clampUseChunk(it.useChunk);
-  if (it.current > it.max) it.current = it.max;
 }
 function preserveCycle(it, now){
   const intervalMs = Math.max(1, it.intervalMin) * 60000;
@@ -1086,7 +1025,7 @@ function setNearOnCurrent(editor, near){
 }
 
 function timerNeedsTick(it, now){
-  if (it.type==='stam' || it.type==='abyss') return !stamInfo(it, now).isFull;
+  if (it.type==='stam') return !stamInfo(it, now).isFull;
   // 受取待機中は表示が固定なので、毎分tickを止めて無駄なDOM更新をしない。
   if (it.type==='idle') return it.state !== 'claim' && !idleInfo(it, now).isFull;
   return false;
@@ -1105,7 +1044,7 @@ function tickRender(now){
     if (!r) continue;
     if (it.type==='group'){
       for (const child of it.children) updateTimerCard(child, r.childRefs[child.id], now);
-    } else if (it.type==='stam' || it.type==='abyss' || it.type==='idle'){
+    } else if (it.type==='stam' || it.type==='idle'){
       updateTimerCard(it, r, now);
     }
   }
@@ -1302,24 +1241,17 @@ function askRemoveItem(id){
   const isHeader = it && it.type === 'header';
   const isGroup = it && it.type === 'group';
   const isRule = it && it.type === 'rule';
-  const isAbyss = it && it.type === 'abyss';
   const isStam = it && it.type === 'stam';
   const canEditName = isHeader || isGroup;
   const colorDefault = isHeader ? (it.color || '#9b8bff') : (isRule ? (it.color || '#52617a') : null);
-  // Abyssは常時、スタミナは設定済み or 後から付けられるよう空欄でも出す
-  const showChunk = isAbyss || isStam;
-  const chunkVal = isAbyss ? clampUseChunk(it.useChunk) : (isStam ? (it.useChunk != null ? clampUseChunk(it.useChunk) : '') : null);
+  const showChunk = isStam;
+  const chunkVal = isStam ? (it.useChunk != null ? clampUseChunk(it.useChunk) : '') : null;
   const showStamMax = isStam && !it.lockedMax;
-  const abyssFormula = isAbyss
-    ? `<label class="toast-color"><span class="toast-label">基礎</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${abyssBaseOf(it)}" maxlength="4" data-role="abyssBase" aria-label="基礎最大" style="width:3.2em;text-align:center;"></label>`
-      + `<label class="toast-color"><span class="toast-label">+/Lv</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${abyssPerRankOf(it)}" maxlength="3" data-role="abyssPer" aria-label="ランクごとの増加" style="width:2.6em;text-align:center;"></label>`
-    : '';
   const stamMaxRow = showStamMax
     ? `<label class="toast-color toast-max-row"><span class="toast-label">最大</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${it.max}" maxlength="3" data-role="stamMax" aria-label="最大スタミナ" style="width:3.2em;text-align:center;"></label>`
     : '';
   const fields =
     (colorDefault ? `<label class="toast-field"><span class="toast-color"><span class="toast-label">色</span><input type="color" value="${colorDefault}" aria-label="色"></span></label>` : '')
-    + (abyssFormula ? `<div class="toast-field wide">${abyssFormula}</div>` : '')
     + (showChunk ? `<label class="toast-field"><span class="toast-color"><span class="toast-label">使い切り</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${chunkVal}" maxlength="3" data-role="useChunk" aria-label="使い切り数" placeholder="なし"></span></label>` : '')
     + (stamMaxRow ? `<label class="toast-field">${stamMaxRow}</label>` : '')
     + (canEditName ? `<button type="button" data-act="editName">${isHeader ? '見出し編集' : '名前編集'}</button>` : '')
@@ -1374,34 +1306,6 @@ function askRemoveItem(id){
       colorEl.addEventListener('pointerdown', e=>e.stopPropagation());
     }
   }
-  if (isAbyss){
-    const bindNum = (role, apply)=>{
-      const el = toastEl.querySelector(`input[data-role="${role}"]`);
-      if (!el) return;
-      el.addEventListener('focus', ()=>{ el.value = ''; });
-      const run = ()=>{
-        apply(el);
-        syncAbyssMax(it);
-        updateOneTimer(it);
-        startTicking(true);
-        save();
-      };
-      el.addEventListener('change', run);
-      el.addEventListener('blur', run);
-      el.addEventListener('keydown', e=>{ if (e.key === 'Enter'){ e.preventDefault(); el.blur(); } });
-      el.addEventListener('pointerdown', e=>e.stopPropagation());
-    };
-    bindNum('abyssBase', (el)=>{
-      const raw = String(el.value || '').replace(/\D/g, '');
-      it.abyssBase = raw === '' ? abyssBaseOf(it) : clampInt(raw, 1, 9999, 240);
-      el.value = String(it.abyssBase);
-    });
-    bindNum('abyssPer', (el)=>{
-      const raw = String(el.value || '').replace(/\D/g, '');
-      it.abyssPerRank = raw === '' ? abyssPerRankOf(it) : clampInt(raw, 0, 999, 5);
-      el.value = String(it.abyssPerRank);
-    });
-  }
   if (showChunk){
     const chunkEl = toastEl.querySelector('input[data-role="useChunk"]');
     if (chunkEl){
@@ -1410,14 +1314,11 @@ function askRemoveItem(id){
       const applyChunk = ()=>{
         const raw = String(chunkEl.value || '').replace(/\D/g, '');
         if (raw === ''){
-          // スタミナは空で「使い切りなし」。Abyssは元値維持
+          // 空欄ならスタミナは「使い切りなし」
           if (isStam){
             delete it.useChunk;
             chunkEl.value = '';
             if (pending40Id === it.id){ pending40Id = null; paintUseChunkPreview(it.id); }
-          } else {
-            it.useChunk = origChunk != null ? origChunk : 40;
-            chunkEl.value = String(it.useChunk);
           }
         } else {
           it.useChunk = clampUseChunk(raw);
@@ -1464,16 +1365,16 @@ function askRemoveItem(id){
     }
   }
 }
-// カード外枠の共通生成（stam / abyss / idle）
+// カード外枠の共通生成（タイマーカード）
 function makeCardEl(type, id, innerHtml){
   const wrap = document.createElement('div');
   wrap.className = 'card ' + type;
   wrap.dataset.id = id;
   wrap.innerHTML = innerHtml;
 
-  // Abyss以外のタイマーだけ、右上にメニュー用のタブを付ける。
+  // タイマーカードには右上のメニュー用タブを付ける。
   // カード本体の短押し／長押しとは別ヒット領域にして、既存タップ処理を汚さない。
-  if (type !== 'abyss'){
+  if (type === 'stam' || type === 'idle'){
     const tab = document.createElement('button');
     tab.type = 'button';
     tab.className = 'timer-menu-tab';
@@ -1504,7 +1405,7 @@ function makeCardEl(type, id, innerHtml){
   }
   return wrap;
 }
-// stam / abyss 共通の下段 HTML
+// スタミナ共通の下段 HTML
 function valrowStamHtml(){
   return `<div class="row valrow-stam">
       <span class="stamval" data-role="curWrap"></span>
@@ -1512,7 +1413,7 @@ function valrowStamHtml(){
       <span class="stammax" data-role="maxWrap"></span>
     </div>`;
 }
-// 現在値インライン編集（stam / abyss 共用）
+// スタミナ現在値インライン編集
 function attachCurrentEditor(curWrap, it, extraCommit){
   const clearFortyPreview = ()=>{
     if (hasUseChunk(it) && pending40Id === it.id){
@@ -1522,7 +1423,6 @@ function attachCurrentEditor(curWrap, it, extraCommit){
   };
   const curEditor = createInlineNumber(stamInfo(it, Date.now()).cur, value => {
     const now = Date.now();
-    if (it.type === 'abyss') syncAbyssMax(it);
     const info = stamInfo(it, now);
     const newCur = clampInt(value, 0, it.max, info.cur);
     preserveCycle(it, now);
@@ -1540,7 +1440,6 @@ function onUseChunkTap(it, e){
   if (e){ e.stopPropagation(); e.preventDefault(); }
   if (!hasUseChunk(it)) return;
   const now = Date.now();
-  if (it.type === 'abyss') syncAbyssMax(it);
   const info = stamInfo(it, now);
   if (pending40Id === it.id){
     preserveCycle(it, now);
@@ -1568,52 +1467,12 @@ function buildStamCard(it){
   const curWrap = wrap.querySelector('[data-role="curWrap"]');
   const maxWrap = wrap.querySelector('[data-role="maxWrap"]');
   const curEditor = attachCurrentEditor(curWrap, it, () => { pending40Id = null; });
-  // 最大は表示のみ（編集は長押しトースト）。AbyssのmaxLabelと同じ軽い置物
+  // 最大は表示のみ（編集はトースト）。
   maxWrap.textContent = String(it.max);
   refs[it.id] = { el: wrap, curEl: curEditor, maxLabel: maxWrap,
     clockEl: wrap.querySelector('[data-role="clock"]') };
-  // 使い切り設定があるときだけカード短押しでプレビュー/確定（Abyssと共通）
+  // 使い切り設定があるときだけカード短押しでプレビュー/確定
   bindTimerShortAction(wrap, hasUseChunk(it) ? (e) => onUseChunkTap(it, e) : null);
-  return wrap;
-}
-
-function buildAbyssCard(it){
-  syncAbyssMax(it);
-  const wrap = makeCardEl('abyss', it.id, `
-    <div class="row abyss-head" data-role="abyssHead">
-      <div class="clockstack abyss-clock" data-role="clock"></div>
-    </div>
-    ${valrowStamHtml()}
-  `);
-  const head = wrap.querySelector('[data-role="abyssHead"]');
-  const curWrap = wrap.querySelector('[data-role="curWrap"]');
-  const maxLabel = wrap.querySelector('[data-role="maxWrap"]');
-  const curEditor = attachCurrentEditor(curWrap, it, () => { pending40Id = null; });
-  const rankEditor = createInlineRank(it.rank || 1,
-    ()=>{
-      if (pending40Id === it.id){ pending40Id = null; paintUseChunkPreview(it.id); }
-    },
-    (next)=>{
-      const now = Date.now();
-      const live = stamInfo(it, now).cur;
-      it.rank = next;
-      syncAbyssMax(it);
-      preserveCycle(it, now);
-      it.current = Math.min(live, it.max);
-      freezeIfFull(it, now);
-      pending40Id = null;
-      updateOneTimer(it);
-      startTicking(true);
-      saveAfterPaint();
-    }
-  );
-  head.appendChild(rankEditor.wrap);
-  const clockEl = wrap.querySelector('[data-role="clock"]');
-  const info0 = stamInfo(it, Date.now());
-  curEditor.setText(info0.cur);
-  maxLabel.textContent = String(it.max);
-  refs[it.id] = { el: wrap, rankEditor, curEl: curEditor, maxLabel, clockEl };
-  bindTimerShortAction(wrap, (e) => onUseChunkTap(it, e));
   return wrap;
 }
 
@@ -1851,7 +1710,7 @@ function findItemById(id){
 }
 function paintUseChunkPreview(id){
   const it = findItemById(id);
-  if (it && (it.type === 'abyss' || it.type === 'stam')) updateOneTimer(it);
+  if (it && it.type === 'stam') updateOneTimer(it);
 }
 function render(){
   const now = Date.now();
@@ -1862,7 +1721,6 @@ function render(){
   Object.keys(refs).forEach(id=>{ if(!existingIds.has(id)) delete refs[id]; });
 
   for (const it of state.items){
-    if (it.type === 'abyss') return;
     if (!refs[it.id]){
       const el = it.type==='stam' ? buildStamCard(it) : it.type==='idle' ? buildIdleCard(it) : it.type==='rule' ? buildRuleCard(it) : it.type==='group' ? buildGroupCard(it) : buildHeaderCard(it);
     } else if (it.type==='group'){
@@ -1897,7 +1755,7 @@ function render(){
     }
   }
 }
-// stam/abyss/idle の値更新をトップレベル/アカウント枠の子どちらでも共用する
+// stam/idle の値更新をトップレベル/アカウント枠の子どちらでも共用する
 function updateTimerCard(it, r, now){
   if (!it || !r) return;
   if (it.type==='stam'){
@@ -1914,25 +1772,6 @@ function updateTimerCard(it, r, now){
     r.el.classList.toggle('claim', waitChunk);
     renderClock(r.clockEl, info.remainMs, info.isFull, now, info.fullAt);
     if (r.curEl && !r.curEl.isEditing()) r.curEl.setText(waitChunk ? remainingAfterUse(info.cur, it) : info.cur);
-    if (r.maxLabel){
-      const v = String(it.max);
-      if (r.maxLabel.textContent !== v) r.maxLabel.textContent = v;
-    }
-    setNearOnCurrent(r.curEl, isNearFull(info.remainMs, info.isFull));
-  } else if (it.type==='abyss'){
-    let info = stamInfo(it, now);
-    if (info.isFull && it.current < it.max){
-      it.current = it.max;
-      it.start = info.fullAt || now;
-      info = stamInfo(it, now);
-      saveAfterPaint();
-    }
-    const wait40 = pending40Id === it.id;
-    r.el.classList.toggle('full', info.isFull);
-    r.el.classList.toggle('claim', wait40);
-    renderClock(r.clockEl, info.remainMs, info.isFull, now, info.fullAt);
-    if (r.rankEditor && !r.rankEditor.isEditing()) r.rankEditor.setRank(it.rank || 1);
-    if (r.curEl && !r.curEl.isEditing()) r.curEl.setText(wait40 ? remainingAfterUse(info.cur, it) : info.cur);
     if (r.maxLabel){
       const v = String(it.max);
       if (r.maxLabel.textContent !== v) r.maxLabel.textContent = v;
@@ -1998,37 +1837,14 @@ function openSetup(type){
   } else if (type === 'stam'){
     setupLabelEl.textContent = 'スタミナ設定';
     setupFieldsEl.innerHTML = `
-      <div class="setup-row">
-        <span>回復</span>
-        <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupInterval" value="5" aria-label="回復間隔">
-        <span>分で1</span>
-      </div>
-      <div class="setup-row dual">
-        <label class="setup-item"><span>最大</span><input type="text" inputmode="numeric" pattern="[0-9]*" id="setupMax" value="100" aria-label="最大スタミナ"></label>
-        <label class="setup-item"><span>使い切り</span><input type="text" inputmode="numeric" pattern="[0-9]*" id="setupUseChunk" value="" placeholder="—" aria-label="使い切り数"></label>
-      </div>`;
+      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupInterval" value="5"><span>分で1</span>
+      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupMax" value="100" style="margin-left:6px;"><span>最大</span>
+      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupUseChunk" value="" style="margin-left:6px;" placeholder="—"><span>使い切り</span>`;
   } else if (type === 'orb'){
     setupLabelEl.textContent = 'オーブ設定';
     setupFieldsEl.innerHTML = `
-      <div class="setup-row">
-        <span>回復</span>
-        <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupOrbHours" value="6" aria-label="オーブ回復間隔">
-        <span>時間で1個</span>
-      </div>
-      <div class="setup-row">
-        <label class="setup-item"><span>最大</span><input type="text" inputmode="numeric" pattern="[0-9]*" id="setupMax" value="4" aria-label="最大オーブ"></label>
-      </div>`;
-  } else if (type === 'abyss'){
-    setupLabelEl.textContent = 'Abyssスタミナ設定';
-    setupFieldsEl.innerHTML = `
-      <div class="setup-row">
-        <span>回復</span>
-        <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupInterval" value="3" aria-label="回復間隔">
-        <span>分で1回復</span>
-      </div>
-      <div class="setup-row">
-        <label class="setup-item"><span>使い切り</span><input type="text" inputmode="numeric" pattern="[0-9]*" id="setupUseChunk" value="40" aria-label="使い切り数"></label>
-      </div>`;
+      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupOrbHours" value="6"><span>時間で1個</span>
+      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupMax" value="4" style="margin-left:6px;"><span>最大</span>`;
   } else if (type === 'rule'){
     setupLabelEl.textContent = '仕切り線の色';
     fillColorPalette('#52617a');
@@ -2071,9 +1887,6 @@ function confirmSetup(){
     const hours = clampInt(setupFieldsEl.querySelector('#setupOrbHours')?.value, 1, 999, 6);
     const max = clampInt(setupFieldsEl.querySelector('#setupMax')?.value, 1, 99, 4);
     if (!pushNewTimer(newOrbItem(hours * 60, max))) return;
-  } else if (setupType === 'abyss'){
-    // Abyssタイマー本体は廃止。40使い切り計算関係の関数だけは残す。
-    return;
   } else if (setupType === 'rule'){
     const color = setupFieldsEl.dataset.color || '#52617a';
     state.items.push(newRuleItem(color));
