@@ -357,12 +357,16 @@
   }
   #setupPanel.show{display:flex;}
   #setupPanel .setupLabel{font-size:13px; color:var(--sub); text-align:center;}
-  #setupFields{display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:6px;}
+  #setupFields{display:flex; flex-direction:column; align-items:stretch; gap:8px; width:100%;}
+  #setupFields .setup-row{display:flex; align-items:center; justify-content:center; gap:7px; min-height:38px;}
+  #setupFields .setup-row.dual{justify-content:space-between; gap:8px;}
+  #setupFields .setup-item{display:flex; align-items:center; justify-content:center; gap:6px; flex:1; min-width:0;}
   #setupFields input{
-    width:60px; background:var(--card2); border:1px solid var(--line); border-radius:8px;
+    width:60px; box-sizing:border-box; background:var(--card2); border:1px solid var(--line); border-radius:8px;
     color:var(--text); font-size:16px; text-align:center; padding:8px 4px;
   }
-  #setupFields span{color:var(--sub); font-size:13px;}
+  #setupFields span{color:var(--sub); font-size:13px; white-space:nowrap;}
+  #setupFields .setup-item > span:first-child{color:var(--text); font-weight:600;}
   #setupActions{display:flex; gap:8px;}
   #setupActions button{
     flex:1; padding:12px; border-radius:10px; border:1px solid var(--line);
@@ -1994,19 +1998,37 @@ function openSetup(type){
   } else if (type === 'stam'){
     setupLabelEl.textContent = 'スタミナ設定';
     setupFieldsEl.innerHTML = `
-      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupInterval" value="5"><span>分で1</span>
-      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupMax" value="100" style="margin-left:6px;"><span>最大</span>
-      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupUseChunk" value="" style="margin-left:6px;" placeholder="—"><span>使い切り</span>`;
+      <div class="setup-row">
+        <span>回復</span>
+        <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupInterval" value="5" aria-label="回復間隔">
+        <span>分で1</span>
+      </div>
+      <div class="setup-row dual">
+        <label class="setup-item"><span>最大</span><input type="text" inputmode="numeric" pattern="[0-9]*" id="setupMax" value="100" aria-label="最大スタミナ"></label>
+        <label class="setup-item"><span>使い切り</span><input type="text" inputmode="numeric" pattern="[0-9]*" id="setupUseChunk" value="" placeholder="—" aria-label="使い切り数"></label>
+      </div>`;
   } else if (type === 'orb'){
     setupLabelEl.textContent = 'オーブ設定';
     setupFieldsEl.innerHTML = `
-      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupOrbHours" value="6"><span>時間で1個</span>
-      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupMax" value="4" style="margin-left:6px;"><span>最大</span>`;
+      <div class="setup-row">
+        <span>回復</span>
+        <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupOrbHours" value="6" aria-label="オーブ回復間隔">
+        <span>時間で1個</span>
+      </div>
+      <div class="setup-row">
+        <label class="setup-item"><span>最大</span><input type="text" inputmode="numeric" pattern="[0-9]*" id="setupMax" value="4" aria-label="最大オーブ"></label>
+      </div>`;
   } else if (type === 'abyss'){
     setupLabelEl.textContent = 'Abyssスタミナ設定';
     setupFieldsEl.innerHTML = `
-      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupInterval" value="3"><span>分で1回復</span>
-      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupUseChunk" value="40" style="margin-left:8px;"><span>使い切り</span>`;
+      <div class="setup-row">
+        <span>回復</span>
+        <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupInterval" value="3" aria-label="回復間隔">
+        <span>分で1回復</span>
+      </div>
+      <div class="setup-row">
+        <label class="setup-item"><span>使い切り</span><input type="text" inputmode="numeric" pattern="[0-9]*" id="setupUseChunk" value="40" aria-label="使い切り数"></label>
+      </div>`;
   } else if (type === 'rule'){
     setupLabelEl.textContent = '仕切り線の色';
     fillColorPalette('#52617a');
@@ -2147,96 +2169,6 @@ document.addEventListener('pointerdown', (e)=>{
     try { window.getSelection()?.removeAllRanges(); } catch (err) {}
   }
 }, true);
-
-/* ═══════════════ 機種差フィット（ここから）═══════════════
-   目的：端末ごとのフォント・画面幅の違いで、スタミナの数字が枠からあふれる
-         場合「だけ」文字サイズを縮めて枠内に収める。
-   方針：枠・「/」・カードの位置や大きさ、タップ判定には一切触れない。
-         枠に収まる端末では何もしない（font-size を上書きしない＝従来のまま）。
-   測定：実行中にレイアウトを測り直さない。
-         ・数字1桁ぶんの幅は、起動後に1回だけ測って固定する（フォントは途中で変わらないため）
-         ・枠の幅は ResizeObserver の通知をもらう（強制レイアウトなし・幅が変わった時だけ）
-         ・あとは「桁数 × 数字幅」の計算だけで決める（毎分の更新でも測定しない）
-   取り外し：このブロック（ここから〜ここまで）を丸ごと削除するだけ。他の箇所は無改造。
-   ═══════════════════════════════════════════════════ */
-(function(){
-  if (typeof ResizeObserver === 'undefined') return;   // 非対応環境では何もしない（従来どおり）
-
-  const MIN_FONT  = 11;    // これより小さくはしない(px)
-  const SAFETY    = 0.98;  // 収まりぎりぎりを避ける余裕
-  const TOLERANCE = 0.5;   // この程度(px)のはみ出しは無視（元の表示を優先）
-
-  let digitEm  = 0;        // 数字1桁の最大幅（em換算）。1回測ったら固定
-  let baseFont = 18;       // 元のフォントサイズ(px)。CSS の値を1回だけ読んで固定
-
-  // 実際の数字と同じフォントで、0〜9のうち一番広い数字の幅を1回だけ測る
-  function calibrate(slot){
-    const cs = getComputedStyle(slot);
-    baseFont = parseFloat(cs.fontSize) || 18;
-    const probe = document.createElement('span');
-    probe.textContent = '0123456789';
-    probe.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden;white-space:nowrap;line-height:1;font-size:100px;font-variant-numeric:tabular-nums;';
-    probe.style.fontFamily = cs.fontFamily;
-    probe.style.fontWeight = cs.fontWeight;
-    document.body.appendChild(probe);
-    const node = probe.firstChild, rg = document.createRange();
-    let w = 0;
-    for (let i = 0; i < 10; i++){
-      rg.setStart(node, i); rg.setEnd(node, i + 1);
-      w = Math.max(w, rg.getBoundingClientRect().width);
-    }
-    probe.remove();
-    digitEm = w / 100;
-  }
-
-  // 桁数と枠幅から文字サイズを決めて反映（測定なし・計算のみ）
-  function apply(card){
-    const slotW = card._slotW;
-    if (!slotW) return;
-    const cur = card.querySelector('.stamval');
-    const max = card.querySelector('.stammax');
-    const curText = cur && cur.querySelector('.inline-number-text');
-    if (!cur || !max || !curText) return;
-    if (!digitEm){ calibrate(cur); if (!digitEm) return; }
-
-    const lc = curText.textContent.length, lm = max.textContent.length;
-    const key = slotW + '|' + lc + '|' + lm;
-    if (card._fitKey === key) return;      // 桁数も枠幅も同じなら何もしない
-    card._fitKey = key;
-
-    const need = Math.max(lc, lm) * digitEm * baseFont;   // 文字サイズ据え置き時に必要な幅
-    let px = '';                                          // '' ＝ 上書きなし（元のまま）
-    if (need > slotW + TOLERANCE){
-      px = Math.max(MIN_FONT, Math.floor(baseFont * (slotW / need) * SAFETY * 10) / 10) + 'px';
-    }
-    if (cur.style.fontSize !== px){ cur.style.fontSize = px; max.style.fontSize = px; }
-  }
-
-  // 枠（現在値スロット）の幅が変わった時だけブラウザから通知が来る
-  const ro = new ResizeObserver(entries => {
-    for (const e of entries){
-      const card = e.target.closest && e.target.closest('.card');
-      if (!card) continue;
-      card._slotW = e.contentRect.width;
-      apply(card);
-    }
-  });
-
-  // updateTimerCard の後ろに乗せる（本体は無改造）。対象はスタミナカードのみ。
-  const seen = new WeakSet();
-  const orig = updateTimerCard;
-  updateTimerCard = function(it, r, now){
-    orig(it, r, now);
-    if (!it || !r || it.type !== 'stam' || !r.el) return;
-    const card = r.el;
-    if (!seen.has(card)){
-      const slot = card.querySelector('.stamval');
-      if (slot){ seen.add(card); ro.observe(slot); }
-    }
-    apply(card);
-  };
-})();
-/* ═══════════════ 機種差フィット（ここまで）═══════════════ */
 
 render();
 startTicking(true);
