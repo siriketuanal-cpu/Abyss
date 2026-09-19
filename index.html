@@ -243,11 +243,10 @@
   }
   /* 放置タイマー本体も下段中央。予定時刻だけ左上へ配置。 */
   .valrow-idle{
-    margin:0 !important; align-items:center; min-height:22px; height:22px;
-    width:auto; position:absolute; left:6px; right:6px; top:auto; bottom:5px;
-    display:flex; justify-content:center; gap:6px;
+    margin-top:0 !important; align-items:center; min-height:22px; height:22px;
+    justify-content:center; gap:6px; position:absolute; left:6px; right:6px; bottom:5px;
   }
-  .valrow-idle .main{min-width:0; width:100%; flex:1 1 100%; margin:0; text-align:center; padding-left:0; font-size:19px; line-height:1.1;}
+  .valrow-idle .main{min-width:2.6em; flex:0 0 auto; margin:0; text-align:center; padding-left:0; font-size:19px; line-height:1.1;}
   .valrow-idle .clockstack{margin:0; position:absolute; left:0; top:auto;}
   .card.idle .valrow-idle .clockstack{position:absolute; left:0; bottom:22px; top:auto;}
   /* 数字の操作は透明な ::before ヒットボックスを使わず、実際の数字要素で受ける。 */
@@ -1410,6 +1409,7 @@ function makeCardEl(type, id, innerHtml){
   tab.className = 'timer-menu-tab';
   tab.setAttribute('aria-label', 'タイマーメニュー');
   tab.title = 'タイマーメニュー';
+  bindTimerMenuButton(tab, id);
   wrap.appendChild(tab);
   return wrap;
 }
@@ -1569,59 +1569,45 @@ function buildRuleCard(it){
   bindLongPressDelete(wrap, it.id);
   return wrap;
 }
-function bindTimerMenuDelegation(parent){
-  if (!parent || parent.dataset.timerMenuBound) return;
-  parent.dataset.timerMenuBound = '1';
+function bindTimerMenuButton(tab, id){
+  if (!tab || tab.dataset.menuBound) return;
+  tab.dataset.menuBound = '1';
   const isPrimary = e => e.isPrimary !== false && !(e.pointerType === 'mouse' && e.button !== 0);
-  parent.addEventListener('pointerdown', e=>{
-    const tab = e.target.closest('.timer-menu-tab');
-    if (!tab || !parent.contains(tab) || !isPrimary(e)) return;
+  tab.addEventListener('pointerdown', e=>{
+    if (!isPrimary(e)) return;
     e.preventDefault();
     e.stopPropagation();
-  }, {capture:true, passive:false});
-  parent.addEventListener('pointerup', e=>{
-    const tab = e.target.closest('.timer-menu-tab');
-    if (!tab || !parent.contains(tab) || !isPrimary(e)) return;
-    const card = tab.closest('.card');
-    const id = card?.dataset.id;
-    if (!id) return;
+  }, {capture:false, passive:false});
+  tab.addEventListener('pointerup', e=>{
+    if (!isPrimary(e)) return;
     e.preventDefault();
     e.stopPropagation();
     tab.blur();
     setTimeout(()=>askRemoveItem(id), 0);
-  }, {capture:true, passive:false});
-  parent.addEventListener('click', e=>{
-    const tab = e.target.closest('.timer-menu-tab');
-    if (!tab || !parent.contains(tab)) return;
+  }, {capture:false, passive:false});
+  tab.addEventListener('click', e=>{
     e.preventDefault();
     e.stopPropagation();
   }, {capture:false, passive:false});
 }
 
-function bindHeaderMenuDelegation(parent){
-  if (!parent || parent.dataset.headerMenuBound) return;
-  parent.dataset.headerMenuBound = '1';
+function bindHeaderMenuButton(btn, id){
+  if (!btn || btn.dataset.menuBound) return;
+  btn.dataset.menuBound = '1';
   const isPrimary = e => e.isPrimary !== false && !(e.pointerType === 'mouse' && e.button !== 0);
-  parent.addEventListener('pointerdown', e=>{
-    const btn = e.target.closest('.header-menu-button');
-    if (!btn || !parent.contains(btn) || !isPrimary(e)) return;
+  btn.addEventListener('pointerdown', e=>{
+    if (!isPrimary(e)) return;
     e.preventDefault();
     e.stopPropagation();
-  }, {capture:true, passive:false});
-  parent.addEventListener('pointerup', e=>{
-    const btn = e.target.closest('.header-menu-button');
-    if (!btn || !parent.contains(btn) || !isPrimary(e)) return;
-    const header = btn.closest('.divider');
-    const id = header?.dataset.id;
-    if (!id) return;
+  }, {capture:false, passive:false});
+  btn.addEventListener('pointerup', e=>{
+    if (!isPrimary(e)) return;
     e.preventDefault();
     e.stopPropagation();
     btn.blur();
     setTimeout(()=>askRemoveItem(id), 0);
-  }, {capture:true, passive:false});
-  parent.addEventListener('click', e=>{
-    const btn = e.target.closest('.header-menu-button');
-    if (!btn || !parent.contains(btn)) return;
+  }, {capture:false, passive:false});
+  btn.addEventListener('click', e=>{
     e.preventDefault();
     e.stopPropagation();
   }, {capture:false, passive:false});
@@ -1643,6 +1629,7 @@ function buildHeaderCard(it){
   menuBtn.title = '見出しメニュー';
   menuBtn.style.setProperty('--header-color', it.color || '#9b8bff');
   menuBtn.textContent = '';
+  bindHeaderMenuButton(menuBtn, it.id);
   wrap.appendChild(menuBtn);
   refs[it.id] = { el: wrap, nameEl: nameEditor.wrap, nameEditor, menuBtn };
   // 既存のヘッダー長押しは残す。丸型ボタンだけは別経路でトーストを開く。
@@ -2057,9 +2044,6 @@ document.addEventListener('pointerdown', (e)=>{
     try { window.getSelection()?.removeAllRanges(); } catch (err) {}
   }
 }, true);
-
-bindTimerMenuDelegation(cardsEl);
-bindHeaderMenuDelegation(cardsEl);
 
 render();
 startTicking(true);
