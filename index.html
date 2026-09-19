@@ -301,21 +301,27 @@
     background:var(--card2); color:var(--text); font-size:14px; font-weight:600;
   }
   #setupPanel{
-    position:fixed; left:0; right:0; bottom:0; background:var(--card);
-    border-top:1px solid var(--line); padding:16px 16px calc(16px + env(safe-area-inset-bottom));
-    display:none; flex-direction:column; gap:12px; z-index:11;
+    position:fixed; left:50%; top:50%; bottom:auto; right:auto;
+    transform:translate(-50%, -50%); width:min(92vw, 340px);
+    background:var(--card); border:1px solid var(--line); border-radius:14px;
+    padding:16px; display:none; flex-direction:column; gap:12px; z-index:25;
+    box-shadow:0 12px 32px rgba(0,0,0,.45);
   }
   #setupPanel.show{display:flex;}
   #setupPanel .setupLabel{font-size:13px; color:var(--sub); text-align:center;}
-  #setupFields{display:flex; align-items:center; justify-content:center; gap:6px;}
+  #setupFields{display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:6px;}
   #setupFields input{
     width:60px; background:var(--card2); border:1px solid var(--line); border-radius:8px;
     color:var(--text); font-size:16px; text-align:center; padding:8px 4px;
   }
   #setupFields span{color:var(--sub); font-size:13px;}
+  #setupActions{display:flex; gap:8px;}
+  #setupActions button{
+    flex:1; padding:12px; border-radius:10px; border:1px solid var(--line);
+    background:var(--card2); color:var(--text); font-size:14px; font-weight:700;
+  }
   #setupConfirm{
-    padding:12px; border-radius:12px; border:none;
-    background:var(--accent); color:#100c26; font-size:14px; font-weight:700;
+    background:var(--accent) !important; color:#100c26 !important; border-color:transparent !important;
   }
   /* 名前・見出し用の軽量ポップアップ（全画面dimなし＝下のカードを再合成しにくい） */
   #nameEditOverlay{
@@ -366,7 +372,10 @@
 <div id="setupPanel">
 <div class="setupLabel" id="setupLabel"></div>
 <div id="setupFields"></div>
-<button id="setupConfirm">追加</button>
+<div id="setupActions">
+<button type="button" id="setupCancel">やめる</button>
+<button type="button" id="setupConfirm">追加</button>
+</div>
 </div>
 <div id="nameEditOverlay" aria-hidden="true">
   <div id="nameEditPanel" role="dialog" aria-modal="true">
@@ -418,6 +427,7 @@ const setupPanelEl = document.getElementById('setupPanel');
 const setupLabelEl = document.getElementById('setupLabel');
 const setupFieldsEl = document.getElementById('setupFields');
 const setupConfirmEl = document.getElementById('setupConfirm');
+const setupCancelEl = document.getElementById('setupCancel');
 const toastEl = document.getElementById('toast');
 const nameEditOverlayEl = document.getElementById('nameEditOverlay');
 const nameEditLabelEl = document.getElementById('nameEditLabel');
@@ -897,7 +907,8 @@ function newStamItem(intervalMin, max, useChunk){
 // 実験：既存スタミナ計算のまま、最大少なめ・1個使い切りのプリセット
 function newOrbItem(intervalMin, max){
   const item = newStamItem(intervalMin, max != null ? max : 4, 1);
-  item.lockedMax = true; // オーブは最大をカード上で編集しない
+  item.lockedMax = true; // カード上で最大編集しない
+  item.useMode = 'sub';   // 1タップで1個減らす（modだと %1 で常に0になる）
   return item;
 }
 function newAbyssItem(intervalMin, useChunk){
@@ -980,9 +991,14 @@ function remainingAfterChunk(cur, chunk){
   const c = clampUseChunk(chunk);
   return cur % c;
 }
+// mod: 220→20（Abyss等のまとめて使い切り）/ sub: 4→3（オーブの1個消費）
+// useChunk=1 の mod は常に0になるので、orb/sub は引き算にする
 function remainingAfter40(cur, it){
+  cur = Math.max(0, Math.floor(Number(cur) || 0));
   const fallback = it && it.type === 'abyss' ? 40 : 1;
-  return remainingAfterChunk(cur, it && it.useChunk != null ? it.useChunk : fallback);
+  const c = clampUseChunk(it && it.useChunk != null ? it.useChunk : fallback);
+  if (it && (it.useMode === 'sub' || it.lockedMax)) return Math.max(0, cur - c);
+  return cur % c;
 }
 // Dot Abyss 相当: 基礎240 + (ランク-1)×5（最大は計算のみ・手編集しない）
 function abyssBaseOf(it){
@@ -1235,14 +1251,19 @@ function askRemoveItem(id){
   // Abyssは常時、スタミナは設定済み or 後から付けられるよう空欄でも出す
   const showChunk = isAbyss || isStam;
   const chunkVal = isAbyss ? clampUseChunk(it.useChunk) : (isStam ? (it.useChunk != null ? clampUseChunk(it.useChunk) : '') : null);
+  const showStamMax = isStam && !it.lockedMax;
   const abyssFormula = isAbyss
     ? `<label class="toast-color">基礎<input type="text" inputmode="numeric" pattern="[0-9]*" value="${abyssBaseOf(it)}" maxlength="4" data-role="abyssBase" aria-label="基礎最大" style="width:3.2em;text-align:center;"></label>`
       + `<label class="toast-color">+/Lv<input type="text" inputmode="numeric" pattern="[0-9]*" value="${abyssPerRankOf(it)}" maxlength="3" data-role="abyssPer" aria-label="ランクごとの増加" style="width:2.6em;text-align:center;"></label>`
+    : '';
+  const stamMaxRow = showStamMax
+    ? `<label class="toast-color toast-max-row" style="flex:1 1 100%;justify-content:center;margin-top:2px;">最大スタミナ<input type="text" inputmode="numeric" pattern="[0-9]*" value="${it.max}" maxlength="3" data-role="stamMax" aria-label="最大スタミナ" style="width:3.2em;text-align:center;"></label>`
     : '';
   const extra =
     (colorDefault ? `<label class="toast-color">色<input type="color" value="${colorDefault}" aria-label="色"></label>` : '')
     + abyssFormula
     + (showChunk ? `<label class="toast-color">使い切り<input type="text" inputmode="numeric" pattern="[0-9]*" value="${chunkVal}" maxlength="3" data-role="useChunk" aria-label="使い切り数" placeholder="なし"></label>` : '')
+    + stamMaxRow
     + (canEditName ? `<button type="button" data-act="editName">${isHeader ? '見出し編集' : '名前編集'}</button>` : '')
     + (canAdd ? '<button type="button" data-act="add">タイマー追加</button>' : '');
   showConfirmToast(
@@ -1354,6 +1375,33 @@ function askRemoveItem(id){
       chunkEl.addEventListener('pointerdown', e=>e.stopPropagation());
     }
   }
+  if (showStamMax){
+    const maxEl = toastEl.querySelector('input[data-role="stamMax"]');
+    if (maxEl){
+      const origMax = it.max;
+      maxEl.addEventListener('focus', ()=>{ maxEl.value = ''; });
+      const applyMax = ()=>{
+        const raw = String(maxEl.value || '').replace(/\D/g, '');
+        const newMax = raw === '' ? origMax : clampInt(raw, 1, 999, origMax);
+        maxEl.value = String(newMax);
+        if (newMax === it.max) return;
+        const now = Date.now();
+        const curNow = stamInfo(it, now).cur;
+        preserveCycle(it, now);
+        it.max = newMax;
+        it.current = Math.min(curNow, newMax);
+        freezeIfFull(it, now);
+        if (pending40Id === it.id) pending40Id = null;
+        updateOneTimer(it);
+        startTicking(true);
+        save();
+      };
+      maxEl.addEventListener('change', applyMax);
+      maxEl.addEventListener('blur', applyMax);
+      maxEl.addEventListener('keydown', e=>{ if (e.key === 'Enter'){ e.preventDefault(); maxEl.blur(); } });
+      maxEl.addEventListener('pointerdown', e=>e.stopPropagation());
+    }
+  }
 }
 // カード外枠の共通生成（stam / abyss / idle）
 function makeCardEl(type, id, innerHtml){
@@ -1427,30 +1475,11 @@ function buildStamCard(it){
   const curWrap = wrap.querySelector('[data-role="curWrap"]');
   const maxWrap = wrap.querySelector('[data-role="maxWrap"]');
   const curEditor = attachCurrentEditor(curWrap, it, () => { pending40Id = null; });
-  let maxEditor = null;
-  if (it.lockedMax){
-    maxWrap.textContent = String(it.max);
-    maxWrap.classList.add('stammax');
-  } else {
-    maxEditor = createInlineNumber(it.max, value => {
-      const now = Date.now();
-      const curNow = stamInfo(it, now).cur;
-      const newMax = clampInt(value, 1, 999, it.max);
-      preserveCycle(it, now);
-      it.max = newMax;
-      it.current = Math.min(curNow, newMax);
-      freezeIfFull(it, now);
-      if (pending40Id === it.id) pending40Id = null;
-      updateOneTimer(it);
-      startTicking(true);
-      saveAfterPaint();
-    }, it.id + ':max');
-    maxWrap.appendChild(maxEditor.wrap);
-  }
-
-  refs[it.id] = { el: wrap, curEl: curEditor, maxEl: maxEditor, maxLabel: it.lockedMax ? maxWrap : null,
+  // 最大は表示のみ（編集は長押しトースト）。AbyssのmaxLabelと同じ軽い置物
+  maxWrap.textContent = String(it.max);
+  refs[it.id] = { el: wrap, curEl: curEditor, maxLabel: maxWrap,
     clockEl: wrap.querySelector('[data-role="clock"]') };
-  // 使い切り設定があるときだけカード短押しでプレビュー/確定（オーブ実験含む）
+  // 使い切り設定があるときだけカード短押しでプレビュー/確定（Abyssと共通）
   bindLongPressDelete(wrap, it.id, hasUseChunk(it) ? (e) => onUseChunkTap(it, e) : null);
   return wrap;
 }
@@ -1771,7 +1800,6 @@ function updateTimerCard(it, r, now){
     r.el.classList.toggle('claim', waitChunk);
     renderClock(r.clockEl, info.remainMs, info.isFull, now, info.fullAt);
     if (r.curEl && !r.curEl.isEditing()) r.curEl.setText(waitChunk ? remainingAfter40(info.cur, it) : info.cur);
-    if (r.maxEl && !r.maxEl.isEditing()) r.maxEl.setText(it.max);
     if (r.maxLabel){
       const v = String(it.max);
       if (r.maxLabel.textContent !== v) r.maxLabel.textContent = v;
@@ -1854,12 +1882,13 @@ function openSetup(type){
     setupLabelEl.textContent = 'ゲーム名ヘッダーの文字色';
     fillColorPalette('#9b8bff');
   } else if (type === 'stam'){
-    setupLabelEl.textContent = 'スタミナ設定（最大はカードで変更可）';
+    setupLabelEl.textContent = 'スタミナ設定';
     setupFieldsEl.innerHTML = `
       <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupInterval" value="5"><span>分で1</span>
+      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupMax" value="100" style="margin-left:6px;"><span>最大</span>
       <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupUseChunk" value="" style="margin-left:6px;" placeholder="—"><span>使い切り</span>`;
   } else if (type === 'orb'){
-    setupLabelEl.textContent = 'オーブ（実験・スタミナと同じ計算）';
+    setupLabelEl.textContent = 'オーブ設定';
     setupFieldsEl.innerHTML = `
       <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupOrbHours" value="6"><span>時間で1個</span>
       <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupMax" value="4" style="margin-left:6px;"><span>最大</span>`;
@@ -1902,9 +1931,10 @@ function confirmSetup(){
     state.items.push(item);
   } else if (setupType === 'stam'){
     const interval = clampInt(setupFieldsEl.querySelector('#setupInterval')?.value, 1, 999, 5);
+    const max = clampInt(setupFieldsEl.querySelector('#setupMax')?.value, 1, 999, 100);
     const chunkRaw = String(setupFieldsEl.querySelector('#setupUseChunk')?.value || '').replace(/\D/g, '');
     const useChunk = chunkRaw === '' ? null : clampUseChunk(chunkRaw);
-    if (!pushNewTimer(newStamItem(interval, 100, useChunk))) return;
+    if (!pushNewTimer(newStamItem(interval, max, useChunk))) return;
   } else if (setupType === 'orb'){
     const hours = clampInt(setupFieldsEl.querySelector('#setupOrbHours')?.value, 1, 999, 6);
     const max = clampInt(setupFieldsEl.querySelector('#setupMax')?.value, 1, 99, 4);
@@ -1948,6 +1978,12 @@ bindTapDown(setupConfirmEl, (e)=>{
   e.stopPropagation();
   confirmSetup();
 });
+if (setupCancelEl){
+  bindTapDown(setupCancelEl, (e)=>{
+    e.stopPropagation();
+    closeSetup();
+  });
+}
 
 const resumeVeilEl = document.getElementById('resumeVeil');
 let resumeTimer = null;
