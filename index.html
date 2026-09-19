@@ -247,7 +247,7 @@
     width:auto; position:absolute; left:6px; right:6px; top:auto; bottom:5px;
     display:flex; justify-content:center; gap:6px;
   }
-  .valrow-idle .main{min-width:2.6em; flex:0 0 auto; margin:0; text-align:center; padding-left:0; font-size:19px; line-height:1.1;}
+  .valrow-idle .main{min-width:0; width:100%; flex:1 1 100%; margin:0; text-align:center; padding-left:0; font-size:19px; line-height:1.1;}
   .valrow-idle .clockstack{margin:0; position:absolute; left:0; top:auto;}
   .card.idle .valrow-idle .clockstack{position:absolute; left:0; bottom:22px; top:auto;}
   /* 数字の操作は透明な ::before ヒットボックスを使わず、実際の数字要素で受ける。 */
@@ -1578,7 +1578,7 @@ function bindTimerMenuDelegation(parent){
     if (!tab || !parent.contains(tab) || !isPrimary(e)) return;
     e.preventDefault();
     e.stopPropagation();
-  }, {capture:false, passive:false});
+  }, {capture:true, passive:false});
   parent.addEventListener('pointerup', e=>{
     const tab = e.target.closest('.timer-menu-tab');
     if (!tab || !parent.contains(tab) || !isPrimary(e)) return;
@@ -1589,7 +1589,7 @@ function bindTimerMenuDelegation(parent){
     e.stopPropagation();
     tab.blur();
     setTimeout(()=>askRemoveItem(id), 0);
-  }, {capture:false, passive:false});
+  }, {capture:true, passive:false});
   parent.addEventListener('click', e=>{
     const tab = e.target.closest('.timer-menu-tab');
     if (!tab || !parent.contains(tab)) return;
@@ -1607,7 +1607,7 @@ function bindHeaderMenuDelegation(parent){
     if (!btn || !parent.contains(btn) || !isPrimary(e)) return;
     e.preventDefault();
     e.stopPropagation();
-  }, {capture:false, passive:false});
+  }, {capture:true, passive:false});
   parent.addEventListener('pointerup', e=>{
     const btn = e.target.closest('.header-menu-button');
     if (!btn || !parent.contains(btn) || !isPrimary(e)) return;
@@ -1618,7 +1618,7 @@ function bindHeaderMenuDelegation(parent){
     e.stopPropagation();
     btn.blur();
     setTimeout(()=>askRemoveItem(id), 0);
-  }, {capture:false, passive:false});
+  }, {capture:true, passive:false});
   parent.addEventListener('click', e=>{
     const btn = e.target.closest('.header-menu-button');
     if (!btn || !parent.contains(btn)) return;
