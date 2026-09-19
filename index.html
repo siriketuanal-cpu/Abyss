@@ -129,6 +129,21 @@
   .card.stam, .card.idle{
     padding:6px; display:flex; flex-direction:column; justify-content:center;
   }
+  /* スタミナ／放置報酬の設定メニュー用しおり。グループ内ではアカウント見出し側へ少し飛び出す。
+     Abyssには付けず、既存カードのタップ領域・長押し処理には干渉させない。 */
+  .timer-menu-tab{
+    position:absolute; top:-8px; right:5px; z-index:6;
+    width:25px; height:22px; padding:0; margin:0;
+    border:1px solid var(--line); border-bottom:0;
+    border-radius:5px 5px 0 0;
+    background:var(--card2); color:var(--sub);
+    display:flex; align-items:center; justify-content:center;
+    font-size:13px; line-height:1; font-weight:800;
+    clip-path:polygon(0 0,100% 0,100% 100%,50% 76%,0 100%);
+    touch-action:manipulation; -webkit-tap-highlight-color:transparent;
+    box-sizing:border-box;
+  }
+  .timer-menu-tab:active{color:var(--text);}
   .name{
     width:100%; background:transparent; border:none; color:var(--text);
     font-size:11px; font-weight:600; padding:2px 0; min-width:0;
@@ -1105,8 +1120,11 @@ function bindLongPressDelete(el, id, shortAction){
       target.closest('.rank')
     );
   };
+  // しおりボタンはカード本体の短押し／長押しから完全に分離する。
+  const isMenuTarget = target => !!(target && target.closest && target.closest('.timer-menu-tab'));
 
   el.addEventListener('pointerdown', e=>{
+    if (isMenuTarget(e.target)) return;
     if (!isPrimary(e) || active) return;
     if (isEditTarget(e.target)) return;
     if (editingId != null) return;
@@ -1138,6 +1156,7 @@ function bindLongPressDelete(el, id, shortAction){
   }, {capture:true, passive:true});
 
   el.addEventListener('pointerup', e=>{
+    if (isMenuTarget(e.target)) return;
     if (!active || e.pointerId !== pid) return;
     const wasLong = longFired, wasMoved = moved;
     if (timer !== null){ clearTimeout(timer); timer = null; }
@@ -1210,6 +1229,10 @@ function showConfirmToast(html, onAct){
   };
   toastTapDownHandler = onClick;
   toastEl.addEventListener('pointerdown', onClick);
+}
+function openTimerToast(id){
+  // 既存のタイマーメニューをそのまま呼び出す。メニュー専用の新しい処理は増やさない。
+  askRemoveItem(id);
 }
 function askRemoveItem(id){
   const it = findItemById(id);
@@ -1443,9 +1466,17 @@ function onUseChunkTap(it, e){
 }
 function buildStamCard(it){
   const wrap = makeCardEl('stam', it.id, `
+    <button type="button" class="timer-menu-tab" data-role="timerMenu" aria-label="タイマーメニュー">⋮</button>
     <div class="clockstack stam-clock" data-role="clock"></div>
     ${valrowStamHtml()}
   `);
+  const menuBtn = wrap.querySelector('[data-role="timerMenu"]');
+  if (menuBtn){
+    bindTapDown(menuBtn, (e)=>{
+      e.stopPropagation();
+      openTimerToast(it.id);
+    });
+  }
   const curWrap = wrap.querySelector('[data-role="curWrap"]');
   const maxWrap = wrap.querySelector('[data-role="maxWrap"]');
   const curEditor = attachCurrentEditor(curWrap, it, () => { pending40Id = null; });
@@ -1500,6 +1531,7 @@ function buildAbyssCard(it){
 
 function buildIdleCard(it){
   const wrap = makeCardEl('idle', it.id, `
+    <button type="button" class="timer-menu-tab" data-role="timerMenu" aria-label="タイマーメニュー">⋮</button>
     <div class="clockstack idle-clock" data-role="clock"></div>
     <div class="row valrow-idle">
       <div class="main" data-role="cur"></div>
@@ -1507,6 +1539,13 @@ function buildIdleCard(it){
   `);
   refs[it.id] = { el: wrap,
     curEl: wrap.querySelector('[data-role="cur"]'), clockEl: wrap.querySelector('[data-role="clock"]') };
+  const menuBtn = wrap.querySelector('[data-role="timerMenu"]');
+  if (menuBtn){
+    bindTapDown(menuBtn, (e)=>{
+      e.stopPropagation();
+      openTimerToast(it.id);
+    });
+  }
   // 受取トグルは短押し(pointerup)。pointerdown にすると長押し削除と同時発火する。
   bindLongPressDelete(wrap, it.id, ()=>toggleIdle(it));
   return wrap;
