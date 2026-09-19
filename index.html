@@ -63,8 +63,6 @@
   }
   .name-text.is-placeholder{ color:var(--sub); font-weight:600; }
   /* TWA復帰時の一瞬の再構築を視覚的に隠す。通常起動・通常操作では非表示。 */
-  #resumeVeil{position:fixed;inset:0;background:var(--bg);opacity:0;pointer-events:none;z-index:100;transition:opacity 90ms linear;}
-  #resumeVeil.show{opacity:1;}
   header{
     display:flex; align-items:center; gap:8px; padding:10px 12px 6px;
     flex:0 0 auto; background:var(--bg); z-index:5;
@@ -343,7 +341,12 @@
   }
   #setupPanel.show{display:flex;}
   #setupPanel .setupLabel{font-size:13px; color:var(--sub); text-align:center;}
-  #setupFields{display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:6px;}
+  #setupFields{display:flex; flex-direction:column; align-items:stretch; justify-content:center; gap:7px; width:100%;}
+  #setupFields .setup-row{display:flex; align-items:center; justify-content:center; gap:6px; width:100%; min-height:30px;}
+  #setupFields .setup-row-stam{display:grid; grid-template-columns:auto minmax(52px,1fr) auto minmax(52px,1fr); gap:6px; max-width:280px; margin:0 auto;}
+  #setupFields .setup-row-interval{width:auto; margin:0 auto;}
+  #setupFields .setup-key{color:var(--sub); font-size:13px; white-space:nowrap;}
+  #setupFields .setup-key-use{margin-left:4px;}
   #setupFields input{
     width:60px; background:var(--card2); border:1px solid var(--line); border-radius:8px;
     color:var(--text); font-size:16px; text-align:center; padding:8px 4px;
@@ -385,7 +388,6 @@
 </style>
 </head>
 <body>
-<div id="resumeVeil" aria-hidden="true"></div>
 <header>
 <button aria-label="アプリを更新" class="iconbtn" id="updateBtn" title="アプリを更新">↻</button>
 <span aria-hidden="true" class="spacer"></span>
@@ -1311,7 +1313,7 @@ function askRemoveItem(id){
     if (chunkEl){
       const origChunk = it.useChunk != null ? clampUseChunk(it.useChunk) : null;
       chunkEl.addEventListener('focus', ()=>{ chunkEl.value = ''; });
-      const applyChunk = ()=>{
+      const applyChunk = (persist)=>{
         const raw = String(chunkEl.value || '').replace(/\D/g, '');
         if (raw === ''){
           // 空欄ならスタミナは「使い切りなし」
@@ -1325,12 +1327,12 @@ function askRemoveItem(id){
           chunkEl.value = String(it.useChunk);
           if (pending40Id === it.id) paintUseChunkPreview(it.id);
         }
-        // カードの短押しバインドは再renderが必要なので、スタミナは軽く再構築
-        if (isStam){ save(); render(); startTicking(true); }
-        else save();
+        // タップ処理は常時バインドしてあり、ここではカード全体を再構築しない。
+        if (persist) save();
       };
-      chunkEl.addEventListener('change', applyChunk);
-      chunkEl.addEventListener('blur', applyChunk);
+      chunkEl.addEventListener('input', ()=>applyChunk(false));
+      chunkEl.addEventListener('change', ()=>applyChunk(true));
+      chunkEl.addEventListener('blur', ()=>applyChunk(true));
       chunkEl.addEventListener('keydown', e=>{
         if (e.key === 'Enter'){ e.preventDefault(); chunkEl.blur(); }
       });
@@ -1472,7 +1474,7 @@ function buildStamCard(it){
   refs[it.id] = { el: wrap, curEl: curEditor, maxLabel: maxWrap,
     clockEl: wrap.querySelector('[data-role="clock"]') };
   // 使い切り設定があるときだけカード短押しでプレビュー/確定
-  bindTimerShortAction(wrap, hasUseChunk(it) ? (e) => onUseChunkTap(it, e) : null);
+  bindTimerShortAction(wrap, (e) => onUseChunkTap(it, e));
   return wrap;
 }
 
@@ -1837,9 +1839,8 @@ function openSetup(type){
   } else if (type === 'stam'){
     setupLabelEl.textContent = 'スタミナ設定';
     setupFieldsEl.innerHTML = `
-      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupInterval" value="5"><span>分で1</span>
-      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupMax" value="100" style="margin-left:6px;"><span>最大</span>
-      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupUseChunk" value="" style="margin-left:6px;" placeholder="—"><span>使い切り</span>`;
+      <div class="setup-row setup-row-interval"><span class="setup-key">回復</span><input type="text" inputmode="numeric" pattern="[0-9]*" id="setupInterval" value="5"><span>分で1</span></div>
+      <div class="setup-row setup-row-stam"><span class="setup-key">最大</span><input type="text" inputmode="numeric" pattern="[0-9]*" id="setupMax" value="100"><span class="setup-key setup-key-use">使い切り</span><input type="text" inputmode="numeric" pattern="[0-9]*" id="setupUseChunk" value="" placeholder="—"></div>`;
   } else if (type === 'orb'){
     setupLabelEl.textContent = 'オーブ設定';
     setupFieldsEl.innerHTML = `
@@ -1929,46 +1930,22 @@ if (setupCancelEl){
   });
 }
 
-const resumeVeilEl = document.getElementById('resumeVeil');
-let resumeTimer = null;
 let wasBackgrounded = false;
-let hiddenAt = 0;
-function clearResumeVeil(){
-  if (resumeTimer){ clearTimeout(resumeTimer); resumeTimer = null; }
-  if (resumeVeilEl) resumeVeilEl.classList.remove('show');
-}
-// 復帰処理を1本化：覆う → 差分更新 → tick再開 → 安定後に覆いを外す
-// キーボード開閉などの短い hidden では動かさない（黒ベール残留の主因）
+// 復帰は「現在時刻で1回だけ差分描画 → tick再開」に一本化。
+// DOM再構築・requestAnimationFrame待ち・復帰用setTimeoutは行わない。
 function resumePipeline(){
-  if (resumeTimer) clearTimeout(resumeTimer);
-  if (!resumeVeilEl) return;
-  resumeVeilEl.classList.add('show');
-  const finish = () => {
-    tickRender(Date.now());
-    startTicking(true);
-    resumeTimer = setTimeout(()=>{
-      resumeTimer = null;
-      resumeVeilEl.classList.remove('show');
-    }, 220);
-  };
-  requestAnimationFrame(() => requestAnimationFrame(finish));
+  tickRender(Date.now());
+  startTicking(true);
 }
 document.addEventListener('visibilitychange', ()=>{
   if (document.hidden){
     wasBackgrounded = true;
-    hiddenAt = Date.now();
     tickGen++;
     if (tickId){ clearTimeout(tickId); tickId=null; }
     return;
   }
   if (!wasBackgrounded) return;
   wasBackgrounded = false;
-  // キーボード等の瞬間的な hidden はベールなしで tick だけ再開
-  if (Date.now() - hiddenAt < 200){
-    startTicking(true);
-    clearResumeVeil();
-    return;
-  }
   resumePipeline();
 });
 window.addEventListener('pageshow', (e)=>{
@@ -1976,7 +1953,6 @@ window.addEventListener('pageshow', (e)=>{
 });
 // 入力外タップで選択解除（キーボード専用の viewport ハックは外した）
 document.addEventListener('pointerdown', (e)=>{
-  clearResumeVeil();
   const t = e.target;
   if (!t || !t.closest || !t.closest('input, textarea, [contenteditable]')){
     try { window.getSelection()?.removeAllRanges(); } catch (err) {}
