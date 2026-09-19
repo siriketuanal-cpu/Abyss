@@ -124,8 +124,9 @@
   .card.idle.full{
     border-color:var(--orange) !important;
   }
-  /* Abyssはカード全体を1つのタップ領域にする。入力欄以外はどこを押しても40使い切り。 */
-  .card.abyss .clockstack, .card.abyss .stammax, .card.abyss .slash{pointer-events:none;}
+  /* Abyss／スタミナ・オーブ：最大・時計はヒット透過。入力欄以外で使い切り。 */
+  .card.abyss .clockstack, .card.abyss .stammax, .card.abyss .slash,
+  .card.stam .clockstack, .card.stam .stammax, .card.stam .slash{pointer-events:none;}
   .card.abyss .abyss-head{justify-content:space-between; min-height:18px; height:18px; margin-bottom:2px; position:static;}
   .card.abyss .rank{position:absolute; top:0; left:6px; right:auto; width:4.5em; max-width:none; text-align:left;}
   .card.stam, .card.idle{
@@ -275,6 +276,12 @@
   #toast button{
     border:1px solid var(--line); background:var(--card2); color:var(--text);
     border-radius:8px; padding:6px 10px; font-size:12px; font-weight:600;
+  }
+  /* 削除・やめるは小さめ＆一段下（最大スタミナ編集の邪魔にしない） */
+  #toast button.ok,
+  #toast button[data-act="no"]{
+    padding:4px 8px; font-size:11px; font-weight:600;
+    margin-top:6px; opacity:.92;
   }
   #toast button.ok{background:var(--danger); border-color:transparent; color:#fff;}
   /* 1回目タップで破線（確定待ち）。2回目で実行 */
@@ -1116,14 +1123,12 @@ function bindLongPressDelete(el, id, shortAction){
   // ここに入ると「編集開始 → 直後に削除確認」が同時発火して壊れる。
   const isEditTarget = (target)=>{
     if (!target || !target.closest) return false;
-    // .name / .name-text は意図的に除外：ヘッダー・グループ名は名前自体が長押し削除の対象
-    // （数字・ランク編集欄だけを「削除/40計算と分離」する）
+    // 現在値・ランク編集だけ分離。最大は表示のみなので maxWrap は使い切りに通す
     return !!(
       target.closest('.inline-edit-input') ||
       target.closest('.rank-edit-input') ||
       target.closest('.rank-text') ||
       target.closest('[data-role="curWrap"]') ||
-      target.closest('[data-role="maxWrap"]') ||
       target.closest('.rank')
     );
   };
