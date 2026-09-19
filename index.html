@@ -63,6 +63,8 @@
   }
   .name-text.is-placeholder{ color:var(--sub); font-weight:600; }
   /* TWA復帰時の一瞬の再構築を視覚的に隠す。通常起動・通常操作では非表示。 */
+  #resumeVeil{position:fixed;inset:0;background:var(--bg);opacity:0;pointer-events:none;z-index:100;transition:opacity 90ms linear;}
+  #resumeVeil.show{opacity:1;}
   header{
     display:flex; align-items:center; gap:8px; padding:10px 12px 6px;
     flex:0 0 auto; background:var(--bg); z-index:5;
@@ -128,9 +130,9 @@
   .row + .row{margin-top:3px;}
   .namerow{margin-bottom:4px;}
   /* タイマーカードは種類に関係なく同じ外寸に揃える。中身だけ配置を変える。 */
-  .card.stam, .card.idle{height:56px; min-height:56px;}
+  .card.stam, .card.idle{height:56px; min-height:56px;} 
   /* claim / full は種類別 border より後に書き、特異性を上げて破線・色が消えないようにする。
-     （種類別のborderより後に共通状態を適用） */
+     （長押し削除の破線は共通 .longpress-target で表示） */
   .card.claim,
   .card.stam.claim,
   .card.idle.claim{
@@ -142,7 +144,6 @@
   .card.idle.full{
     border-color:var(--orange) !important;
   }
-  /* スタミナ：最大・時計はヒット透過。入力欄以外で使い切り。 */
   .card.stam .clockstack, .card.stam .stammax, .card.stam .slash{pointer-events:none;}
   .card.stam, .card.idle{
     padding:6px; display:flex; flex-direction:column; justify-content:center;
@@ -151,7 +152,7 @@
     width:100%; background:transparent; border:none; color:var(--text);
     font-size:11px; font-weight:600; padding:2px 0; min-width:0;
   }
-  /* ランク：普段は span、編集時だけ input（現在は見出し系で使用） */
+  /* ランク：普段は span、編集時だけ input（名前と同じ方式） */
   .rank{
     position:absolute; top:2px; right:2px; width:4.5em; max-width:45%;
     height:18px; line-height:18px; min-height:0; max-height:18px;
@@ -232,10 +233,13 @@
   [data-role="curWrap"].near,
   [data-role="curWrap"].near .inline-number-text{color:var(--danger) !important;}
   .main.near{color:var(--danger) !important;}
-  /* 予定時刻はタイマーカードで右上に統一。 */
   .card.stam > .stam-clock,
   .card.idle > .idle-clock{
     position:absolute; right:6px; left:auto; top:0; margin:0; transform:none; height:18px; line-height:18px;
+  }
+    margin:0; min-width:0; flex-direction:row; align-items:center; justify-content:flex-start;
+    gap:0; font-size:9.5px; line-height:18px; letter-spacing:.01em; transform:none;
+    position:absolute; right:6px; left:auto; top:0; height:18px;
   }
   /* 放置タイマー本体も下段中央。予定時刻だけ左上へ配置。 */
   .valrow-idle{
@@ -258,6 +262,15 @@
     width:65%; max-width:260px; flex:0 1 auto; font-size:13px; font-weight:700; color:var(--accent);
     padding:0; line-height:1.25; min-height:0;
   }
+  .header-menu-button{
+    margin-left:auto; flex:0 0 22px; width:22px; height:22px;
+    padding:0; border:1px solid var(--line); border-radius:50%;
+    background:var(--card2); color:var(--sub); font-size:14px; line-height:20px;
+    display:flex; align-items:center; justify-content:center;
+    appearance:none; -webkit-appearance:none; outline:none; box-shadow:none;
+    touch-action:manipulation; -webkit-tap-highlight-color:transparent;
+  }
+  .header-menu-button:active{background:var(--card2); color:var(--text);}
   .header-palette{display:flex; gap:5px; flex-wrap:wrap; justify-content:center; margin:4px 0 2px;}
   .header-swatch{width:26px; height:26px; padding:0; border-radius:50%; border:2px solid var(--line); box-shadow:none;}
   .header-swatch.selected{border-color:#fff; outline:1px solid var(--accent);}
@@ -341,12 +354,7 @@
   }
   #setupPanel.show{display:flex;}
   #setupPanel .setupLabel{font-size:13px; color:var(--sub); text-align:center;}
-  #setupFields{display:flex; flex-direction:column; align-items:stretch; justify-content:center; gap:7px; width:100%;}
-  #setupFields .setup-row{display:flex; align-items:center; justify-content:center; gap:6px; width:100%; min-height:30px;}
-  #setupFields .setup-row-stam{display:grid; grid-template-columns:auto minmax(52px,1fr) auto minmax(52px,1fr); gap:6px; max-width:280px; margin:0 auto;}
-  #setupFields .setup-row-interval{width:auto; margin:0 auto;}
-  #setupFields .setup-key{color:var(--sub); font-size:13px; white-space:nowrap;}
-  #setupFields .setup-key-use{margin-left:4px;}
+  #setupFields{display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:6px;}
   #setupFields input{
     width:60px; background:var(--card2); border:1px solid var(--line); border-radius:8px;
     color:var(--text); font-size:16px; text-align:center; padding:8px 4px;
@@ -388,6 +396,7 @@
 </style>
 </head>
 <body>
+<div id="resumeVeil" aria-hidden="true"></div>
 <header>
 <button aria-label="アプリを更新" class="iconbtn" id="updateBtn" title="アプリを更新">↻</button>
 <span aria-hidden="true" class="spacer"></span>
@@ -547,14 +556,10 @@ function load(){
     if (raw){
       const data = JSON.parse(raw);
       if (data && Array.isArray(data.items)){
-        // 旧版に残っているAbyssタイマー本体だけを読み込み対象から外す。
-        // 40使い切り計算はスタミナ／オーブ側の共通処理として残す。
-        data.items = data.items.filter(it => it && it.type !== 'abyss');
         data.items.forEach(it=>{
           if (!it) return;
           normalizeIdleClaim(it);
           if (it.type === 'group' && Array.isArray(it.children)){
-            it.children = it.children.filter(ch => ch && ch.type !== 'abyss');
             it.children.forEach(ch=>{
               normalizeIdleClaim(ch);
             });
@@ -1069,27 +1074,13 @@ function startTicking(force){
   if (!tickId && needsTicking()) scheduleTick(tickGen);
 }
 
-// タイマー／長押し系で共通して使うポインタ判定。
-const TAP_MOVE_PX = 24;
-const isPrimaryPointer = e => e.isPrimary !== false && !(e.pointerType === 'mouse' && e.button !== 0);
-const isTimerEditTarget = (target)=>{
-  if (!target || !target.closest) return false;
-  return !!(
-    target.closest('.inline-edit-input') ||
-    target.closest('.rank-edit-input') ||
-    target.closest('.rank-text') ||
-    target.closest('[data-role="curWrap"]') ||
-    target.closest('.rank') ||
-    target.closest('.timer-menu-tab')
-  );
-};
-
 // 長押し削除＋短押しアクション（使い切り・受取など）
 function bindLongPressDelete(el, id, shortAction){
-  const HOLD_MS = 520;
+  const HOLD_MS = 520, MOVE_PX = 24;
   let timer = null, active = false, moved = false, longFired = false;
   let sx = 0, sy = 0, pid = null;
 
+  const isPrimary = e => e.isPrimary !== false && !(e.pointerType==='mouse' && e.button!==0);
   const clearSelection = ()=>{ try{ window.getSelection()?.removeAllRanges(); }catch(e){} };
   const cleanup = ()=>{
     if (timer !== null){ clearTimeout(timer); timer = null; }
@@ -1097,10 +1088,21 @@ function bindLongPressDelete(el, id, shortAction){
   };
 
   // 現在値・ランク編集中は長押し削除／使い切りと分離
-  const isEditTarget = isTimerEditTarget;
+  const isEditTarget = (target)=>{
+    if (!target || !target.closest) return false;
+    return !!(
+      target.closest('.inline-edit-input') ||
+      target.closest('.rank-edit-input') ||
+      target.closest('.rank-text') ||
+      target.closest('[data-role="curWrap"]') ||
+      target.closest('.rank') ||
+      target.closest('.timer-menu-tab') ||
+      target.closest('.header-menu-button')
+    );
+  };
 
   el.addEventListener('pointerdown', e=>{
-    if (!isPrimaryPointer(e) || active) return;
+    if (!isPrimary(e) || active) return;
     if (isEditTarget(e.target)) return;
     if (editingId != null) return;
 
@@ -1124,7 +1126,7 @@ function bindLongPressDelete(el, id, shortAction){
 
   el.addEventListener('pointermove', e=>{
     if (!active || e.pointerId !== pid) return;
-    if (Math.hypot(e.clientX-sx, e.clientY-sy) > TAP_MOVE_PX){
+    if (Math.hypot(e.clientX-sx, e.clientY-sy) > MOVE_PX){
       moved = true;
       if (timer !== null){ clearTimeout(timer); timer = null; }
     }
@@ -1160,48 +1162,46 @@ function targetInGroupName(target, el){
   return !!n && el.contains(n);
 }
 
-// タイマーカードの通常タップは親コンテナで1系統だけ監視する。
-// 各カードへ個別に pointer 系リスナーを付けず、カード追加・再描画のたびに
-// リスナーが増えないようイベント委譲する。長押しメニューはここでは扱わない。
-function bindTimerTapDelegation(container){
-  if (!container || container.dataset.timerTapBound === '1') return;
-  container.dataset.timerTapBound = '1';
-  let active = false, moved = false, pid = null, card = null;
+// タイマーカード用の通常タップだけを処理。長押しでメニューは開かない。
+// メニューは右上の timer-menu-tab からのみ開く。
+function bindTimerShortAction(el, shortAction){
+  let active = false, moved = false, pid = null;
   let sx = 0, sy = 0;
-
-  const cleanup = ()=>{ active=false; moved=false; pid=null; card=null; };
-  const findTimerCard = target => {
-    if (!target || !target.closest) return null;
-    const el = target.closest('.card.stam, .card.idle');
-    return el && container.contains(el) ? el : null;
+  const MOVE_PX = 24;
+  const isPrimary = e => e.isPrimary !== false && !(e.pointerType==='mouse' && e.button!==0);
+  const isEditTarget = (target)=>{
+    if (!target || !target.closest) return false;
+    return !!(
+      target.closest('.inline-edit-input') ||
+      target.closest('.rank-edit-input') ||
+      target.closest('.rank-text') ||
+      target.closest('[data-role="curWrap"]') ||
+      target.closest('.rank') ||
+      target.closest('.timer-menu-tab') ||
+      target.closest('.header-menu-button')
+    );
   };
+  const cleanup = ()=>{ active=false; moved=false; pid=null; };
 
-  container.addEventListener('pointerdown', e=>{
-    if (!isPrimaryPointer(e) || active || editingId != null || isTimerEditTarget(e.target)) return;
-    const hit = findTimerCard(e.target);
-    if (!hit) return;
-    active = true; moved = false; pid = e.pointerId; card = hit;
+  el.addEventListener('pointerdown', e=>{
+    if (!isPrimary(e) || active || editingId != null || isEditTarget(e.target)) return;
+    active = true; moved = false; pid = e.pointerId;
     sx = e.clientX; sy = e.clientY;
   }, {capture:true, passive:true});
 
-  container.addEventListener('pointermove', e=>{
+  el.addEventListener('pointermove', e=>{
     if (!active || e.pointerId !== pid) return;
-    if (Math.hypot(e.clientX-sx, e.clientY-sy) > TAP_MOVE_PX) moved = true;
+    if (Math.hypot(e.clientX-sx, e.clientY-sy) > MOVE_PX) moved = true;
   }, {capture:true, passive:true});
 
-  container.addEventListener('pointerup', e=>{
+  el.addEventListener('pointerup', e=>{
     if (!active || e.pointerId !== pid) return;
-    const hit = card;
-    const shouldAct = !moved && !isTimerEditTarget(e.target) && hit && container.contains(hit);
-    const id = hit ? hit.dataset.id : null;
-    const it = id ? findItemById(id) : null;
+    const shouldAct = !moved && !isEditTarget(e.target) && typeof shortAction === 'function';
     cleanup();
-    if (!shouldAct || !it) return;
-    if (it.type === 'stam') onUseChunkTap(it, e);
-    else if (it.type === 'idle') toggleIdle(it);
+    if (shouldAct) shortAction(e);
   }, {capture:true, passive:false});
 
-  container.addEventListener('pointercancel', e=>{
+  el.addEventListener('pointercancel', e=>{
     if (!active || e.pointerId !== pid) return;
     cleanup();
   }, {capture:true, passive:true});
@@ -1261,6 +1261,7 @@ function askRemoveItem(id){
   const isStam = it && it.type === 'stam';
   const canEditName = isHeader || isGroup;
   const colorDefault = isHeader ? (it.color || '#9b8bff') : (isRule ? (it.color || '#52617a') : null);
+  // スタミナは設定済み or 後から付けられるよう空欄でも出す
   const showChunk = isStam;
   const chunkVal = isStam ? (it.useChunk != null ? clampUseChunk(it.useChunk) : '') : null;
   const showStamMax = isStam && !it.lockedMax;
@@ -1328,10 +1329,10 @@ function askRemoveItem(id){
     if (chunkEl){
       const origChunk = it.useChunk != null ? clampUseChunk(it.useChunk) : null;
       chunkEl.addEventListener('focus', ()=>{ chunkEl.value = ''; });
-      const applyChunk = (persist)=>{
+      const applyChunk = ()=>{
         const raw = String(chunkEl.value || '').replace(/\D/g, '');
         if (raw === ''){
-          // 空欄ならスタミナは「使い切りなし」
+          // スタミナは空で「使い切りなし」
           if (isStam){
             delete it.useChunk;
             chunkEl.value = '';
@@ -1342,12 +1343,12 @@ function askRemoveItem(id){
           chunkEl.value = String(it.useChunk);
           if (pending40Id === it.id) paintUseChunkPreview(it.id);
         }
-        // タップ処理は常時バインドしてあり、ここではカード全体を再構築しない。
-        if (persist) save();
+        // カードの短押しバインドは再renderが必要なので、スタミナは軽く再構築
+        if (isStam){ save(); render(); startTicking(true); }
+        else save();
       };
-      chunkEl.addEventListener('input', ()=>applyChunk(false));
-      chunkEl.addEventListener('change', ()=>applyChunk(true));
-      chunkEl.addEventListener('blur', ()=>applyChunk(true));
+      chunkEl.addEventListener('change', applyChunk);
+      chunkEl.addEventListener('blur', applyChunk);
       chunkEl.addEventListener('keydown', e=>{
         if (e.key === 'Enter'){ e.preventDefault(); chunkEl.blur(); }
       });
@@ -1382,47 +1383,23 @@ function askRemoveItem(id){
     }
   }
 }
-// カード外枠の共通生成（タイマーカード）
+// カード外枠の共通生成（stam / idle）
 function makeCardEl(type, id, innerHtml){
   const wrap = document.createElement('div');
   wrap.className = 'card ' + type;
   wrap.dataset.id = id;
   wrap.innerHTML = innerHtml;
 
-  // タイマーカードには右上のメニュー用タブを付ける。
-  // カード本体の短押し／長押しとは別ヒット領域にして、既存タップ処理を汚さない。
-  if (type === 'stam' || type === 'idle'){
-    const tab = document.createElement('button');
-    tab.type = 'button';
-    tab.className = 'timer-menu-tab';
-    tab.setAttribute('aria-label', 'タイマーメニュー');
-    tab.title = 'タイマーメニュー';
-    // pointerdownでは開かない。まずネイティブのボタンフォーカスを止め、
-    // pointerupが完了してからトーストを生成する。これなら生成直後の入力欄へ
-    // 同じタップが流れ込む余地を作らない。
-    tab.addEventListener('pointerdown', e=>{
-      if (e.isPrimary === false) return;
-      if (e.pointerType === 'mouse' && e.button !== 0) return;
-      e.preventDefault();
-      e.stopPropagation();
-    }, {capture:false, passive:false});
-    tab.addEventListener('pointerup', e=>{
-      if (e.isPrimary === false) return;
-      if (e.pointerType === 'mouse' && e.button !== 0) return;
-      e.preventDefault();
-      e.stopPropagation();
-      tab.blur();
-      setTimeout(()=>askRemoveItem(id), 0);
-    }, {capture:false, passive:false});
-    tab.addEventListener('click', e=>{
-      e.preventDefault();
-      e.stopPropagation();
-    }, {capture:false, passive:false});
+  // 付箋型メニューボタン自体は各カードへ置くが、イベントは共通の親で委譲する。
+  const tab = document.createElement('button');
+  tab.type = 'button';
+  tab.className = 'timer-menu-tab';
+  tab.setAttribute('aria-label', 'タイマーメニュー');
+  tab.title = 'タイマーメニュー';
   wrap.appendChild(tab);
-  }
   return wrap;
 }
-// スタミナ共通の下段 HTML
+// スタミナ系共通の下段 HTML
 function valrowStamHtml(){
   return `<div class="row valrow-stam">
       <span class="stamval" data-role="curWrap"></span>
@@ -1430,7 +1407,7 @@ function valrowStamHtml(){
       <span class="stammax" data-role="maxWrap"></span>
     </div>`;
 }
-// スタミナ現在値インライン編集
+// 現在値インライン編集（スタミナ系共用）
 function attachCurrentEditor(curWrap, it, extraCommit){
   const clearFortyPreview = ()=>{
     if (hasUseChunk(it) && pending40Id === it.id){
@@ -1484,10 +1461,12 @@ function buildStamCard(it){
   const curWrap = wrap.querySelector('[data-role="curWrap"]');
   const maxWrap = wrap.querySelector('[data-role="maxWrap"]');
   const curEditor = attachCurrentEditor(curWrap, it, () => { pending40Id = null; });
-  // 最大は表示のみ（編集はトースト）。
+  // 最大は表示のみ（編集は長押しトースト）。
   maxWrap.textContent = String(it.max);
   refs[it.id] = { el: wrap, curEl: curEditor, maxLabel: maxWrap,
     clockEl: wrap.querySelector('[data-role="clock"]') };
+  // 使い切り設定があるときだけカード短押しでプレビュー/確定
+  bindTimerShortAction(wrap, hasUseChunk(it) ? (e) => onUseChunkTap(it, e) : null);
   return wrap;
 }
 
@@ -1500,6 +1479,8 @@ function buildIdleCard(it){
   `);
   refs[it.id] = { el: wrap,
     curEl: wrap.querySelector('[data-role="cur"]'), clockEl: wrap.querySelector('[data-role="clock"]') };
+  // 受取トグルは短押し(pointerup)。pointerdown にすると長押し削除と同時発火する。
+  bindTimerShortAction(wrap, ()=>toggleIdle(it));
   return wrap;
 }
 
@@ -1574,6 +1555,64 @@ function buildRuleCard(it){
   bindLongPressDelete(wrap, it.id);
   return wrap;
 }
+function bindTimerMenuDelegation(parent){
+  if (!parent || parent.dataset.timerMenuBound) return;
+  parent.dataset.timerMenuBound = '1';
+  const isPrimary = e => e.isPrimary !== false && !(e.pointerType === 'mouse' && e.button !== 0);
+  parent.addEventListener('pointerdown', e=>{
+    const tab = e.target.closest('.timer-menu-tab');
+    if (!tab || !parent.contains(tab) || !isPrimary(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+  }, {capture:false, passive:false});
+  parent.addEventListener('pointerup', e=>{
+    const tab = e.target.closest('.timer-menu-tab');
+    if (!tab || !parent.contains(tab) || !isPrimary(e)) return;
+    const card = tab.closest('.card');
+    const id = card?.dataset.id;
+    if (!id) return;
+    e.preventDefault();
+    e.stopPropagation();
+    tab.blur();
+    setTimeout(()=>askRemoveItem(id), 0);
+  }, {capture:false, passive:false});
+  parent.addEventListener('click', e=>{
+    const tab = e.target.closest('.timer-menu-tab');
+    if (!tab || !parent.contains(tab)) return;
+    e.preventDefault();
+    e.stopPropagation();
+  }, {capture:false, passive:false});
+}
+
+function bindHeaderMenuDelegation(parent){
+  if (!parent || parent.dataset.headerMenuBound) return;
+  parent.dataset.headerMenuBound = '1';
+  const isPrimary = e => e.isPrimary !== false && !(e.pointerType === 'mouse' && e.button !== 0);
+  parent.addEventListener('pointerdown', e=>{
+    const btn = e.target.closest('.header-menu-button');
+    if (!btn || !parent.contains(btn) || !isPrimary(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+  }, {capture:false, passive:false});
+  parent.addEventListener('pointerup', e=>{
+    const btn = e.target.closest('.header-menu-button');
+    if (!btn || !parent.contains(btn) || !isPrimary(e)) return;
+    const header = btn.closest('.divider');
+    const id = header?.dataset.id;
+    if (!id) return;
+    e.preventDefault();
+    e.stopPropagation();
+    btn.blur();
+    setTimeout(()=>askRemoveItem(id), 0);
+  }, {capture:false, passive:false});
+  parent.addEventListener('click', e=>{
+    const btn = e.target.closest('.header-menu-button');
+    if (!btn || !parent.contains(btn)) return;
+    e.preventDefault();
+    e.stopPropagation();
+  }, {capture:false, passive:false});
+}
+
 function buildHeaderCard(it){
   const wrap = document.createElement('div');
   wrap.className = 'divider';
@@ -1582,8 +1621,16 @@ function buildHeaderCard(it){
   });
   nameEditor.setColor(it.color || 'var(--accent)');
   wrap.appendChild(nameEditor.wrap);
+  wrap.dataset.id = it.id;
+  const menuBtn = document.createElement('button');
+  menuBtn.type = 'button';
+  menuBtn.className = 'header-menu-button';
+  menuBtn.setAttribute('aria-label', '見出しメニュー');
+  menuBtn.title = '見出しメニュー';
+  menuBtn.textContent = '⋮';
+  wrap.appendChild(menuBtn);
   refs[it.id] = { el: wrap, nameEl: nameEditor.wrap, nameEditor };
-  // 名前要素ではなく divider 本体に長押しを付ける（子の stopPropagation の影響を受けない）
+  // 既存のヘッダー長押しは残す。丸型ボタンだけは別経路でトーストを開く。
   bindLongPressDelete(wrap, it.id);
   return wrap;
 }
@@ -1734,7 +1781,7 @@ function render(){
   Object.keys(refs).forEach(id=>{ if(!existingIds.has(id)) delete refs[id]; });
 
   for (const it of state.items){
-    if (!refs[it.id]){
+      if (!refs[it.id]){
       const el = it.type==='stam' ? buildStamCard(it) : it.type==='idle' ? buildIdleCard(it) : it.type==='rule' ? buildRuleCard(it) : it.type==='group' ? buildGroupCard(it) : buildHeaderCard(it);
     } else if (it.type==='group'){
       renderGroupBody(it);
@@ -1768,7 +1815,7 @@ function render(){
     }
   }
 }
-// stam/idle の値更新をトップレベル/アカウント枠の子どちらでも共用する
+// スタミナ/放置の値更新をトップレベル/アカウント枠の子どちらでも共用する
 function updateTimerCard(it, r, now){
   if (!it || !r) return;
   if (it.type==='stam'){
@@ -1850,8 +1897,9 @@ function openSetup(type){
   } else if (type === 'stam'){
     setupLabelEl.textContent = 'スタミナ設定';
     setupFieldsEl.innerHTML = `
-      <div class="setup-row setup-row-interval"><span class="setup-key">回復</span><input type="text" inputmode="numeric" pattern="[0-9]*" id="setupInterval" value="5"><span>分で1</span></div>
-      <div class="setup-row setup-row-stam"><span class="setup-key">最大</span><input type="text" inputmode="numeric" pattern="[0-9]*" id="setupMax" value="100"><span class="setup-key setup-key-use">使い切り</span><input type="text" inputmode="numeric" pattern="[0-9]*" id="setupUseChunk" value="" placeholder="—"></div>`;
+      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupInterval" value="5"><span>分で1</span>
+      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupMax" value="100" style="margin-left:6px;"><span>最大</span>
+      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupUseChunk" value="" style="margin-left:6px;" placeholder="—"><span>使い切り</span>`;
   } else if (type === 'orb'){
     setupLabelEl.textContent = 'オーブ設定';
     setupFieldsEl.innerHTML = `
@@ -1941,22 +1989,46 @@ if (setupCancelEl){
   });
 }
 
+const resumeVeilEl = document.getElementById('resumeVeil');
+let resumeTimer = null;
 let wasBackgrounded = false;
-// 復帰は「現在時刻で1回だけ差分描画 → tick再開」に一本化。
-// DOM再構築・requestAnimationFrame待ち・復帰用setTimeoutは行わない。
+let hiddenAt = 0;
+function clearResumeVeil(){
+  if (resumeTimer){ clearTimeout(resumeTimer); resumeTimer = null; }
+  if (resumeVeilEl) resumeVeilEl.classList.remove('show');
+}
+// 復帰処理を1本化：覆う → 差分更新 → tick再開 → 安定後に覆いを外す
+// キーボード開閉などの短い hidden では動かさない（黒ベール残留の主因）
 function resumePipeline(){
-  tickRender(Date.now());
-  startTicking(true);
+  if (resumeTimer) clearTimeout(resumeTimer);
+  if (!resumeVeilEl) return;
+  resumeVeilEl.classList.add('show');
+  const finish = () => {
+    tickRender(Date.now());
+    startTicking(true);
+    resumeTimer = setTimeout(()=>{
+      resumeTimer = null;
+      resumeVeilEl.classList.remove('show');
+    }, 220);
+  };
+  requestAnimationFrame(() => requestAnimationFrame(finish));
 }
 document.addEventListener('visibilitychange', ()=>{
   if (document.hidden){
     wasBackgrounded = true;
+    hiddenAt = Date.now();
     tickGen++;
     if (tickId){ clearTimeout(tickId); tickId=null; }
     return;
   }
   if (!wasBackgrounded) return;
   wasBackgrounded = false;
+  // キーボード等の瞬間的な hidden はベールなしで tick だけ再開
+  if (Date.now() - hiddenAt < 200){
+    startTicking(true);
+    clearResumeVeil();
+    return;
+  }
   resumePipeline();
 });
 window.addEventListener('pageshow', (e)=>{
@@ -1964,13 +2036,16 @@ window.addEventListener('pageshow', (e)=>{
 });
 // 入力外タップで選択解除（キーボード専用の viewport ハックは外した）
 document.addEventListener('pointerdown', (e)=>{
+  clearResumeVeil();
   const t = e.target;
   if (!t || !t.closest || !t.closest('input, textarea, [contenteditable]')){
     try { window.getSelection()?.removeAllRanges(); } catch (err) {}
   }
 }, true);
 
-bindTimerTapDelegation(cardsEl);
+bindTimerMenuDelegation(cardsEl);
+bindHeaderMenuDelegation(cardsEl);
+
 render();
 startTicking(true);
 
