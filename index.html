@@ -2153,62 +2153,88 @@ document.addEventListener('pointerdown', (e)=>{
          場合「だけ」文字サイズを縮めて枠内に収める。
    方針：枠・「/」・カードの位置や大きさ、タップ判定には一切触れない。
          枠に収まる端末では何もしない（font-size を上書きしない＝従来のまま）。
+   測定：実行中にレイアウトを測り直さない。
+         ・数字1桁ぶんの幅は、起動後に1回だけ測って固定する（フォントは途中で変わらないため）
+         ・枠の幅は ResizeObserver の通知をもらう（強制レイアウトなし・幅が変わった時だけ）
+         ・あとは「桁数 × 数字幅」の計算だけで決める（毎分の更新でも測定しない）
    取り外し：このブロック（ここから〜ここまで）を丸ごと削除するだけ。他の箇所は無改造。
    ═══════════════════════════════════════════════════ */
 (function(){
-  const MIN_FONT = 11;    // これより小さくはしない(px)
-  const SAFETY   = 0.98;  // 収まりぎりぎりを避ける余裕
+  if (typeof ResizeObserver === 'undefined') return;   // 非対応環境では何もしない（従来どおり）
 
-  const range = document.createRange();
-  const textW = el => { range.selectNodeContents(el); return range.getBoundingClientRect().width; };
+  const MIN_FONT  = 11;    // これより小さくはしない(px)
+  const SAFETY    = 0.98;  // 収まりぎりぎりを避ける余裕
+  const TOLERANCE = 0.5;   // この程度(px)のはみ出しは無視（元の表示を優先）
 
-  function fit(card){
-    if (!card || !card.isConnected) return;
+  let digitEm  = 0;        // 数字1桁の最大幅（em換算）。1回測ったら固定
+  let baseFont = 18;       // 元のフォントサイズ(px)。CSS の値を1回だけ読んで固定
+
+  // 実際の数字と同じフォントで、0〜9のうち一番広い数字の幅を1回だけ測る
+  function calibrate(slot){
+    const cs = getComputedStyle(slot);
+    baseFont = parseFloat(cs.fontSize) || 18;
+    const probe = document.createElement('span');
+    probe.textContent = '0123456789';
+    probe.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden;white-space:nowrap;line-height:1;font-size:100px;font-variant-numeric:tabular-nums;';
+    probe.style.fontFamily = cs.fontFamily;
+    probe.style.fontWeight = cs.fontWeight;
+    document.body.appendChild(probe);
+    const node = probe.firstChild, rg = document.createRange();
+    let w = 0;
+    for (let i = 0; i < 10; i++){
+      rg.setStart(node, i); rg.setEnd(node, i + 1);
+      w = Math.max(w, rg.getBoundingClientRect().width);
+    }
+    probe.remove();
+    digitEm = w / 100;
+  }
+
+  // 桁数と枠幅から文字サイズを決めて反映（測定なし・計算のみ）
+  function apply(card){
+    const slotW = card._slotW;
+    if (!slotW) return;
     const cur = card.querySelector('.stamval');
     const max = card.querySelector('.stammax');
     const curText = cur && cur.querySelector('.inline-number-text');
     if (!cur || !max || !curText) return;
+    if (!digitEm){ calibrate(cur); if (!digitEm) return; }
 
-    // 文字が前回と同じなら測り直さない（毎秒の更新で余計な再計算をしない）
-    const key = curText.textContent + '/' + max.textContent;
-    if (card._fitKey === key) return;
-
-    // いったん元のサイズに戻して測る
-    cur.style.fontSize = '';
-    max.style.fontSize = '';
-    const curW = cur.getBoundingClientRect().width;
-    const maxW = max.getBoundingClientRect().width;
-    if (!curW || !maxW) return;   // 非表示中などは測れない → 次回に回す（キーは保存しない）
-
-    // あふれている側に合わせて、現在値・最大値を同じ比率で縮める
-    let k = 1;
-    const tc = textW(curText), tm = textW(max);
-    if (tc > curW) k = Math.min(k, curW / tc);
-    if (tm > maxW) k = Math.min(k, maxW / tm);
-    if (k < 1){
-      const base = parseFloat(getComputedStyle(max).fontSize) || 18;
-      const px = Math.max(MIN_FONT, Math.floor(base * k * SAFETY * 10) / 10);
-      cur.style.fontSize = px + 'px';
-      max.style.fontSize = px + 'px';
-    }
+    const lc = curText.textContent.length, lm = max.textContent.length;
+    const key = slotW + '|' + lc + '|' + lm;
+    if (card._fitKey === key) return;      // 桁数も枠幅も同じなら何もしない
     card._fitKey = key;
+
+    const need = Math.max(lc, lm) * digitEm * baseFont;   // 文字サイズ据え置き時に必要な幅
+    let px = '';                                          // '' ＝ 上書きなし（元のまま）
+    if (need > slotW + TOLERANCE){
+      px = Math.max(MIN_FONT, Math.floor(baseFont * (slotW / need) * SAFETY * 10) / 10) + 'px';
+    }
+    if (cur.style.fontSize !== px){ cur.style.fontSize = px; max.style.fontSize = px; }
   }
 
+  // 枠（現在値スロット）の幅が変わった時だけブラウザから通知が来る
+  const ro = new ResizeObserver(entries => {
+    for (const e of entries){
+      const card = e.target.closest && e.target.closest('.card');
+      if (!card) continue;
+      card._slotW = e.contentRect.width;
+      apply(card);
+    }
+  });
+
   // updateTimerCard の後ろに乗せる（本体は無改造）。対象はスタミナカードのみ。
+  const seen = new WeakSet();
   const orig = updateTimerCard;
   updateTimerCard = function(it, r, now){
     orig(it, r, now);
-    if (it && r && it.type === 'stam') fit(r.el);
+    if (!it || !r || it.type !== 'stam' || !r.el) return;
+    const card = r.el;
+    if (!seen.has(card)){
+      const slot = card.querySelector('.stamval');
+      if (slot){ seen.add(card); ro.observe(slot); }
+    }
+    apply(card);
   };
-
-  // 画面幅が変わったら測り直す
-  let rz = 0;
-  window.addEventListener('resize', ()=>{
-    clearTimeout(rz);
-    rz = setTimeout(()=>{
-      document.querySelectorAll('.card.stam').forEach(c=>{ c._fitKey = null; fit(c); });
-    }, 120);
-  });
 })();
 /* ═══════════════ 機種差フィット（ここまで）═══════════════ */
 
