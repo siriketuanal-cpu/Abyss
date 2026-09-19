@@ -2148,6 +2148,70 @@ document.addEventListener('pointerdown', (e)=>{
   }
 }, true);
 
+/* ═══════════════ 機種差フィット（ここから）═══════════════
+   目的：端末ごとのフォント・画面幅の違いで、スタミナの数字が枠からあふれる
+         場合「だけ」文字サイズを縮めて枠内に収める。
+   方針：枠・「/」・カードの位置や大きさ、タップ判定には一切触れない。
+         枠に収まる端末では何もしない（font-size を上書きしない＝従来のまま）。
+   取り外し：このブロック（ここから〜ここまで）を丸ごと削除するだけ。他の箇所は無改造。
+   ═══════════════════════════════════════════════════ */
+(function(){
+  const MIN_FONT = 11;    // これより小さくはしない(px)
+  const SAFETY   = 0.98;  // 収まりぎりぎりを避ける余裕
+
+  const range = document.createRange();
+  const textW = el => { range.selectNodeContents(el); return range.getBoundingClientRect().width; };
+
+  function fit(card){
+    if (!card || !card.isConnected) return;
+    const cur = card.querySelector('.stamval');
+    const max = card.querySelector('.stammax');
+    const curText = cur && cur.querySelector('.inline-number-text');
+    if (!cur || !max || !curText) return;
+
+    // 文字が前回と同じなら測り直さない（毎秒の更新で余計な再計算をしない）
+    const key = curText.textContent + '/' + max.textContent;
+    if (card._fitKey === key) return;
+
+    // いったん元のサイズに戻して測る
+    cur.style.fontSize = '';
+    max.style.fontSize = '';
+    const curW = cur.getBoundingClientRect().width;
+    const maxW = max.getBoundingClientRect().width;
+    if (!curW || !maxW) return;   // 非表示中などは測れない → 次回に回す（キーは保存しない）
+
+    // あふれている側に合わせて、現在値・最大値を同じ比率で縮める
+    let k = 1;
+    const tc = textW(curText), tm = textW(max);
+    if (tc > curW) k = Math.min(k, curW / tc);
+    if (tm > maxW) k = Math.min(k, maxW / tm);
+    if (k < 1){
+      const base = parseFloat(getComputedStyle(max).fontSize) || 18;
+      const px = Math.max(MIN_FONT, Math.floor(base * k * SAFETY * 10) / 10);
+      cur.style.fontSize = px + 'px';
+      max.style.fontSize = px + 'px';
+    }
+    card._fitKey = key;
+  }
+
+  // updateTimerCard の後ろに乗せる（本体は無改造）。対象はスタミナカードのみ。
+  const orig = updateTimerCard;
+  updateTimerCard = function(it, r, now){
+    orig(it, r, now);
+    if (it && r && it.type === 'stam') fit(r.el);
+  };
+
+  // 画面幅が変わったら測り直す
+  let rz = 0;
+  window.addEventListener('resize', ()=>{
+    clearTimeout(rz);
+    rz = setTimeout(()=>{
+      document.querySelectorAll('.card.stam').forEach(c=>{ c._fitKey = null; fit(c); });
+    }, 120);
+  });
+})();
+/* ═══════════════ 機種差フィット（ここまで）═══════════════ */
+
 render();
 startTicking(true);
 
