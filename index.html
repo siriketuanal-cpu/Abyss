@@ -429,7 +429,7 @@ let state = load();
 // 現行UIではタイマーはアカウント枠の子としてのみ作成する。
 function migrateOrphanTimers(){
   if (!state || !Array.isArray(state.items)) return false;
-  const orphan = state.items.filter(it => it && (it.type==='stam' || it.type==='abyss' || it.type==='idle'));
+  const orphan = state.items.filter(it => it && (it.type==='stam' || it.type==='idle'));
   if (!orphan.length) return false;
   const keep = state.items.filter(it => !orphan.includes(it));
   const groups = [];
@@ -1160,33 +1160,48 @@ function targetInGroupName(target, el){
   return !!n && el.contains(n);
 }
 
-// タイマーカード用の通常タップだけを処理。
-// 長押しでメニューは開かない。メニューは右上の timer-menu-tab からのみ開く。
-// pointerdown で開始位置を確保し、移動を監視して、pointerup でタップ確定する。
-function bindTimerShortAction(el, shortAction){
-  let active = false, moved = false, pid = null;
+// タイマーカードの通常タップは親コンテナで1系統だけ監視する。
+// 各カードへ個別に pointer 系リスナーを付けず、カード追加・再描画のたびに
+// リスナーが増えないようイベント委譲する。長押しメニューはここでは扱わない。
+function bindTimerTapDelegation(container){
+  if (!container || container.dataset.timerTapBound === '1') return;
+  container.dataset.timerTapBound = '1';
+  let active = false, moved = false, pid = null, card = null;
   let sx = 0, sy = 0;
-  const cleanup = ()=>{ active=false; moved=false; pid=null; };
 
-  el.addEventListener('pointerdown', e=>{
+  const cleanup = ()=>{ active=false; moved=false; pid=null; card=null; };
+  const findTimerCard = target => {
+    if (!target || !target.closest) return null;
+    const el = target.closest('.card.stam, .card.idle');
+    return el && container.contains(el) ? el : null;
+  };
+
+  container.addEventListener('pointerdown', e=>{
     if (!isPrimaryPointer(e) || active || editingId != null || isTimerEditTarget(e.target)) return;
-    active = true; moved = false; pid = e.pointerId;
+    const hit = findTimerCard(e.target);
+    if (!hit) return;
+    active = true; moved = false; pid = e.pointerId; card = hit;
     sx = e.clientX; sy = e.clientY;
   }, {capture:true, passive:true});
 
-  el.addEventListener('pointermove', e=>{
+  container.addEventListener('pointermove', e=>{
     if (!active || e.pointerId !== pid) return;
     if (Math.hypot(e.clientX-sx, e.clientY-sy) > TAP_MOVE_PX) moved = true;
   }, {capture:true, passive:true});
 
-  el.addEventListener('pointerup', e=>{
+  container.addEventListener('pointerup', e=>{
     if (!active || e.pointerId !== pid) return;
-    const shouldAct = !moved && !isTimerEditTarget(e.target) && typeof shortAction === 'function';
+    const hit = card;
+    const shouldAct = !moved && !isTimerEditTarget(e.target) && hit && container.contains(hit);
+    const id = hit ? hit.dataset.id : null;
+    const it = id ? findItemById(id) : null;
     cleanup();
-    if (shouldAct) shortAction(e);
+    if (!shouldAct || !it) return;
+    if (it.type === 'stam') onUseChunkTap(it, e);
+    else if (it.type === 'idle') toggleIdle(it);
   }, {capture:true, passive:false});
 
-  el.addEventListener('pointercancel', e=>{
+  container.addEventListener('pointercancel', e=>{
     if (!active || e.pointerId !== pid) return;
     cleanup();
   }, {capture:true, passive:true});
@@ -1473,8 +1488,6 @@ function buildStamCard(it){
   maxWrap.textContent = String(it.max);
   refs[it.id] = { el: wrap, curEl: curEditor, maxLabel: maxWrap,
     clockEl: wrap.querySelector('[data-role="clock"]') };
-  // 使い切り設定があるときだけカード短押しでプレビュー/確定
-  bindTimerShortAction(wrap, (e) => onUseChunkTap(it, e));
   return wrap;
 }
 
@@ -1487,8 +1500,6 @@ function buildIdleCard(it){
   `);
   refs[it.id] = { el: wrap,
     curEl: wrap.querySelector('[data-role="cur"]'), clockEl: wrap.querySelector('[data-role="clock"]') };
-  // 受取トグルは短押し(pointerup)。pointerdown にすると長押し削除と同時発火する。
-  bindTimerShortAction(wrap, ()=>toggleIdle(it));
   return wrap;
 }
 
@@ -1959,6 +1970,7 @@ document.addEventListener('pointerdown', (e)=>{
   }
 }, true);
 
+bindTimerTapDelegation(cardsEl);
 render();
 startTicking(true);
 
