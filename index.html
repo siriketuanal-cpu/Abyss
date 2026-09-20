@@ -431,8 +431,7 @@
 <script>
 const STORAGE_KEY = 'freetimer:v1';
 let state = load();
-// 旧版で存在し得た「アカウント外タイマー」を起動時にアカウントへ移行。
-// 現行UIではタイマーはアカウント枠の子としてのみ作成する。
+
 function migrateOrphanTimers(){
   if (!state || !Array.isArray(state.items)) return false;
   const orphan = state.items.filter(it => it && (it.type==='stam' || it.type==='idle'));
@@ -442,8 +441,6 @@ function migrateOrphanTimers(){
   for (let i=0; i<orphan.length; i+=2){
     groups.push({ id:'g' + Date.now().toString(36) + Math.random().toString(36).slice(2,7), type:'group', name:'', children:orphan.slice(i,i+2) });
   }
-  // 最初の孤立タイマーがあった位置に移行後のアカウント枠を挿入し、
-  // それ以外の既存項目の順序はなるべく維持する。
   const firstIndex = state.items.findIndex(it => orphan.includes(it));
   const beforeCount = state.items.slice(0, firstIndex).filter(it => !orphan.includes(it)).length;
   state.items = keep.slice(0,beforeCount).concat(groups, keep.slice(beforeCount));
@@ -456,10 +453,8 @@ let tickId = null;
 let tickGen = 0;
 let pending40Id = null;
 let claimId = null;
-// インライン数字編集中の対象。null | `${itemId}:cur` | `${itemId}:max`
 let editingId = null;
 
-// DOM参照は一度だけ取得して使い回す(毎分ティックや毎クリックで検索し直さない)。
 const cardsEl = document.getElementById('cards');
 const emptyEl = document.getElementById('empty');
 const addPanelEl = document.getElementById('addPanel');
@@ -490,7 +485,6 @@ function openNameEditPopup(opts){
   opts = opts || {};
   if (!nameEditOverlayEl || !nameEditInputEl) return;
   if (nameEditFocusTimer){ clearTimeout(nameEditFocusTimer); nameEditFocusTimer = null; }
-  // トースト由来の pointer が残っていると focus 直後に blur されることがある
   closeToast();
   nameEditLabelEl.textContent = opts.label || '名前を編集';
   nameEditInputEl.value = opts.value != null ? String(opts.value) : '';
@@ -498,7 +492,6 @@ function openNameEditPopup(opts){
   nameEditOnOk = typeof opts.onOk === 'function' ? opts.onOk : null;
   nameEditOverlayEl.classList.add('show');
   nameEditOverlayEl.setAttribute('aria-hidden', 'false');
-  // トースト閉鎖・前の pointer が落ち着いてから focus（初回キーボード落ち対策）
   nameEditFocusTimer = setTimeout(()=>{
     nameEditFocusTimer = null;
     if (!nameEditOverlayEl.classList.contains('show')) return;
@@ -516,7 +509,6 @@ function confirmNameEdit(){
   if (cb) cb(v);
 }
 if (nameEditOkEl){
-  // pointerdown だと focus を奪ってキーボードが先に閉じることがある → click で確定
   nameEditOkEl.addEventListener('click', e=>{
     e.preventDefault();
     e.stopPropagation();
@@ -543,8 +535,6 @@ if (nameEditInputEl){
 }
 
 function normalizeIdleClaim(it){
-  // 「受取」は一時的なUI状態。永続化されると claimId（メモリのみ）とズレて
-  // 再起動後も「受取」のまま固まる。読み込み時は必ず running に戻す。
   if (it && it.type === 'idle' && it.state === 'claim') it.state = 'running';
 }
 function load(){
@@ -568,37 +558,48 @@ function load(){
   }catch(e){}
   return { items: [] };
 }
-// 同期localStorageは描画を止めることがある → 既定は次タスクに遅延。
-// 即時が必要なときだけ save(true)
-let saveTimer = null;
+
+// ── 保存管理（全経路を単一の pendingSave で完全1本化）──
+let pendingSave = false;
+let pendingSaveTimer = null;
+let pendingSaveRaf = null;
+
 function saveNow(){
+  if (pendingSaveTimer){ clearTimeout(pendingSaveTimer); pendingSaveTimer = null; }
+  if (pendingSaveRaf){ cancelAnimationFrame(pendingSaveRaf); pendingSaveRaf = null; }
+  pendingSave = false;
   try{
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }catch(e){
-  }
+  }catch(e){}
 }
-function save(immediate){
-  if (immediate){
-    if (saveTimer){ clearTimeout(saveTimer); saveTimer = null; }
+
+function requestSave(mode){
+  if (mode === 'now'){
     saveNow();
     return;
   }
-  if (saveTimer) return; // 連続操作は1回にまとめる
-  saveTimer = setTimeout(()=>{
-    saveTimer = null;
-    saveNow();
-  }, 0);
+  if (pendingSave) return;
+  pendingSave = true;
+  if (mode === 'afterPaint'){
+    pendingSaveRaf = requestAnimationFrame(()=>{
+      pendingSaveRaf = null;
+      pendingSaveTimer = setTimeout(()=>{
+        pendingSaveTimer = null;
+        if (pendingSave) saveNow();
+      }, 0);
+    });
+  } else {
+    pendingSaveTimer = setTimeout(()=>{
+      pendingSaveTimer = null;
+      if (pendingSave) saveNow();
+    }, 0);
+  }
 }
-// 描画を先にコミットしてから保存（確定タップ用）
-function saveAfterPaint(){
-  requestAnimationFrame(()=>{
-    setTimeout(()=> saveNow(), 0);
-  });
-}
+function save(immediate){ requestSave(immediate ? 'now' : 'debounced'); }
+function saveAfterPaint(){ requestSave('afterPaint'); }
+
 function uid(){ return 'x' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 
-// アプリ内のタップ操作は pointerdown に統一。ネイティブ入力の編集開始だけは、
-// 長押しでキーボードを出さないため短い指離し時にfocusする。
 function bindTapDown(el, handler){
   el.addEventListener('pointerdown', (e)=>{
     if (e.isPrimary === false) return;
@@ -610,7 +611,7 @@ function bindTapDown(el, handler){
 function clearOnFocus(input){
   input.addEventListener('focus', () => { input.value = ''; });
 }
-// 数字・ランク用インライン編集（短押しfocus / 長押しは破棄して雫抑制）
+
 function createPersistentInlineEditor(opts){
   const {
     initialValue = '',
@@ -655,7 +656,6 @@ function createPersistentInlineEditor(opts){
   paint();
   wrap.appendChild(text);
 
-  // input は常設。通常時は操作対象外。
   const input = document.createElement('input');
   input.type = 'text';
   if (inputMode) input.inputMode = inputMode;
@@ -695,9 +695,7 @@ function createPersistentInlineEditor(opts){
     input.tabIndex = 0;
     input.removeAttribute('aria-hidden');
     if (clearOnFocus) input.value = '';
-    // テキスト非表示はフォーカス直前にずらす（タップ瞬間の点滅を軽減）
     wrap.classList.add('editing');
-    // removeAllRanges は一部Androidで focus 直後にキーボードを閉じるので使わない
     const placeCaret = ()=>{
       try {
         const len = String(input.value || '').length;
@@ -706,7 +704,6 @@ function createPersistentInlineEditor(opts){
     };
     try { input.focus({preventScroll:true}); } catch (e) {}
     placeCaret();
-    // ジェスチャ外 focus でキーボードが出ない端末向けの再試行
     setTimeout(()=>{
       if (editor !== input) return;
       try {
@@ -722,7 +719,6 @@ function createPersistentInlineEditor(opts){
       try { input.focus({preventScroll:true}); } catch (e) {}
       return;
     }
-    // キャンセル時は必ず元値に戻す（長押し破棄でブランクが残るのを防ぐ）
     let next;
     if (!commit){
       next = originalValue;
@@ -749,7 +745,6 @@ function createPersistentInlineEditor(opts){
     input.value = clearOnFocus ? '' : String(shownValue ?? '');
     editor = input;
     guardBlur = true;
-    // focus は pointerup 側。editing クラスは focusInput で付与
     setTimeout(()=>{ guardBlur = false; }, 350);
   };
 
@@ -768,7 +763,6 @@ function createPersistentInlineEditor(opts){
     e.stopPropagation();
     try {
       window.getSelection()?.removeAllRanges();
-      // 編集中の長押しで全選択・雫が残らないよう、押下時点で末尾に寄せる
       const len = String(input.value || '').length;
       input.setSelectionRange(len, len);
     } catch (err) {}
@@ -782,7 +776,6 @@ function createPersistentInlineEditor(opts){
     e.stopPropagation();
   }, {capture:true});
 
-  // 数字・ランク用：短押しでfocus / 長押しでfocusせず破棄（雫ハンドル抑制）
   let wrapHoldTimer = null;
   let wrapPointerId = null;
   let wrapHoldX = 0, wrapHoldY = 0;
@@ -841,7 +834,6 @@ function createPersistentInlineEditor(opts){
   };
 }
 
-// 名前・見出しは表示専用（編集はポップアップ）。input も雫対策も持たない。
 function createInlineText(initialValue, placeholder, _onCommit){
   const wrap = document.createElement('span');
   wrap.className = 'name';
@@ -921,15 +913,13 @@ function newStamItem(intervalMin, max, useChunk){
     intervalMin: clampInt(intervalMin, 1, 99999, 5),
     start: Date.now()
   };
-  // useChunk あり → カード短押しで使い切りプレビュー/確定
   if (useChunk != null && Number(useChunk) > 0) item.useChunk = clampUseChunk(useChunk);
   return item;
 }
-// 実験：既存スタミナ計算のまま、最大少なめ・1個使い切りのプリセット
 function newOrbItem(intervalMin, max){
   const item = newStamItem(intervalMin, max != null ? max : 4, 1);
-  item.lockedMax = true; // カード上で最大編集しない
-  item.useMode = 'sub';   // 1タップで1個減らす（modだと %1 で常に0になる）
+  item.lockedMax = true;
+  item.useMode = 'sub';
   return item;
 }
 function hasUseChunk(it){
@@ -948,13 +938,11 @@ function newGroupItem(){
   return { id: uid(), type:'group', name:'', children: [] };
 }
 
-// 残り時間ではなく「何時何分に完了するか」を時刻表記で返す(スタミナ用)。
 function fmtClockAt(remainMs, now){
   const d = new Date((now || Date.now()) + Math.max(0, remainMs));
   const p = n => String(n).padStart(2,'0');
   return { h: p(d.getHours()), m: p(d.getMinutes()) };
 }
-// 残り時間を「あと◯:◯◯」のカウントダウン表記で返す(放置報酬用)。
 function fmtCountdown(ms){
   ms = Math.max(0, ms);
   const totalMin = Math.ceil(ms/60000);
@@ -963,7 +951,6 @@ function fmtCountdown(ms){
 }
 
 function stamInfo(it, now){
-  // ベースが既に満タンなら回復計算しない（満タン時刻は start に固定）
   if (it.current >= it.max){
     return { cur: it.max, remainMs:0, isFull:true, fullAt: it.start };
   }
@@ -980,20 +967,16 @@ function stamInfo(it, now){
   const remainMs = (need - 1) * intervalMs + nextIn;
   return { cur, remainMs, isFull:false };
 }
-// 満タンにしたら start を今に固定して、以降の回復計算を止める
 function freezeIfFull(it, now){
   if (it.current >= it.max){
     it.current = it.max;
     it.start = now;
   }
 }
-// 現在値/上限値を書き換えても「次の1回復までの残り時間」がリセットされないよう、
-// サイクルの位相(既にどれだけ経過しているか)を維持したまま基準時刻だけを進める。
 function clampUseChunk(v){
   const n = Math.floor(Number(v) || 0);
   return Math.max(1, Math.min(100, n || 40));
 }
-// 使い切り後の残り。mod: 220→20 / sub（オーブ）: 4→3
 function remainingAfterUse(cur, it){
   cur = Math.max(0, Math.floor(Number(cur) || 0));
   const fallback = 1;
@@ -1017,11 +1000,9 @@ function fmtHM(ts){
   const p = n => String(n).padStart(2,'0');
   return p(d.getHours()) + ':' + p(d.getMinutes());
 }
-// 満タン、または満タンまで2時間未満 → 赤
 function isNearFull(remainMs, isFull){
   return !!isFull || (remainMs > 0 && remainMs < 7200000);
 }
-// 現在値の赤表示（文字に1回だけ当てる）
 function setNearOnCurrent(editor, near){
   if (!editor || !editor.text) return;
   if (near) editor.text.style.setProperty('color', 'var(--danger)', 'important');
@@ -1030,7 +1011,6 @@ function setNearOnCurrent(editor, near){
 
 function timerNeedsTick(it, now){
   if (it.type==='stam') return !stamInfo(it, now).isFull;
-  // 受取待機中は表示が固定なので、毎分tickを止めて無駄なDOM更新をしない。
   if (it.type==='idle') return it.state !== 'claim' && !idleInfo(it, now).isFull;
   return false;
 }
@@ -1041,8 +1021,30 @@ function needsTicking(now){
     return timerNeedsTick(it, now);
   });
 }
+
+// ── 描画前段：自然満タンの状態同期を一括処理（描画関数から副作用を分離）──
+function syncFullStamItems(now){
+  let changed = false;
+  const check = (it) => {
+    if (it && it.type === 'stam' && it.current < it.max){
+      const info = stamInfo(it, now);
+      if (info.isFull){
+        it.current = it.max;
+        it.start = info.fullAt || now;
+        changed = true;
+      }
+    }
+  };
+  for (const it of state.items){
+    if (it.type === 'group') it.children.forEach(check);
+    else check(it);
+  }
+  if (changed) saveAfterPaint();
+}
+
 function tickRender(now){
   now = now || Date.now();
+  syncFullStamItems(now);
   for (const it of state.items){
     const r = refs[it.id];
     if (!r) continue;
@@ -1060,7 +1062,6 @@ function scheduleTick(gen){
   tickId = setTimeout(()=>{
     tickId = null;
     if (gen !== tickGen) return;
-    // 毎分はDOM構造を再構築せず、既存ノードの表示だけ差分更新。
     tickRender(Date.now());
     if (needsTicking()) scheduleTick(gen);
   }, delay);
@@ -1071,7 +1072,6 @@ function startTicking(force){
   if (!tickId && needsTicking()) scheduleTick(tickGen);
 }
 
-// 長押し削除＋短押しアクション（使い切り・受取など）
 function bindLongPressDelete(el, id, shortAction){
   const HOLD_MS = 520, MOVE_PX = 24;
   let timer = null, active = false, moved = false, longFired = false;
@@ -1084,7 +1084,6 @@ function bindLongPressDelete(el, id, shortAction){
     active = false; moved = false; longFired = false; pid = null;
   };
 
-  // 現在値・ランク編集中は長押し削除／使い切りと分離
   const isEditTarget = (target)=>{
     if (!target || !target.closest) return false;
     return !!(
@@ -1093,7 +1092,8 @@ function bindLongPressDelete(el, id, shortAction){
       target.closest('.rank-text') ||
       target.closest('[data-role="curWrap"]') ||
       target.closest('.rank') ||
-      target.closest('.timer-menu-tab')
+      target.closest('.timer-menu-tab') ||
+      target.closest('.header-menu-button')
     );
   };
 
@@ -1158,8 +1158,6 @@ function targetInGroupName(target, el){
   return !!n && el.contains(n);
 }
 
-// タイマーカード用の通常タップだけを処理。長押しでメニューは開かない。
-// メニューは右上の timer-menu-tab からのみ開く。
 function bindTimerShortAction(el, shortAction){
   let active = false, moved = false, pid = null;
   let sx = 0, sy = 0;
@@ -1209,7 +1207,6 @@ function clearLongPressTarget(){
     longPressTargetEl = null;
   }
 }
-// トースト＝確認UI専用。開く/閉じる/2段階確定をここに集約。
 function closeToast(){
   clearLongPressTarget();
   if (!toastEl) return;
@@ -1228,13 +1225,11 @@ function showConfirmToast(html, onAct){
     const btn = e.target.closest('button[data-act]');
     if (!btn) return;
     const act = btn.dataset.act;
-    // 即閉じ（やめる）
     if (act === 'no' || act === 'cancel'){
       closeToast();
       if (typeof onAct === 'function') onAct(act, btn);
       return;
     }
-    // 削除だけ2回タップ確定。編集・追加などは1回で実行
     if (act === 'yes' && !btn.classList.contains('armed')){
       toastEl.querySelectorAll('button.armed').forEach(b => b.classList.remove('armed'));
       btn.classList.add('armed');
@@ -1258,7 +1253,6 @@ function askRemoveItem(id){
   const isIdle = it && it.type === 'idle';
   const canEditName = isHeader || isGroup;
   const colorDefault = isHeader ? (it.color || '#9b8bff') : (isRule ? (it.color || '#52617a') : null);
-  // スタミナは設定済み or 後から付けられるよう空欄でも出す
   const showChunk = isStam;
   const chunkVal = isStam ? (it.useChunk != null ? clampUseChunk(it.useChunk) : '') : null;
   const showStamMax = isStam && !it.lockedMax;
@@ -1272,7 +1266,7 @@ function askRemoveItem(id){
     + (canEditName ? `<button type="button" data-act="editName">${isHeader ? '見出し編集' : '名前編集'}</button>` : '')
     + (canAdd ? '<button type="button" data-act="add">タイマー追加</button>' : '')
     + (canAddAccountBelowHeader ? '<button type="button" data-act="addAccountBelow">アカウント追加</button>' : '')
-    + (isIdle ? idleToastRowsHtml(it) : '');   // 放置：設定時間／残り時間の入力行
+    + (isIdle ? idleToastRowsHtml(it) : '');
   const extra = fields ? `<div class="toast-fields">${fields}</div>` : '';
   showConfirmToast(
     extra
@@ -1300,7 +1294,7 @@ function askRemoveItem(id){
           placeholder: isHeader ? '見出し(ゲーム名など)' : 'アカウント',
           onOk: (v)=>{
             const next = String(v == null ? '' : v);
-            if (it.name === next) return; // 変更なし＝DOMも触らない
+            if (it.name === next) return;
             it.name = next;
             if (ed && typeof ed.setText === 'function') ed.setText(next);
             else if (ed && typeof ed.setValue === 'function') ed.setValue(next);
@@ -1310,7 +1304,6 @@ function askRemoveItem(id){
       }
     }
   );
-  // closeToast の後にハイライトを付け直す
   const targetRef = refs[id];
   if (targetRef && targetRef.el){
     targetRef.el.classList.add('longpress-target');
@@ -1336,12 +1329,10 @@ function askRemoveItem(id){
   if (showChunk){
     const chunkEl = toastEl.querySelector('input[data-role="useChunk"]');
     if (chunkEl){
-      const origChunk = it.useChunk != null ? clampUseChunk(it.useChunk) : null;
       chunkEl.addEventListener('focus', ()=>{ chunkEl.value = ''; });
       const applyChunk = ()=>{
         const raw = String(chunkEl.value || '').replace(/\D/g, '');
         if (raw === ''){
-          // スタミナは空で「使い切りなし」
           if (isStam){
             delete it.useChunk;
             chunkEl.value = '';
@@ -1352,7 +1343,6 @@ function askRemoveItem(id){
           chunkEl.value = String(it.useChunk);
           if (pending40Id === it.id) paintUseChunkPreview(it.id);
         }
-        // カードの短押しバインドは再renderが必要なので、スタミナは軽く再構築
         if (isStam){ save(); render(); startTicking(true); }
         else save();
       };
@@ -1394,13 +1384,6 @@ function askRemoveItem(id){
   if (isIdle) bindIdleToastRows(it);
 }
 
-/* ═══════════ 放置トースト：設定時間／残り時間（ここから）═══════════
-   ・設定 …… 設置時と同じ h / m。変えても開始時刻は据え置き（経過時間はそのまま）。
-   ・残り …… 今の残り時間を h / m で手合わせ。上限は設定時間。開始時刻を逆算して合わせる。
-   ・リスナーはトーストを開いた時に入力欄の親へ1回だけ付ける（常駐なし・測定なし）。
-   取り外し：このブロック／askRemoveItem 内の idleToastRowsHtml 行と bindIdleToastRows 行／
-             CSS の .toast-hm を削除。
-   ═══════════════════════════════════════════════════ */
 function idleHm(min){
   min = Math.max(0, Math.floor(min));
   return [Math.floor(min / 60), min % 60];
@@ -1422,7 +1405,6 @@ function bindIdleToastRows(it){
   const q = k => box.querySelector(`[data-idle="${k}"]`);
   const rowOf = el => (el && el.dataset && el.dataset.idle) ? el.dataset.idle.slice(0, 3) : null;
   const read = (hk, mk) => clampInt(q(hk).value, 0, 999, 0) * 60 + clampInt(q(mk).value, 0, 59, 0);
-  // 確定後の実際の値を表示へ戻す（上限で丸められた時などもここで揃う）
   const sync = ()=>{
     const [dh, dm] = idleHm(it.durationMin);
     const [rh, rm] = idleHm(Math.ceil(idleInfo(it, Date.now()).remainMs / 60000));
@@ -1441,37 +1423,33 @@ function bindIdleToastRows(it){
       const durMs = Math.max(1, it.durationMin) * 60000;
       const remainMs = Math.min(durMs, read('remH', 'remM') * 60000);
       it.start = now - (durMs - remainMs);
-      // 手動で合わせたら「受取」待ちは解除して通常カウントに戻す
       if (it.state === 'claim'){ it.state = 'running'; if (claimId === it.id) claimId = null; }
     }
     updateOneTimer(it);
     startTicking(true);
     save();
   };
-  // 外側（受取キャンセル等）へ届かせない。既存の入力欄と同じ扱い。
   box.addEventListener('pointerdown', e=>e.stopPropagation());
   box.addEventListener('focusin', e=>{ if (rowOf(e.target)) e.target.value = ''; });
   box.addEventListener('input', e=>{ const r = rowOf(e.target); if (r) dirty[r] = true; });
   box.addEventListener('focusout', e=>{
     const t = e.target, row = rowOf(t);
     if (!row) return;
-    if (t.value.trim() === '') t.value = t.defaultValue;      // 空のまま離れたら元に戻す
-    if (rowOf(e.relatedTarget) === row) return;              // 同じ行の h⇄m 移動中は確定しない
+    if (t.value.trim() === '') t.value = t.defaultValue;
+    if (rowOf(e.relatedTarget) === row) return;
     if (dirty[row]){ dirty[row] = false; commit(row); sync(); }
   });
   box.addEventListener('keydown', e=>{
     if (e.key === 'Enter' && rowOf(e.target)){ e.preventDefault(); e.target.blur(); }
   });
 }
-/* ═══════════ 放置トースト：設定時間／残り時間（ここまで）═══════════ */
-// カード外枠の共通生成（stam / idle）
+
 function makeCardEl(type, id, innerHtml){
   const wrap = document.createElement('div');
   wrap.className = 'card ' + type;
   wrap.dataset.id = id;
   wrap.innerHTML = innerHtml;
 
-  // 付箋型メニューボタンは各カードへ置くだけ。イベントは #cards で1回だけ委譲（bindMenuButtonDelegation）。
   const tab = document.createElement('button');
   tab.type = 'button';
   tab.className = 'timer-menu-tab';
@@ -1480,7 +1458,7 @@ function makeCardEl(type, id, innerHtml){
   wrap.appendChild(tab);
   return wrap;
 }
-// スタミナ系共通の下段 HTML
+
 function valrowStamHtml(){
   return `<div class="row valrow-stam">
       <span class="stamval" data-role="curWrap"></span>
@@ -1488,7 +1466,7 @@ function valrowStamHtml(){
       <span class="stammax" data-role="maxWrap"></span>
     </div>`;
 }
-// 現在値インライン編集（スタミナ系共用）
+
 function attachCurrentEditor(curWrap, it, extraCommit){
   const clearFortyPreview = ()=>{
     if (hasUseChunk(it) && pending40Id === it.id){
@@ -1511,6 +1489,7 @@ function attachCurrentEditor(curWrap, it, extraCommit){
   curWrap.appendChild(curEditor.wrap);
   return curEditor;
 }
+
 function onUseChunkTap(it, e){
   if (e){ e.stopPropagation(); e.preventDefault(); }
   if (!hasUseChunk(it)) return;
@@ -1534,6 +1513,7 @@ function onUseChunkTap(it, e){
     paintUseChunkPreview(it.id);
   }
 }
+
 function buildStamCard(it){
   const wrap = makeCardEl('stam', it.id, `
     <div class="clockstack stam-clock" data-role="clock"></div>
@@ -1542,11 +1522,9 @@ function buildStamCard(it){
   const curWrap = wrap.querySelector('[data-role="curWrap"]');
   const maxWrap = wrap.querySelector('[data-role="maxWrap"]');
   const curEditor = attachCurrentEditor(curWrap, it, () => { pending40Id = null; });
-  // 最大は表示のみ（編集は長押しトースト）。
   maxWrap.textContent = String(it.max);
   refs[it.id] = { el: wrap, curEl: curEditor, maxLabel: maxWrap,
     clockEl: wrap.querySelector('[data-role="clock"]') };
-  // 使い切り設定があるときだけカード短押しでプレビュー/確定
   bindTimerShortAction(wrap, hasUseChunk(it) ? (e) => onUseChunkTap(it, e) : null);
   return wrap;
 }
@@ -1560,11 +1538,9 @@ function buildIdleCard(it){
   `);
   refs[it.id] = { el: wrap,
     curEl: wrap.querySelector('[data-role="cur"]'), clockEl: wrap.querySelector('[data-role="clock"]') };
-  // 受取トグルは短押し(pointerup)。pointerdown にすると長押し削除と同時発火する。
   bindTimerShortAction(wrap, ()=>toggleIdle(it));
   return wrap;
 }
-
 
 function buildTimerChild(it){
   return it.type==='stam' ? buildStamCard(it) : it.type==='idle' ? buildIdleCard(it) : null;
@@ -1599,8 +1575,6 @@ function renderGroupBody(it){
   r.el.classList.toggle('single', single);
   r.bodyEl.classList.toggle('one', single);
 
-  // タイマーが1個もないアカウントは、タイマー1枚分ぴったりの空き枠を表示。
-  // 実データは増やさず、既存のタイマー追加フローだけを呼び出す。
   const emptySlot = r.bodyEl.querySelector('[data-role="emptySlot"]');
   if (it.children.length === 0){
     if (!emptySlot){
@@ -1636,12 +1610,7 @@ function buildRuleCard(it){
   bindLongPressDelete(wrap, it.id);
   return wrap;
 }
-// ── メニューボタン（タイマーの付箋タブ／見出しの丸ボタン）のイベント委譲 ──
-// ボタン個別にはリスナーを付けず、#cards で pointerdown / pointerup / click を1回だけ受ける。
-// ・capture で先に受けて stopPropagation するので、カード側の長押し・短押し処理とは競合しない
-//   （従来と同じく、ボタン上の操作はカード側に届かない）。
-// ・対象のIDは、ボタンが属する要素(タイマーカード or 見出し)の data-id から引く。
-// ・ボタンを増やす時は class を付けて MENU_BTN_SEL に足すだけ。個別の bind は不要。
+
 const MENU_BTN_SEL = '.timer-menu-tab, .header-menu-button';
 function bindMenuButtonDelegation(){
   if (!cardsEl) return;
@@ -1686,13 +1655,12 @@ function buildHeaderCard(it){
   menuBtn.title = '見出しメニュー';
   menuBtn.style.setProperty('--header-color', it.color || '#9b8bff');
   menuBtn.textContent = '';
-  wrap.appendChild(menuBtn);   // イベントは #cards の委譲側で処理
+  wrap.appendChild(menuBtn);
   refs[it.id] = { el: wrap, nameEl: nameEditor.wrap, nameEditor, menuBtn };
   // 見出し本体の長押しは無し。メニュー（編集・色・削除など）は丸ボタンからのみ開く。
   return wrap;
 }
 
-// 構造を変えない操作は対象カードだけを更新する。
 function getTimerRef(id){
   const direct = refs[id];
   if (direct) return direct;
@@ -1704,18 +1672,14 @@ function getTimerRef(id){
 function updateOneTimer(it){
   updateTimerCard(it, getTimerRef(it.id), Date.now());
 }
-// タップで「受取」表示に切替。内部の実時間は止めない(表示だけの上書き)。
-// もう一度タップ＝受取確定→フル時間で再開。
 function toggleIdle(it){
   if (it.state === 'claim'){
-    // 確定時だけtickを再開。待機中に止めていたタイマーをここで1回だけ再始動する。
     it.state = 'running';
     it.start = Date.now();
     if (claimId === it.id) claimId = null;
     updateOneTimer(it);
     startTicking(true);
   } else {
-    // 「受取」待機中は表示が固定なので、tick自体を止める。
     it.state = 'claim';
     claimId = it.id;
     updateOneTimer(it);
@@ -1732,11 +1696,7 @@ function cancelClaim(it){
   saveAfterPaint();
 }
 
-// ×タップ→確認状態(赤)→もう一度タップで削除。ネイティブconfirm()はPWA環境で
-// 動作しないことがあるため使わない。
-
 document.addEventListener('pointerdown', (e) => {
-  // 実際に選択状態があるときだけ解除する。通常のカードタップでは不要な処理を省く。
   try {
     if (document.activeElement !== e.target && window.getSelection){
       const sel = window.getSelection();
@@ -1761,7 +1721,6 @@ document.addEventListener('pointerdown', (e) => {
     pendingAddGroupId = null;
   }
   if (toastEl && toastEl.classList.contains('show') && !toastEl.contains(e.target)){
-    // トースト内inputフォーカス中の枠外タップはキーボード閉じだけ（メニューは残す）
     const ae = document.activeElement;
     if (ae && toastEl.contains(ae) && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')){
       try { ae.blur(); } catch (err) {}
@@ -1769,9 +1728,6 @@ document.addEventListener('pointerdown', (e) => {
       closeToast();
     }
   }
-  // 作成パネルは基本、枠外タップで閉じない（数字入力中にキーボードを閉じただけで
-  // 誤キャンセルされるのを防ぐため）。ただし仕切り線の色選択にはキャンセル手段が
-  // 他に無いので、そこだけ枠外タップで閉じられるようにする。
   if (setupType === 'rule' && setupPanelEl.classList.contains('show') && !setupPanelEl.contains(e.target)){
     closeSetup();
   }
@@ -1804,7 +1760,6 @@ function removeItem(id){
   save(); render(); startTicking(true);
 }
 
-// 04/20のようなデジタル時計表示を組み立てる共通処理(スタミナ・放置報酬で共用)。
 function renderClock(el, remainMs, isFull, now, fullAt){
   if (!el) return;
   const key = isFull ? 'full:' + fmtHM(fullAt || now) : (()=>{ const c = fmtClockAt(remainMs, now); return c.h+c.m; })();
@@ -1813,7 +1768,6 @@ function renderClock(el, remainMs, isFull, now, fullAt){
   if (isFull) el.innerHTML = `<span class="full-at">${fmtHM(fullAt || now)}</span>`;
   else el.textContent = fmtHM((now || Date.now()) + Math.max(0, remainMs));
 }
-
 
 function findItemById(id){
   for (const it of state.items){
@@ -1831,6 +1785,7 @@ function paintUseChunkPreview(id){
 }
 function render(){
   const now = Date.now();
+  syncFullStamItems(now);
   emptyEl.style.display = state.items.length ? 'none' : 'block';
 
   const existingIds = new Set(state.items.map(i=>i.id));
@@ -1838,8 +1793,8 @@ function render(){
   Object.keys(refs).forEach(id=>{ if(!existingIds.has(id)) delete refs[id]; });
 
   for (const it of state.items){
-      if (!refs[it.id]){
-      const el = it.type==='stam' ? buildStamCard(it) : it.type==='idle' ? buildIdleCard(it) : it.type==='rule' ? buildRuleCard(it) : it.type==='group' ? buildGroupCard(it) : buildHeaderCard(it);
+    if (!refs[it.id]){
+      it.type==='stam' ? buildStamCard(it) : it.type==='idle' ? buildIdleCard(it) : it.type==='rule' ? buildRuleCard(it) : it.type==='group' ? buildGroupCard(it) : buildHeaderCard(it);
     } else if (it.type==='group'){
       renderGroupBody(it);
     }
@@ -1847,7 +1802,6 @@ function render(){
 
   const topEls = state.items.map(it => refs[it.id].el);
 
-  // 順序が違うときだけ並べ替え（毎分の append を避ける）
   let needOrder = false;
   const kids = cardsEl.children;
   for (let i = 0; i < topEls.length; i++){
@@ -1872,18 +1826,12 @@ function render(){
     }
   }
 }
-// スタミナ/放置の値更新をトップレベル/アカウント枠の子どちらでも共用する
+
+// 描画専用：副作用を持たず純粋にDOMに値を反映する
 function updateTimerCard(it, r, now){
   if (!it || !r) return;
   if (it.type==='stam'){
-    let info = stamInfo(it, now);
-    // 自然回復で満タン到達したら固定して以降の計算を止める
-    if (info.isFull && it.current < it.max){
-      it.current = it.max;
-      it.start = info.fullAt || now;
-      info = stamInfo(it, now);
-      saveAfterPaint();
-    }
+    const info = stamInfo(it, now);
     const waitChunk = hasUseChunk(it) && pending40Id === it.id;
     r.el.classList.toggle('full', info.isFull);
     r.el.classList.toggle('claim', waitChunk);
@@ -1895,7 +1843,6 @@ function updateTimerCard(it, r, now){
     }
     setNearOnCurrent(r.curEl, isNearFull(info.remainMs, info.isFull));
   } else if (it.type==='idle'){
-    // claimId と state のズレ（再起動・途中操作など）で「受取」が固まるのを自己修復
     if (it.state === 'claim' && claimId !== it.id){
       it.state = 'running';
     }
@@ -1904,8 +1851,6 @@ function updateTimerCard(it, r, now){
     r.el.classList.toggle('full', info.isFull && it.state!=='claim');
     const label = it.state==='claim' ? '受取' : (info.isFull ? fmtHM(info.fullAt) : fmtCountdown(info.remainMs));
     if (r.curEl.textContent !== label) r.curEl.textContent = label;
-    // 放置の数字：カウントダウン中かつ2時間未満で赤
-    // 満タン・2時間前・受取待ちも赤維持
     r.curEl.classList.toggle('near', it.state==='claim' || isNearFull(info.remainMs, info.isFull));
     renderClock(r.clockEl, info.remainMs, info.isFull, now, info.fullAt);
   }
@@ -2054,8 +1999,6 @@ function clearResumeVeil(){
   if (resumeTimer){ clearTimeout(resumeTimer); resumeTimer = null; }
   if (resumeVeilEl) resumeVeilEl.classList.remove('show');
 }
-// 復帰処理を1本化：覆う → 差分更新 → tick再開 → 安定後に覆いを外す
-// キーボード開閉などの短い hidden では動かさない（黒ベール残留の主因）
 function resumePipeline(){
   if (resumeTimer) clearTimeout(resumeTimer);
   if (!resumeVeilEl) return;
@@ -2070,8 +2013,17 @@ function resumePipeline(){
   };
   requestAnimationFrame(() => requestAnimationFrame(finish));
 }
+
+// ── バックグラウンド・非表示・ページ離脱時の即時保存 ──
+function flushPendingSaveOnHide(){
+  if (pendingSave){
+    saveNow();
+  }
+}
+
 document.addEventListener('visibilitychange', ()=>{
   if (document.hidden){
+    flushPendingSaveOnHide();
     wasBackgrounded = true;
     hiddenAt = Date.now();
     tickGen++;
@@ -2080,7 +2032,6 @@ document.addEventListener('visibilitychange', ()=>{
   }
   if (!wasBackgrounded) return;
   wasBackgrounded = false;
-  // キーボード等の瞬間的な hidden はベールなしで tick だけ再開
   if (Date.now() - hiddenAt < 200){
     startTicking(true);
     clearResumeVeil();
@@ -2088,10 +2039,14 @@ document.addEventListener('visibilitychange', ()=>{
   }
   resumePipeline();
 });
+
+window.addEventListener('pagehide', flushPendingSaveOnHide);
+window.addEventListener('beforeunload', flushPendingSaveOnHide);
+
 window.addEventListener('pageshow', (e)=>{
   if (e.persisted) resumePipeline();
 });
-// 入力外タップで選択解除（キーボード専用の viewport ハックは外した）
+
 document.addEventListener('pointerdown', (e)=>{
   clearResumeVeil();
   const t = e.target;
@@ -2100,28 +2055,17 @@ document.addEventListener('pointerdown', (e)=>{
   }
 }, true);
 
-/* ═══════════════ 機種差フィット（ここから）═══════════════
-   目的：端末ごとのフォント・画面幅の違いで、スタミナの数字が枠からあふれる
-         場合「だけ」文字サイズを縮めて枠内に収める。
-   方針：枠・「/」・カードの位置や大きさ、タップ判定には一切触れない。
-         枠に収まる端末では何もしない（font-size を上書きしない＝従来のまま）。
-   測定：実行中にレイアウトを測り直さない。
-         ・数字1桁ぶんの幅は、起動後に1回だけ測って固定する（フォントは途中で変わらないため）
-         ・枠の幅は ResizeObserver の通知をもらう（強制レイアウトなし・幅が変わった時だけ）
-         ・あとは「桁数 × 数字幅」の計算だけで決める（毎分の更新でも測定しない）
-   取り外し：このブロック（ここから〜ここまで）を丸ごと削除するだけ。他の箇所は無改造。
-   ═══════════════════════════════════════════════════ */
+/* ═══════════════ 機種差フィット ═══════════════ */
 (function(){
-  if (typeof ResizeObserver === 'undefined') return;   // 非対応環境では何もしない（従来どおり）
+  if (typeof ResizeObserver === 'undefined') return;
 
-  const MIN_FONT  = 11;    // これより小さくはしない(px)
-  const SAFETY    = 0.98;  // 収まりぎりぎりを避ける余裕
-  const TOLERANCE = 0.5;   // この程度(px)のはみ出しは無視（元の表示を優先）
+  const MIN_FONT  = 11;
+  const SAFETY    = 0.98;
+  const TOLERANCE = 0.5;
 
-  let digitEm  = 0;        // 数字1桁の最大幅（em換算）。1回測ったら固定
-  let baseFont = 18;       // 元のフォントサイズ(px)。CSS の値を1回だけ読んで固定
+  let digitEm  = 0;
+  let baseFont = 18;
 
-  // 実際の数字と同じフォントで、0〜9のうち一番広い数字の幅を1回だけ測る
   function calibrate(slot){
     const cs = getComputedStyle(slot);
     baseFont = parseFloat(cs.fontSize) || 18;
@@ -2141,7 +2085,6 @@ document.addEventListener('pointerdown', (e)=>{
     digitEm = w / 100;
   }
 
-  // 桁数と枠幅から文字サイズを決めて反映（測定なし・計算のみ）
   function apply(card){
     const slotW = card._slotW;
     if (!slotW) return;
@@ -2153,18 +2096,17 @@ document.addEventListener('pointerdown', (e)=>{
 
     const lc = curText.textContent.length, lm = max.textContent.length;
     const key = slotW + '|' + lc + '|' + lm;
-    if (card._fitKey === key) return;      // 桁数も枠幅も同じなら何もしない
+    if (card._fitKey === key) return;
     card._fitKey = key;
 
-    const need = Math.max(lc, lm) * digitEm * baseFont;   // 文字サイズ据え置き時に必要な幅
-    let px = '';                                          // '' ＝ 上書きなし（元のまま）
+    const need = Math.max(lc, lm) * digitEm * baseFont;
+    let px = '';
     if (need > slotW + TOLERANCE){
       px = Math.max(MIN_FONT, Math.floor(baseFont * (slotW / need) * SAFETY * 10) / 10) + 'px';
     }
     if (cur.style.fontSize !== px){ cur.style.fontSize = px; max.style.fontSize = px; }
   }
 
-  // 枠（現在値スロット）の幅が変わった時だけブラウザから通知が来る
   const ro = new ResizeObserver(entries => {
     for (const e of entries){
       const card = e.target.closest && e.target.closest('.card');
@@ -2174,7 +2116,6 @@ document.addEventListener('pointerdown', (e)=>{
     }
   });
 
-  // updateTimerCard の後ろに乗せる（本体は無改造）。対象はスタミナカードのみ。
   const seen = new WeakSet();
   const orig = updateTimerCard;
   updateTimerCard = function(it, r, now){
@@ -2188,26 +2129,25 @@ document.addEventListener('pointerdown', (e)=>{
     apply(card);
   };
 })();
-/* ═══════════════ 機種差フィット（ここまで）═══════════════ */
 
 render();
 startTicking(true);
 
-// 長押しメニュー(コピー等)やドラッグ選択を出さない。
 document.addEventListener('contextmenu', (e)=> e.preventDefault());
 document.addEventListener('dragstart', (e)=> e.preventDefault());
-// テキスト選択は入力欄側で必要な範囲だけ抑止する。
 document.addEventListener('paste', (e)=> e.preventDefault());
 
 bindTapDown(document.getElementById('updateBtn'), ()=>{
-  // クエリ付きで update.html 自体のキャッシュも避ける
   location.href = 'update.html?r=' + Date.now().toString(36);
 });
 
-// Service worker: register once, never poll for updates automatically.
 if ('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{
-    navigator.serviceWorker.register('sw.js');
+    // iframe内やプロキシ環境下でのリダイレクトエラーを防ぐため、安全にcatchして登録
+    navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(err => {
+      // 開発環境やリバースプロキシによるリダイレクト制限時は安全にスキップ
+      console.warn('ServiceWorker registration bypassed:', err?.message || err);
+    });
   });
 }
 </script>
