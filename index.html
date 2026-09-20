@@ -126,7 +126,7 @@
     top:-8px;
     left:-8px;
     right:-8px;
-    bottom:-8px;
+    bottom:0;
   }
   .card.stam .timer-menu-btn{border-color:#5aa9ff;}
   .card.idle .timer-menu-btn{border-color:#f0a85a;}
@@ -197,7 +197,6 @@
     position:absolute; top:-9px; left:8px;
     margin:0; padding:0 6px; gap:0; z-index:3;
     min-height:0; height:18px; line-height:18px;
-    min-width:56px;
     display:inline-flex; align-items:center;
     background:var(--bg); border-radius:4px;
     max-width:calc(100% - 16px);
@@ -927,9 +926,9 @@ function isOrbItem(it){
   return !!(it && it.type === 'stam' && (it.isOrb || it.useMode === 'sub' || (it.max <= 10 && it.intervalMin >= 60)));
 }
 function newOrbItem(intervalMin, max){
-  const item = newStamItem(intervalMin, max != null ? max : 4, 1);
+  const item = newStamItem(intervalMin, max != null ? max : 4);
   item.isOrb = true;
-  item.useMode = 'sub';   // 1タップで1個減らす（自然回復の位相は維持）
+  item.useMode = 'sub';   // 1タップで消費個数分減らす
   return item;
 }
 function hasUseChunk(it){
@@ -998,7 +997,7 @@ function freezeIfFull(it, now){
 // サイクルの位相(既にどれだけ経過しているか)を維持したまま基準時刻だけを進める。
 function clampUseChunk(v){
   const n = Math.floor(Number(v) || 0);
-  return Math.max(1, Math.min(100, n || 40));
+  return Math.max(1, Math.min(999, n || 1));
 }
 // 使い切り後の残り。mod: 220→20 / sub（オーブ）: 4→3
 function remainingAfterUse(cur, it){
@@ -1321,7 +1320,7 @@ function askRemoveItem(id){
   const colorDefault = isHeader ? (it.color || '#9b8bff') : (isRule ? (it.color || '#52617a') : null);
   const isOrb = isOrbItem(it);
   const isOrbHours = isOrb && it.intervalMin >= 60 && it.intervalMin % 60 === 0;
-  const showChunk = isStam && !isOrb;
+  const showChunk = isStam;
   const chunkVal = showChunk ? (it.useChunk != null ? clampUseChunk(it.useChunk) : '') : null;
   const showStamMax = isStam;
   const stamMaxRow = showStamMax
@@ -1425,15 +1424,13 @@ function askRemoveItem(id){
       chunkEl.addEventListener('focus', ()=>{ chunkEl.value = ''; });
       const applyChunk = ()=>{
         const raw = String(chunkEl.value || '').replace(/\D/g, '');
-        if (raw === ''){
-          // スタミナは空で「使い切りなし」
-          if (isStam){
-            delete it.useChunk;
-            chunkEl.value = '';
-            if (pending40Id === it.id){ pending40Id = null; paintUseChunkPreview(it.id); }
-          }
+        const num = Number(raw);
+        if (raw === '' || num === 0){
+          delete it.useChunk;
+          chunkEl.value = '';
+          if (pending40Id === it.id){ pending40Id = null; paintUseChunkPreview(it.id); }
         } else {
-          it.useChunk = clampUseChunk(raw);
+          it.useChunk = clampUseChunk(num);
           chunkEl.value = String(it.useChunk);
           if (pending40Id === it.id) paintUseChunkPreview(it.id);
         }
