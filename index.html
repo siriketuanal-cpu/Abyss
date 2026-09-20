@@ -20,7 +20,7 @@
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; -webkit-touch-callout:none;
     -webkit-user-select:none; user-select:none;}
   /* タイマー内の数字表示はすべてこのフォントで統一 */
-  .stamval, .stammax, .inline-number-text, .main, .clockstack, .rank{
+  .stamval, .stammax, .inline-number-text, .main, .clockstack{
     font-family:var(--timer-number-font);
   }
   /* body は固定。スクロールは #cards のみ → キーボード開閉の黒残り・二重描画を防ぐ */
@@ -41,7 +41,6 @@
   .stamval .inline-number-text{ text-align:right; }
   .stammax .inline-number-text{ text-align:left; }
   .inline-number.editing .inline-number-text{visibility:hidden;}
-  .rank.editing .rank-text{visibility:hidden;}
   .inline-edit-input{
     position:absolute; top:0; left:0; width:100%; height:100%; box-sizing:border-box;
     border:0; outline:0; background:transparent; color:inherit;
@@ -62,9 +61,6 @@
     -webkit-user-select:none; user-select:none; touch-action:manipulation;
   }
   .name-text.is-placeholder{ color:var(--sub); font-weight:600; }
-  /* TWA復帰時の一瞬の再構築を視覚的に隠す。通常起動・通常操作では非表示。 */
-  #resumeVeil{position:fixed;inset:0;background:var(--bg);opacity:0;pointer-events:none;z-index:100;transition:opacity 90ms linear;}
-  #resumeVeil.show{opacity:1;}
   header{
     display:flex; align-items:center; gap:8px; padding:10px 12px 6px;
     flex:0 0 auto; background:var(--bg); z-index:5;
@@ -152,44 +148,25 @@
     width:100%; background:transparent; border:none; color:var(--text);
     font-size:11px; font-weight:600; padding:2px 0; min-width:0;
   }
-  /* ランク：普段は span、編集時だけ input（名前と同じ方式） */
-  .rank{
-    position:absolute; top:2px; right:2px; width:4.5em; max-width:45%;
-    height:18px; line-height:18px; min-height:0; max-height:18px;
-    margin:0; padding:0 2px; box-sizing:border-box;
-    background:transparent; border:none; outline:none;
-    color:var(--orange);
-    font-size:10px; font-weight:800; text-align:left;
-    font-variant-numeric:tabular-nums;
-    -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
-    touch-action:manipulation; z-index:2; display:block;
-  }
-  .rank-text{ display:block; overflow:hidden; white-space:nowrap; }
-  .rank-edit-input{
-    position:absolute; inset:0; width:100%; height:100%; box-sizing:border-box;
-    background:transparent; border:none; outline:none; color:inherit;
-    font:inherit; font-weight:inherit; font-variant-numeric:tabular-nums;
-    text-align:left; padding:0; margin:0; caret-color:transparent;
-    -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
-    touch-action:none;
-    appearance:none; -webkit-appearance:none; z-index:3;
-  }
-  /* アカウント枠：通常カード2枚分の横幅。名前は上端に被せて行高を消す */
+  /* アカウント枠（A案：フィールドセット／ネームタグ風デザイン） */
   .card.group{
     grid-column:span 2; position:relative;
-    padding:16px 4px 4px; border:1px solid #555b68; box-shadow:none; border-radius:8px;
+    padding:10px 4px 4px; border:1px solid #555b68; box-shadow:none; border-radius:8px;
+    margin-top:4px;
   }
   .card.group.single{grid-column:span 1;}
   .group-namerow{
-    position:absolute; top:2px; left:4px; right:4px;
-    margin:0; padding:0; gap:0; z-index:3;
-    min-height:0; height:14px; line-height:14px;
-    display:flex; align-items:center;
+    position:absolute; top:-9px; left:8px;
+    margin:0; padding:0 5px; gap:0; z-index:3;
+    min-height:0; height:16px; line-height:16px;
+    display:inline-flex; align-items:center;
+    background:var(--bg); border-radius:4px;
+    max-width:calc(100% - 16px);
   }
   .group-namerow .name{
-    font-size:11px; padding:0; font-weight:700; color:var(--accent);
-    flex:0 1 auto; width:auto; max-width:70%; box-sizing:border-box;
-    line-height:14px; height:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    font-size:10.5px; padding:0; font-weight:700; color:var(--accent);
+    flex:0 1 auto; width:auto; box-sizing:border-box;
+    line-height:16px; height:16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   }
   .group-body{display:grid; grid-template-columns:repeat(2,1fr); gap:6px; min-height:1px; align-items:end;}
   .group-body.one{grid-template-columns:1fr;}
@@ -283,51 +260,62 @@
     content:''; position:absolute; left:0; right:0; top:-10px; bottom:-10px;
   }
   #toast{
-    /* 画面中央。必要な設定だけを横並びにして、従来よりかなり小さく。 */
+    /* 画面中央。必要な設定だけを横並びにして、コンパクト＆高コントラストに。 */
     position:fixed; left:50%; top:50%; bottom:auto;
-    transform:translate(-50%, -50%); width:min(72vw, 250px); max-width:72%;
-    background:#26272d; color:var(--text); border:1px solid var(--line);
-    border-radius:9px; padding:8px; font-size:12px; z-index:30;
-    display:none; box-shadow:0 6px 18px rgba(0,0,0,.3);
+    transform:translate(-50%, -50%); width:min(72vw, 240px); max-width:74%;
+    background:#232429; color:var(--text); border:1px solid var(--line);
+    border-radius:10px; padding:7px 8px; font-size:12px; z-index:30;
+    display:none; box-shadow:0 8px 24px rgba(0,0,0,.45);
   }
   #toast.show{display:block;}
   #toast .toast-fields{
     display:grid; grid-template-columns:repeat(2, minmax(0, 1fr));
-    gap:5px; width:100%;
+    gap:4px; width:100%;
   }
   #toast .toast-field{
-    min-width:0; min-height:36px; padding:5px 6px;
-    display:flex; align-items:center; justify-content:space-between; gap:5px;
-    border:1px solid var(--line); border-radius:7px; background:var(--card2);
+    min-width:0; min-height:29px; padding:2px 6px;
+    display:flex; align-items:center; justify-content:space-between; gap:4px;
+    border:1px solid var(--line); border-radius:6px; background:var(--card2);
   }
   #toast .toast-field.wide{grid-column:1 / -1;}
   #toast .toast-label{
-    min-width:0; color:var(--sub); font-size:11px; line-height:1.2;
+    min-width:0; color:#8e96a5; font-size:11px; font-weight:600; line-height:1.2;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  #toast .toast-fields > button{
+    grid-column:1 / -1; width:100%; min-height:29px; padding:4px 8px;
+    font-size:11.5px; font-weight:600; border-radius:6px;
+    border:1px solid var(--line); background:var(--card2); color:var(--text);
+  }
+  #toast .idle-mode-btn{
+    padding:2px 8px; font-size:11px; font-weight:700;
+    border:1px solid var(--line); background:var(--card); color:#ffd166;
+    border-radius:5px; line-height:1.3;
   }
   #toast button{
     border:1px solid var(--line); background:var(--card2); color:var(--text);
-    border-radius:8px; padding:7px 10px; font-size:12px; font-weight:600;
+    border-radius:6px; padding:5px 8px; font-size:12px; font-weight:600;
   }
   #toast .toast-actions{
     display:grid; grid-template-columns:1fr 1fr; gap:5px;
-    margin-top:6px; padding-top:6px; border-top:1px solid var(--line);
+    margin-top:5px; padding-top:5px; border-top:1px solid var(--line);
   }
-  #toast .toast-actions button{width:100%; min-height:28px; padding:5px 7px;}
+  #toast .toast-actions button{width:100%; min-height:27px; padding:4px 6px; font-size:12px; border-radius:6px;}
   #toast button.ok{background:var(--danger); border-color:transparent; color:#fff;}
   /* 1回目タップで破線（確定待ち）。2回目で実行 */
   #toast button.armed{outline:2px dashed #fff; outline-offset:2px;}
   #toast .toast-color{
-    display:flex; align-items:center; justify-content:space-between; gap:5px;
+    display:flex; align-items:center; justify-content:space-between; gap:4px;
     min-width:0; width:100%; height:100%; color:var(--text); font-size:12px;
   }
-  #toast .toast-color input[type="color"]{width:24px;height:21px;padding:1px;border:1px solid var(--line);border-radius:5px;background:transparent;}
+  #toast .toast-color input[type="color"]{width:24px;height:20px;padding:1px;border:1px solid var(--line);border-radius:4px;background:transparent;}
   #toast .toast-color input[type="text"]{
-    width:2.8em; height:24px; padding:1px 3px; border:1px solid var(--line); border-radius:5px;
-    background:var(--card2); color:var(--text) !important; font-size:13px; font-weight:700;
-    text-align:center; caret-color:var(--text); -webkit-text-fill-color:var(--text);
+    width:2.7em; height:22px; padding:1px 3px; border:1px solid var(--line); border-radius:4px;
+    background:var(--card); color:#ffffff !important; font-size:12.5px; font-weight:700;
+    text-align:center; caret-color:#ffffff; -webkit-text-fill-color:#ffffff;
   }
-  #toast .toast-hm{display:flex; align-items:center; gap:3px; color:var(--sub); font-size:11px;}
+  #toast .toast-color input[type="text"]::placeholder{color:#606775; font-weight:500;}
+  #toast .toast-hm{display:flex; align-items:center; gap:2px; color:#8e96a5; font-size:11px;}
   #empty{color:var(--sub); font-size:13px; text-align:center; padding:40px 0;}
   #addPanel{
     position:fixed; left:0; right:0; bottom:0; background:var(--card);
@@ -393,7 +381,6 @@
 </style>
 </head>
 <body>
-<div id="resumeVeil" aria-hidden="true"></div>
 <header>
 <button aria-label="アプリを更新" class="iconbtn" id="updateBtn" title="アプリを更新">↻</button>
 <span aria-hidden="true" class="spacer"></span>
@@ -431,7 +418,8 @@
 <script>
 const STORAGE_KEY = 'freetimer:v1';
 let state = load();
-
+// 旧版で存在し得た「アカウント外タイマー」を起動時にアカウントへ移行。
+// 現行UIではタイマーはアカウント枠の子としてのみ作成する。
 function migrateOrphanTimers(){
   if (!state || !Array.isArray(state.items)) return false;
   const orphan = state.items.filter(it => it && (it.type==='stam' || it.type==='idle'));
@@ -441,6 +429,8 @@ function migrateOrphanTimers(){
   for (let i=0; i<orphan.length; i+=2){
     groups.push({ id:'g' + Date.now().toString(36) + Math.random().toString(36).slice(2,7), type:'group', name:'', children:orphan.slice(i,i+2) });
   }
+  // 最初の孤立タイマーがあった位置に移行後のアカウント枠を挿入し、
+  // それ以外の既存項目の順序はなるべく維持する。
   const firstIndex = state.items.findIndex(it => orphan.includes(it));
   const beforeCount = state.items.slice(0, firstIndex).filter(it => !orphan.includes(it)).length;
   state.items = keep.slice(0,beforeCount).concat(groups, keep.slice(beforeCount));
@@ -453,8 +443,10 @@ let tickId = null;
 let tickGen = 0;
 let pending40Id = null;
 let claimId = null;
+// インライン数字編集中の対象。null | `${itemId}:cur` | `${itemId}:max`
 let editingId = null;
 
+// DOM参照は一度だけ取得して使い回す(毎分ティックや毎クリックで検索し直さない)。
 const cardsEl = document.getElementById('cards');
 const emptyEl = document.getElementById('empty');
 const addPanelEl = document.getElementById('addPanel');
@@ -485,6 +477,7 @@ function openNameEditPopup(opts){
   opts = opts || {};
   if (!nameEditOverlayEl || !nameEditInputEl) return;
   if (nameEditFocusTimer){ clearTimeout(nameEditFocusTimer); nameEditFocusTimer = null; }
+  // トースト由来の pointer が残っていると focus 直後に blur されることがある
   closeToast();
   nameEditLabelEl.textContent = opts.label || '名前を編集';
   nameEditInputEl.value = opts.value != null ? String(opts.value) : '';
@@ -492,6 +485,7 @@ function openNameEditPopup(opts){
   nameEditOnOk = typeof opts.onOk === 'function' ? opts.onOk : null;
   nameEditOverlayEl.classList.add('show');
   nameEditOverlayEl.setAttribute('aria-hidden', 'false');
+  // トースト閉鎖・前の pointer が落ち着いてから focus（初回キーボード落ち対策）
   nameEditFocusTimer = setTimeout(()=>{
     nameEditFocusTimer = null;
     if (!nameEditOverlayEl.classList.contains('show')) return;
@@ -509,6 +503,7 @@ function confirmNameEdit(){
   if (cb) cb(v);
 }
 if (nameEditOkEl){
+  // pointerdown だと focus を奪ってキーボードが先に閉じることがある → click で確定
   nameEditOkEl.addEventListener('click', e=>{
     e.preventDefault();
     e.stopPropagation();
@@ -535,6 +530,8 @@ if (nameEditInputEl){
 }
 
 function normalizeIdleClaim(it){
+  // 「受取」は一時的なUI状態。永続化されると claimId（メモリのみ）とズレて
+  // 再起動後も「受取」のまま固まる。読み込み時は必ず running に戻す。
   if (it && it.type === 'idle' && it.state === 'claim') it.state = 'running';
 }
 function load(){
@@ -559,7 +556,7 @@ function load(){
   return { items: [] };
 }
 
-// ── 保存管理（全経路を単一の pendingSave で完全1本化）──
+// ── 保存管理（全保存経路を単一の pendingSave で完全1本化 ＆ バックグラウンド移行時即時確定）──
 let pendingSave = false;
 let pendingSaveTimer = null;
 let pendingSaveRaf = null;
@@ -578,7 +575,7 @@ function requestSave(mode){
     saveNow();
     return;
   }
-  if (pendingSave) return;
+  if (pendingSave) return; // 既に予約があれば1本にまとめる
   pendingSave = true;
   if (mode === 'afterPaint'){
     pendingSaveRaf = requestAnimationFrame(()=>{
@@ -600,6 +597,8 @@ function saveAfterPaint(){ requestSave('afterPaint'); }
 
 function uid(){ return 'x' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 
+// アプリ内のタップ操作は pointerdown に統一。ネイティブ入力の編集開始だけは、
+// 長押しでキーボードを出さないため短い指離し時にfocusする。
 function bindTapDown(el, handler){
   el.addEventListener('pointerdown', (e)=>{
     if (e.isPrimary === false) return;
@@ -612,60 +611,33 @@ function clearOnFocus(input){
   input.addEventListener('focus', () => { input.value = ''; });
 }
 
-function createPersistentInlineEditor(opts){
-  const {
-    initialValue = '',
-    wrapClass = 'inline-number',
-    textClass = 'inline-number-text',
-    inputClass = 'inline-edit-input',
-    placeholder = '',
-    format = v => String(v == null ? '' : v),
-    sanitize = v => String(v == null ? '' : v),
-    normalize = v => v,
-    emptyKeepsValue = true,
-    clearOnFocus = false,
-    maxLength = null,
-    inputMode = null,
-    editKey = null,
-    onOpen = null,
-    onCommit = null,
-    usePlaceholderClass = false,
-  } = opts || {};
+// スタミナ現在値用インライン編集
+function createInlineNumber(initialValue, onCommit, editKey, onOpen){
+  const normalize = v => String(Math.max(0, Math.floor(Number(String(v).replace(/\D/g, '')) || Number(v) || 0)));
+  const sanitize = v => String(v).replace(/\D/g, '').slice(0, 3);
 
   const wrap = document.createElement('span');
-  wrap.className = wrapClass;
+  wrap.className = 'inline-number';
   const text = document.createElement('span');
-  text.className = textClass;
+  text.className = 'inline-number-text';
   let shownValue = normalize(initialValue);
 
   const paint = ()=>{
-    const display = format(shownValue);
-    if (usePlaceholderClass){
-      if (String(shownValue)){
-        if (text.textContent !== display) text.textContent = display;
-        text.classList.remove('is-placeholder');
-      } else {
-        const ph = placeholder || '';
-        if (text.textContent !== ph) text.textContent = ph;
-        text.classList.add('is-placeholder');
-      }
-    } else if (text.textContent !== display){
-      text.textContent = display;
-    }
+    if (text.textContent !== shownValue) text.textContent = shownValue;
   };
   paint();
   wrap.appendChild(text);
 
+  // input は常設。編集時のみ表示。
   const input = document.createElement('input');
   input.type = 'text';
-  if (inputMode) input.inputMode = inputMode;
-  input.className = inputClass;
-  input.placeholder = placeholder || '';
+  input.inputMode = 'numeric';
+  input.maxLength = 3;
+  input.className = 'inline-edit-input';
   input.autocomplete = 'off';
   input.autocapitalize = 'off';
   input.autocorrect = 'off';
   input.spellcheck = false;
-  if (maxLength != null) input.maxLength = maxLength;
   input.tabIndex = -1;
   input.setAttribute('aria-hidden','true');
   input.style.visibility = 'hidden';
@@ -694,23 +666,9 @@ function createPersistentInlineEditor(opts){
     input.style.pointerEvents = 'auto';
     input.tabIndex = 0;
     input.removeAttribute('aria-hidden');
-    if (clearOnFocus) input.value = '';
+    input.value = '';
     wrap.classList.add('editing');
-    const placeCaret = ()=>{
-      try {
-        const len = String(input.value || '').length;
-        if (typeof input.setSelectionRange === 'function') input.setSelectionRange(len, len);
-      } catch (err) {}
-    };
     try { input.focus({preventScroll:true}); } catch (e) {}
-    placeCaret();
-    setTimeout(()=>{
-      if (editor !== input) return;
-      try {
-        if (document.activeElement !== input) input.focus({preventScroll:true});
-        placeCaret();
-      } catch (e) {}
-    }, 30);
   };
 
   const finish = (commit=true)=>{
@@ -724,7 +682,7 @@ function createPersistentInlineEditor(opts){
       next = originalValue;
     } else {
       const raw = sanitize(input.value);
-      next = (emptyKeepsValue && raw === '') ? originalValue : normalize(raw);
+      next = (raw === '') ? originalValue : normalize(raw);
     }
     editor = null;
     wrap.classList.remove('editing');
@@ -742,7 +700,7 @@ function createPersistentInlineEditor(opts){
     originalValue = shownValue;
     if (typeof onOpen === 'function') onOpen();
     if (editKey != null) editingId = editKey;
-    input.value = clearOnFocus ? '' : String(shownValue ?? '');
+    input.value = '';
     editor = input;
     guardBlur = true;
     setTimeout(()=>{ guardBlur = false; }, 350);
@@ -757,20 +715,6 @@ function createPersistentInlineEditor(opts){
     if (e.key === 'Enter'){ e.preventDefault(); guardBlur = false; input.blur(); }
     else if (e.key === 'Escape'){ e.preventDefault(); input.value = ''; guardBlur = false; finish(false); }
   });
-  input.addEventListener('pointerdown', e=>{
-    if (e.isPrimary === false) return;
-    e.preventDefault();
-    e.stopPropagation();
-    try {
-      window.getSelection()?.removeAllRanges();
-      const len = String(input.value || '').length;
-      input.setSelectionRange(len, len);
-    } catch (err) {}
-  }, {capture:true, passive:false});
-  input.addEventListener('selectstart', e=>{
-    e.preventDefault();
-    try { window.getSelection()?.removeAllRanges(); } catch (err) {}
-  }, {capture:true});
   input.addEventListener('contextmenu', e=>{
     e.preventDefault();
     e.stopPropagation();
@@ -828,12 +772,12 @@ function createPersistentInlineEditor(opts){
     wrap, text, input, open,
     setText: setValue,
     setValue,
-    setRank: setValue,
     setColor: c => { wrap.style.color = c || ''; },
     isEditing
   };
 }
 
+// 名前・見出しは表示専用（編集はポップアップ）。input も雫対策も持たない。
 function createInlineText(initialValue, placeholder, _onCommit){
   const wrap = document.createElement('span');
   wrap.className = 'name';
@@ -866,45 +810,6 @@ function createInlineText(initialValue, placeholder, _onCommit){
   };
 }
 
-function createInlineRank(initialRank, onOpen, onCommit){
-  const clampRank = v => Math.max(1, Math.min(200, Math.floor(Number(String(v).replace(/\D/g, '')) || Number(v) || 1)));
-  return createPersistentInlineEditor({
-    initialValue: clampRank(initialRank),
-    wrapClass: 'rank',
-    textClass: 'rank-text',
-    inputClass: 'rank-edit-input',
-    format: v => 'Lv.' + clampRank(v),
-    normalize: v => clampRank(v),
-    sanitize: v => String(v).replace(/\D/g, '').slice(0, 3),
-    emptyKeepsValue: true,
-    clearOnFocus: true,
-    maxLength: 3,
-    inputMode: 'numeric',
-    onOpen,
-    onCommit: v => onCommit(clampRank(v))
-  });
-}
-
-function createInlineNumber(initialValue, onCommit, editKey, onOpen){
-  const normalizeNumber = v => String(Math.max(0, Math.floor(Number(String(v).replace(/\D/g, '')) || Number(v) || 0)));
-  return createPersistentInlineEditor({
-    initialValue: String(initialValue),
-    wrapClass: 'inline-number',
-    textClass: 'inline-number-text',
-    inputClass: 'inline-edit-input',
-    normalize: normalizeNumber,
-    sanitize: v => String(v).replace(/\D/g, '').slice(0, 3),
-    format: v => String(v),
-    emptyKeepsValue: true,
-    clearOnFocus: true,
-    maxLength: 3,
-    inputMode: 'numeric',
-    editKey,
-    onOpen,
-    onCommit
-  });
-}
-
 function newStamItem(intervalMin, max, useChunk){
   const m = clampInt(max, 1, 999, 100);
   const item = {
@@ -913,13 +818,15 @@ function newStamItem(intervalMin, max, useChunk){
     intervalMin: clampInt(intervalMin, 1, 99999, 5),
     start: Date.now()
   };
+  // useChunk あり → カード短押しで使い切りプレビュー/確定
   if (useChunk != null && Number(useChunk) > 0) item.useChunk = clampUseChunk(useChunk);
   return item;
 }
+// 実験：既存スタミナ計算のまま、最大少なめ・1個使い切りのプリセット
 function newOrbItem(intervalMin, max){
   const item = newStamItem(intervalMin, max != null ? max : 4, 1);
-  item.lockedMax = true;
-  item.useMode = 'sub';
+  item.lockedMax = true; // カード上で最大編集しない
+  item.useMode = 'sub';   // 1タップで1個減らす（modだと %1 で常に0になる）
   return item;
 }
 function hasUseChunk(it){
@@ -938,19 +845,29 @@ function newGroupItem(){
   return { id: uid(), type:'group', name:'', children: [] };
 }
 
+// 残り時間ではなく「何時何分に完了するか」を時刻表記で返す(スタミナ用)。
 function fmtClockAt(remainMs, now){
   const d = new Date((now || Date.now()) + Math.max(0, remainMs));
   const p = n => String(n).padStart(2,'0');
   return { h: p(d.getHours()), m: p(d.getMinutes()) };
 }
+// 残り時間を「あと◯:◯◯」のカウントダウン表記で返す(放置報酬用)。
 function fmtCountdown(ms){
   ms = Math.max(0, ms);
   const totalMin = Math.ceil(ms/60000);
   const h = Math.floor(totalMin/60), m = totalMin%60;
   return h + ':' + String(m).padStart(2,'0');
 }
+// 経過時間を「◯:◯◯」のカウントアップ表記で返す(放置報酬用)。
+function fmtElapsed(ms){
+  ms = Math.max(0, ms);
+  const totalMin = Math.floor(ms/60000);
+  const h = Math.floor(totalMin/60), m = totalMin%60;
+  return h + ':' + String(m).padStart(2,'0');
+}
 
 function stamInfo(it, now){
+  // ベースが既に満タンなら回復計算しない（満タン時刻は start に固定）
   if (it.current >= it.max){
     return { cur: it.max, remainMs:0, isFull:true, fullAt: it.start };
   }
@@ -967,16 +884,20 @@ function stamInfo(it, now){
   const remainMs = (need - 1) * intervalMs + nextIn;
   return { cur, remainMs, isFull:false };
 }
+// 満タンにしたら start を今に固定して、以降の回復計算を止める
 function freezeIfFull(it, now){
   if (it.current >= it.max){
     it.current = it.max;
     it.start = now;
   }
 }
+// 現在値/上限値を書き換えても「次の1回復までの残り時間」がリセットされないよう、
+// サイクルの位相(既にどれだけ経過しているか)を維持したまま基準時刻だけを進める。
 function clampUseChunk(v){
   const n = Math.floor(Number(v) || 0);
   return Math.max(1, Math.min(100, n || 40));
 }
+// 使い切り後の残り。mod: 220→20 / sub（オーブ）: 4→3
 function remainingAfterUse(cur, it){
   cur = Math.max(0, Math.floor(Number(cur) || 0));
   const fallback = 1;
@@ -993,16 +914,18 @@ function idleInfo(it, now){
   const durMs = Math.max(1, it.durationMin) * 60000;
   const elapsed = Math.max(0, now - it.start);
   const remainMs = Math.max(0, durMs - elapsed);
-  return { remainMs, isFull: remainMs<=0, fullAt: it.start + durMs };
+  return { elapsed, remainMs, isFull: remainMs<=0, fullAt: it.start + durMs };
 }
 function fmtHM(ts){
   const d = new Date(ts);
   const p = n => String(n).padStart(2,'0');
   return p(d.getHours()) + ':' + p(d.getMinutes());
 }
+// 満タン、または満タンまで2時間未満 → 赤
 function isNearFull(remainMs, isFull){
   return !!isFull || (remainMs > 0 && remainMs < 7200000);
 }
+// 現在値の赤表示（文字に1回だけ当てる）
 function setNearOnCurrent(editor, near){
   if (!editor || !editor.text) return;
   if (near) editor.text.style.setProperty('color', 'var(--danger)', 'important');
@@ -1011,6 +934,7 @@ function setNearOnCurrent(editor, near){
 
 function timerNeedsTick(it, now){
   if (it.type==='stam') return !stamInfo(it, now).isFull;
+  // 受取待機中は表示が固定なので、毎分tickを止めて無駄なDOM更新をしない。
   if (it.type==='idle') return it.state !== 'claim' && !idleInfo(it, now).isFull;
   return false;
 }
@@ -1062,6 +986,7 @@ function scheduleTick(gen){
   tickId = setTimeout(()=>{
     tickId = null;
     if (gen !== tickGen) return;
+    // 毎分はDOM構造を再構築せず、既存ノードの表示だけ差分更新。
     tickRender(Date.now());
     if (needsTicking()) scheduleTick(gen);
   }, delay);
@@ -1072,29 +997,28 @@ function startTicking(force){
   if (!tickId && needsTicking()) scheduleTick(tickGen);
 }
 
-function bindLongPressDelete(el, id, shortAction){
+// 現在値編集中やメニューボタンは長押し削除／使い切りと分離
+function isEditTarget(target){
+  if (!target || !target.closest) return false;
+  return !!(
+    target.closest('.inline-edit-input') ||
+    target.closest('[data-role="curWrap"]') ||
+    target.closest('.timer-menu-tab') ||
+    target.closest('.header-menu-button')
+  );
+}
+
+// グループ名や仕切り線の長押し削除
+function bindLongPressDelete(el, id){
   const HOLD_MS = 520, MOVE_PX = 24;
-  let timer = null, active = false, moved = false, longFired = false;
+  let timer = null, active = false, moved = false;
   let sx = 0, sy = 0, pid = null;
 
   const isPrimary = e => e.isPrimary !== false && !(e.pointerType==='mouse' && e.button!==0);
   const clearSelection = ()=>{ try{ window.getSelection()?.removeAllRanges(); }catch(e){} };
   const cleanup = ()=>{
     if (timer !== null){ clearTimeout(timer); timer = null; }
-    active = false; moved = false; longFired = false; pid = null;
-  };
-
-  const isEditTarget = (target)=>{
-    if (!target || !target.closest) return false;
-    return !!(
-      target.closest('.inline-edit-input') ||
-      target.closest('.rank-edit-input') ||
-      target.closest('.rank-text') ||
-      target.closest('[data-role="curWrap"]') ||
-      target.closest('.rank') ||
-      target.closest('.timer-menu-tab') ||
-      target.closest('.header-menu-button')
-    );
+    active = false; moved = false; pid = null;
   };
 
   el.addEventListener('pointerdown', e=>{
@@ -1102,13 +1026,12 @@ function bindLongPressDelete(el, id, shortAction){
     if (isEditTarget(e.target)) return;
     if (editingId != null) return;
 
-    active = true; moved = false; longFired = false;
+    active = true; moved = false;
     sx = e.clientX; sy = e.clientY; pid = e.pointerId;
 
     timer = setTimeout(()=>{
       if (!active || moved) return;
       timer = null;
-      longFired = true;
       clearSelection();
       try {
         const ae = document.activeElement;
@@ -1128,22 +1051,11 @@ function bindLongPressDelete(el, id, shortAction){
     }
   }, {capture:true, passive:true});
 
-  el.addEventListener('pointerup', e=>{
-    if (!active || e.pointerId !== pid) return;
-    const wasLong = longFired, wasMoved = moved;
-    if (timer !== null){ clearTimeout(timer); timer = null; }
-
-    if (wasLong){
-      e.preventDefault();
-      e.stopPropagation();
-    } else if (!wasMoved && typeof shortAction === 'function'){
-      if (!isEditTarget(e.target)) shortAction(e);
-    }
+  el.addEventListener('pointerup', ()=>{
     cleanup();
-  }, {capture:true, passive:false});
+  }, {capture:true, passive:true});
 
-  el.addEventListener('pointercancel', e=>{
-    if (!active || e.pointerId !== pid) return;
+  el.addEventListener('pointercancel', ()=>{
     cleanup();
   }, {capture:true, passive:true});
 
@@ -1158,22 +1070,12 @@ function targetInGroupName(target, el){
   return !!n && el.contains(n);
 }
 
+// タイマーカード用の通常タップだけを高速処理。
 function bindTimerShortAction(el, shortAction){
   let active = false, moved = false, pid = null;
   let sx = 0, sy = 0;
-  const MOVE_PX = 24;
+  const MOVE_PX = 10;
   const isPrimary = e => e.isPrimary !== false && !(e.pointerType==='mouse' && e.button!==0);
-  const isEditTarget = (target)=>{
-    if (!target || !target.closest) return false;
-    return !!(
-      target.closest('.inline-edit-input') ||
-      target.closest('.rank-edit-input') ||
-      target.closest('.rank-text') ||
-      target.closest('[data-role="curWrap"]') ||
-      target.closest('.rank') ||
-      target.closest('.timer-menu-tab')
-    );
-  };
   const cleanup = ()=>{ active=false; moved=false; pid=null; };
 
   el.addEventListener('pointerdown', e=>{
@@ -1183,8 +1085,8 @@ function bindTimerShortAction(el, shortAction){
   }, {capture:true, passive:true});
 
   el.addEventListener('pointermove', e=>{
-    if (!active || e.pointerId !== pid) return;
-    if (Math.hypot(e.clientX-sx, e.clientY-sy) > MOVE_PX) moved = true;
+    if (!active || e.pointerId !== pid || moved) return;
+    if (Math.abs(e.clientX - sx) > MOVE_PX || Math.abs(e.clientY - sy) > MOVE_PX) moved = true;
   }, {capture:true, passive:true});
 
   el.addEventListener('pointerup', e=>{
@@ -1207,6 +1109,7 @@ function clearLongPressTarget(){
     longPressTargetEl = null;
   }
 }
+// トースト＝確認UI専用。開く/閉じる/2段階確定をここに集約。
 function closeToast(){
   clearLongPressTarget();
   if (!toastEl) return;
@@ -1225,11 +1128,13 @@ function showConfirmToast(html, onAct){
     const btn = e.target.closest('button[data-act]');
     if (!btn) return;
     const act = btn.dataset.act;
+    // 即閉じ（やめる）
     if (act === 'no' || act === 'cancel'){
       closeToast();
       if (typeof onAct === 'function') onAct(act, btn);
       return;
     }
+    // 削除だけ2回タップ確定。編集・追加などは1回で実行
     if (act === 'yes' && !btn.classList.contains('armed')){
       toastEl.querySelectorAll('button.armed').forEach(b => b.classList.remove('armed'));
       btn.classList.add('armed');
@@ -1253,20 +1158,21 @@ function askRemoveItem(id){
   const isIdle = it && it.type === 'idle';
   const canEditName = isHeader || isGroup;
   const colorDefault = isHeader ? (it.color || '#9b8bff') : (isRule ? (it.color || '#52617a') : null);
+  // スタミナは設定済み or 後から付けられるよう空欄でも出す
   const showChunk = isStam;
   const chunkVal = isStam ? (it.useChunk != null ? clampUseChunk(it.useChunk) : '') : null;
   const showStamMax = isStam && !it.lockedMax;
   const stamMaxRow = showStamMax
-    ? `<label class="toast-color toast-max-row"><span class="toast-label">最大</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${it.max}" maxlength="3" data-role="stamMax" aria-label="最大スタミナ" style="width:3.2em;text-align:center;"></label>`
+    ? `<label class="toast-field"><span class="toast-color toast-max-row"><span class="toast-label">最大</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${it.max}" maxlength="3" data-role="stamMax" aria-label="最大スタミナ"></span></label>`
     : '';
   const fields =
     (colorDefault ? `<label class="toast-field"><span class="toast-color"><span class="toast-label">色</span><input type="color" value="${colorDefault}" aria-label="色"></span></label>` : '')
     + (showChunk ? `<label class="toast-field"><span class="toast-color"><span class="toast-label">使い切り</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${chunkVal}" maxlength="3" data-role="useChunk" aria-label="使い切り数" placeholder="なし"></span></label>` : '')
-    + (stamMaxRow ? `<label class="toast-field">${stamMaxRow}</label>` : '')
+    + stamMaxRow
     + (canEditName ? `<button type="button" data-act="editName">${isHeader ? '見出し編集' : '名前編集'}</button>` : '')
     + (canAdd ? '<button type="button" data-act="add">タイマー追加</button>' : '')
     + (canAddAccountBelowHeader ? '<button type="button" data-act="addAccountBelow">アカウント追加</button>' : '')
-    + (isIdle ? idleToastRowsHtml(it) : '');
+    + (isIdle ? idleToastRowsHtml(it) : '');   // 放置：設定時間／残り時間の入力行
   const extra = fields ? `<div class="toast-fields">${fields}</div>` : '';
   showConfirmToast(
     extra
@@ -1294,7 +1200,7 @@ function askRemoveItem(id){
           placeholder: isHeader ? '見出し(ゲーム名など)' : 'アカウント',
           onOk: (v)=>{
             const next = String(v == null ? '' : v);
-            if (it.name === next) return;
+            if (it.name === next) return; // 変更なし＝DOMも触らない
             it.name = next;
             if (ed && typeof ed.setText === 'function') ed.setText(next);
             else if (ed && typeof ed.setValue === 'function') ed.setValue(next);
@@ -1304,6 +1210,7 @@ function askRemoveItem(id){
       }
     }
   );
+  // closeToast の後にハイライトを付け直す
   const targetRef = refs[id];
   if (targetRef && targetRef.el){
     targetRef.el.classList.add('longpress-target');
@@ -1333,6 +1240,7 @@ function askRemoveItem(id){
       const applyChunk = ()=>{
         const raw = String(chunkEl.value || '').replace(/\D/g, '');
         if (raw === ''){
+          // スタミナは空で「使い切りなし」
           if (isStam){
             delete it.useChunk;
             chunkEl.value = '';
@@ -1343,8 +1251,11 @@ function askRemoveItem(id){
           chunkEl.value = String(it.useChunk);
           if (pending40Id === it.id) paintUseChunkPreview(it.id);
         }
-        if (isStam){ save(); render(); startTicking(true); }
-        else save();
+        if (isStam){
+          if (refs[it.id]) refs[it.id].shortAction = hasUseChunk(it) ? (e) => onUseChunkTap(it, e) : null;
+          updateOneTimer(it);
+        }
+        save();
       };
       chunkEl.addEventListener('change', applyChunk);
       chunkEl.addEventListener('blur', applyChunk);
@@ -1384,19 +1295,32 @@ function askRemoveItem(id){
   if (isIdle) bindIdleToastRows(it);
 }
 
+/* ═══════════ 放置トースト：設定時間／残り時間（ここから）═══════════ */
 function idleHm(min){
   min = Math.max(0, Math.floor(min));
   return [Math.floor(min / 60), min % 60];
 }
+function idleModeRowHtml(countMode){
+  const isUp = countMode === 'up';
+  const modeLabel = isUp ? '▲ カウントアップ' : '▼ カウントダウン';
+  return `<div class="toast-field wide"><span class="toast-color"><span class="toast-label">方式</span>`
+    + `<button type="button" data-role="idleModeToggle" class="idle-mode-btn">${modeLabel}</button>`
+    + `</span></div>`;
+}
 function idleToastRowsHtml(it){
+  const isUp = it.countMode === 'up';
+  const modeRow = idleModeRowHtml(it.countMode);
   const [dh, dm] = idleHm(it.durationMin);
-  const [rh, rm] = idleHm(Math.ceil(idleInfo(it, Date.now()).remainMs / 60000));
+  const info = idleInfo(it, Date.now());
+  const curMin = isUp ? Math.floor(info.elapsed / 60000) : Math.ceil(info.remainMs / 60000);
+  const [rh, rm] = idleHm(curMin);
+  const rowLabel = isUp ? '経過' : '残り';
   const row = (key, label, h, m) =>
     `<div class="toast-field wide"><span class="toast-color"><span class="toast-label">${label}</span><span class="toast-hm">`
     + `<input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" value="${h}" data-idle="${key}H" aria-label="${label}(時間)"><span>h</span>`
     + `<input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="${m}" data-idle="${key}M" aria-label="${label}(分)"><span>m</span>`
     + `</span></span></div>`;
-  return row('dur', '設定', dh, dm) + row('rem', '残り', rh, rm);
+  return modeRow + row('dur', '設定', dh, dm) + row('rem', rowLabel, rh, rm);
 }
 function bindIdleToastRows(it){
   const box = toastEl && toastEl.querySelector('.toast-fields');
@@ -1406,8 +1330,11 @@ function bindIdleToastRows(it){
   const rowOf = el => (el && el.dataset && el.dataset.idle) ? el.dataset.idle.slice(0, 3) : null;
   const read = (hk, mk) => clampInt(q(hk).value, 0, 999, 0) * 60 + clampInt(q(mk).value, 0, 59, 0);
   const sync = ()=>{
+    const isUp = it.countMode === 'up';
     const [dh, dm] = idleHm(it.durationMin);
-    const [rh, rm] = idleHm(Math.ceil(idleInfo(it, Date.now()).remainMs / 60000));
+    const info = idleInfo(it, Date.now());
+    const curMin = isUp ? Math.floor(info.elapsed / 60000) : Math.ceil(info.remainMs / 60000);
+    const [rh, rm] = idleHm(curMin);
     for (const [k, v] of [['durH', dh], ['durM', dm], ['remH', rh], ['remM', rm]]){
       const el = q(k);
       if (el){ el.value = String(v); el.defaultValue = String(v); }
@@ -1420,15 +1347,36 @@ function bindIdleToastRows(it){
       if (total === it.durationMin) return;
       it.durationMin = total;
     } else {
+      const isUp = it.countMode === 'up';
       const durMs = Math.max(1, it.durationMin) * 60000;
-      const remainMs = Math.min(durMs, read('remH', 'remM') * 60000);
-      it.start = now - (durMs - remainMs);
+      if (isUp){
+        const elapsedMs = Math.min(durMs, read('remH', 'remM') * 60000);
+        it.start = now - elapsedMs;
+      } else {
+        const remainMs = Math.min(durMs, read('remH', 'remM') * 60000);
+        it.start = now - (durMs - remainMs);
+      }
       if (it.state === 'claim'){ it.state = 'running'; if (claimId === it.id) claimId = null; }
     }
     updateOneTimer(it);
     startTicking(true);
     save();
   };
+
+  const modeBtn = box.querySelector('[data-role="idleModeToggle"]');
+  if (modeBtn){
+    bindTapDown(modeBtn, (e)=>{
+      e.stopPropagation();
+      it.countMode = it.countMode === 'up' ? 'down' : 'up';
+      const isUp = it.countMode === 'up';
+      modeBtn.textContent = isUp ? '▲ カウントアップ' : '▼ カウントダウン';
+      const remLabelEl = box.querySelector('[data-idle="remH"]')?.closest('.toast-field')?.querySelector('.toast-label');
+      if (remLabelEl) remLabelEl.textContent = isUp ? '経過' : '残り';
+      sync();
+      updateOneTimer(it);
+      save();
+    });
+  }
   box.addEventListener('pointerdown', e=>e.stopPropagation());
   box.addEventListener('focusin', e=>{ if (rowOf(e.target)) e.target.value = ''; });
   box.addEventListener('input', e=>{ const r = rowOf(e.target); if (r) dirty[r] = true; });
@@ -1443,6 +1391,7 @@ function bindIdleToastRows(it){
     if (e.key === 'Enter' && rowOf(e.target)){ e.preventDefault(); e.target.blur(); }
   });
 }
+/* ═══════════ 放置トースト：設定時間／残り時間（ここまで）═══════════ */
 
 function makeCardEl(type, id, innerHtml){
   const wrap = document.createElement('div');
@@ -1523,9 +1472,11 @@ function buildStamCard(it){
   const maxWrap = wrap.querySelector('[data-role="maxWrap"]');
   const curEditor = attachCurrentEditor(curWrap, it, () => { pending40Id = null; });
   maxWrap.textContent = String(it.max);
-  refs[it.id] = { el: wrap, curEl: curEditor, maxLabel: maxWrap,
-    clockEl: wrap.querySelector('[data-role="clock"]') };
-  bindTimerShortAction(wrap, hasUseChunk(it) ? (e) => onUseChunkTap(it, e) : null);
+  const r = { el: wrap, curEl: curEditor, maxLabel: maxWrap,
+    clockEl: wrap.querySelector('[data-role="clock"]'),
+    shortAction: hasUseChunk(it) ? (e) => onUseChunkTap(it, e) : null };
+  refs[it.id] = r;
+  bindTimerShortAction(wrap, (e) => r.shortAction ? r.shortAction(e) : null);
   return wrap;
 }
 
@@ -1617,11 +1568,6 @@ function bindMenuButtonDelegation(){
   const isPrimary = e => e.isPrimary !== false && !(e.pointerType === 'mouse' && e.button !== 0);
   const menuBtnOf = e => (e.target && e.target.closest) ? e.target.closest(MENU_BTN_SEL) : null;
   cardsEl.addEventListener('pointerdown', e=>{
-    if (!menuBtnOf(e) || !isPrimary(e)) return;
-    e.preventDefault();
-    e.stopPropagation();
-  }, {capture:true, passive:false});
-  cardsEl.addEventListener('pointerup', e=>{
     const btn = menuBtnOf(e);
     if (!btn || !isPrimary(e)) return;
     e.preventDefault();
@@ -1704,9 +1650,8 @@ document.addEventListener('pointerdown', (e) => {
     }
   } catch(err){}
   if (claimId != null){
-    const claimed = findItemById(claimId);
-    const r = claimed ? getTimerRef(claimId) : null;
-    if (!claimed || !r || !r.el.contains(e.target)) cancelClaim(claimed || {id:claimId});
+    const r = getTimerRef(claimId);
+    if (!r || !r.el.contains(e.target)) cancelClaim({id:claimId});
   }
   if (pending40Id != null){
     const r = getTimerRef(pending40Id);
@@ -1737,7 +1682,6 @@ function clampInt(v, min, max, fb){
   const n = parseInt(v,10);
   return Number.isFinite(n) ? Math.max(min, Math.min(max,n)) : fb;
 }
-function esc(s){ return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 function removeItem(id){
   if (refs[id]) refs[id].el.remove();
@@ -1849,7 +1793,8 @@ function updateTimerCard(it, r, now){
     const info = idleInfo(it, now);
     r.el.classList.toggle('claim', it.state==='claim');
     r.el.classList.toggle('full', info.isFull && it.state!=='claim');
-    const label = it.state==='claim' ? '受取' : (info.isFull ? fmtHM(info.fullAt) : fmtCountdown(info.remainMs));
+    const runningLabel = (it.countMode === 'up') ? fmtElapsed(info.elapsed) : fmtCountdown(info.remainMs);
+    const label = it.state==='claim' ? '受取' : (info.isFull ? fmtHM(info.fullAt) : runningLabel);
     if (r.curEl.textContent !== label) r.curEl.textContent = label;
     r.curEl.classList.toggle('near', it.state==='claim' || isNearFull(info.remainMs, info.isFull));
     renderClock(r.clockEl, info.remainMs, info.isFull, now, info.fullAt);
@@ -1858,6 +1803,7 @@ function updateTimerCard(it, r, now){
 
 let pendingAddGroupId = null;
 let setupType = null;
+let setupIdleMode = 'down';
 
 function closeAddPanel(){
   addPanelEl.classList.remove('show');
@@ -1911,9 +1857,21 @@ function openSetup(type){
     setupLabelEl.textContent = '仕切り線の色';
     fillColorPalette('#52617a');
   } else {
-    setupLabelEl.textContent = '満タンまでの時間';
-    setupFieldsEl.innerHTML = `<input type="text" inputmode="numeric" pattern="[0-9]*" id="setupH" value="12"><span>h</span>
-      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupM" value="0"><span>m</span>`;
+    setupLabelEl.textContent = '放置報酬の設定';
+    setupIdleMode = 'down';
+    setupFieldsEl.innerHTML = `<div style="width:100%;margin-bottom:6px;">`
+      + idleModeRowHtml(setupIdleMode)
+      + `</div>`
+      + `<input type="text" inputmode="numeric" pattern="[0-9]*" id="setupH" value="12"><span>h</span>`
+      + `<input type="text" inputmode="numeric" pattern="[0-9]*" id="setupM" value="0"><span>m</span>`;
+    const modeBtn = setupFieldsEl.querySelector('[data-role="idleModeToggle"]');
+    if (modeBtn){
+      bindTapDown(modeBtn, (e)=>{
+        e.stopPropagation();
+        setupIdleMode = setupIdleMode === 'up' ? 'down' : 'up';
+        modeBtn.textContent = setupIdleMode === 'up' ? '▲ カウントアップ' : '▼ カウントダウン';
+      });
+    }
   }
   setupFieldsEl.querySelectorAll('input').forEach(el=>{
     if (el.type === 'color') return;
@@ -1955,7 +1913,7 @@ function confirmSetup(){
   } else if (setupType === 'idle'){
     const h = clampInt(setupFieldsEl.querySelector('#setupH')?.value, 0, 999, 12);
     const m = clampInt(setupFieldsEl.querySelector('#setupM')?.value, 0, 59, 0);
-    if (!pushNewTimer(newIdleItem(h*60+m))) return;
+    if (!pushNewTimer(newIdleItem(h*60+m, setupIdleMode))) return;
   }
   closeSetup();
   save(); render(); startTicking(true);
@@ -1991,28 +1949,7 @@ if (setupCancelEl){
   });
 }
 
-const resumeVeilEl = document.getElementById('resumeVeil');
-let resumeTimer = null;
 let wasBackgrounded = false;
-let hiddenAt = 0;
-function clearResumeVeil(){
-  if (resumeTimer){ clearTimeout(resumeTimer); resumeTimer = null; }
-  if (resumeVeilEl) resumeVeilEl.classList.remove('show');
-}
-function resumePipeline(){
-  if (resumeTimer) clearTimeout(resumeTimer);
-  if (!resumeVeilEl) return;
-  resumeVeilEl.classList.add('show');
-  const finish = () => {
-    tickRender(Date.now());
-    startTicking(true);
-    resumeTimer = setTimeout(()=>{
-      resumeTimer = null;
-      resumeVeilEl.classList.remove('show');
-    }, 220);
-  };
-  requestAnimationFrame(() => requestAnimationFrame(finish));
-}
 
 // ── バックグラウンド・非表示・ページ離脱時の即時保存 ──
 function flushPendingSaveOnHide(){
@@ -2021,41 +1958,34 @@ function flushPendingSaveOnHide(){
   }
 }
 
+// 復帰処理：黒幕や無駄な待機・二重描画を省き、即座に差分更新してtick再開
+function resumeApp(){
+  tickRender(Date.now());
+  startTicking(true);
+}
+
 document.addEventListener('visibilitychange', ()=>{
   if (document.hidden){
     flushPendingSaveOnHide();
     wasBackgrounded = true;
-    hiddenAt = Date.now();
     tickGen++;
-    if (tickId){ clearTimeout(tickId); tickId=null; }
+    if (tickId){ clearTimeout(tickId); tickId = null; }
     return;
   }
   if (!wasBackgrounded) return;
   wasBackgrounded = false;
-  if (Date.now() - hiddenAt < 200){
-    startTicking(true);
-    clearResumeVeil();
-    return;
-  }
-  resumePipeline();
+  // バックグラウンドからの復帰：次フレームで即座に滑らかに同期
+  requestAnimationFrame(resumeApp);
 });
 
 window.addEventListener('pagehide', flushPendingSaveOnHide);
 window.addEventListener('beforeunload', flushPendingSaveOnHide);
 
 window.addEventListener('pageshow', (e)=>{
-  if (e.persisted) resumePipeline();
+  if (e.persisted) resumeApp();
 });
 
-document.addEventListener('pointerdown', (e)=>{
-  clearResumeVeil();
-  const t = e.target;
-  if (!t || !t.closest || !t.closest('input, textarea, [contenteditable]')){
-    try { window.getSelection()?.removeAllRanges(); } catch (err) {}
-  }
-}, true);
-
-/* ═══════════════ 機種差フィット ═══════════════ */
+/* ═══════════════ 機種差フィット（ここから）═══════════════ */
 (function(){
   if (typeof ResizeObserver === 'undefined') return;
 
@@ -2129,23 +2059,25 @@ document.addEventListener('pointerdown', (e)=>{
     apply(card);
   };
 })();
+/* ═══════════════ 機種差フィット（ここまで）═══════════════ */
 
 render();
 startTicking(true);
 
+// 長押しメニュー(コピー等)やドラッグ選択を出さない。
 document.addEventListener('contextmenu', (e)=> e.preventDefault());
 document.addEventListener('dragstart', (e)=> e.preventDefault());
+// テキスト選択は入力欄側で必要な範囲だけ抑止する。
 document.addEventListener('paste', (e)=> e.preventDefault());
 
 bindTapDown(document.getElementById('updateBtn'), ()=>{
   location.href = 'update.html?r=' + Date.now().toString(36);
 });
 
+// Service worker: register once, never poll for updates automatically.
 if ('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{
-    // iframe内やプロキシ環境下でのリダイレクトエラーを防ぐため、安全にcatchして登録
     navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(err => {
-      // 開発環境やリバースプロキシによるリダイレクト制限時は安全にスキップ
       console.warn('ServiceWorker registration bypassed:', err?.message || err);
     });
   });
