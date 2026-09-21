@@ -1,6 +1,5 @@
 <!DOCTYPE html>
-
-<html lang="ja">
+<html lang="ja" style="background-color:#0b0b14">
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no, interactive-widget=overlays-content" name="viewport"/>
@@ -28,7 +27,7 @@
     font-family:var(--timer-number-font);
   }
   /* body は固定。スクロールは #cards のみ → キーボード開閉の黒残り・二重描画を防ぐ */
-  html,body{height:100%; overflow:hidden; overscroll-behavior:none;}
+  html,body{height:100%; overflow:hidden; overscroll-behavior:none; background-color:#0b0b14;}
   body{
     margin:0; background:var(--bg); color:var(--text);
     font-family:Roboto,"Noto Sans JP",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
@@ -91,12 +90,14 @@
     background:var(--card); border:1px solid var(--line); border-radius:10px;
     padding:6px 6px; position:relative; min-width:0;
     touch-action:pan-y; -webkit-touch-callout:none; -webkit-tap-highlight-color:transparent;
+    contain:layout style;
+    transform:translateZ(0);
   }
-  /* タイマー枠：通常時は細めの色分け線 */
-  .card.stam{border:1px solid #5aa9ff;}
+  /* タイマー枠：種別ごとの独立カラー（被りなし） */
+  .card.stam{border:1px solid #4fa3ff;}
   .card.orb{border:1px solid #a78bfa;}
-  .card.idle{border:1px solid #f0a85a;}
-  .card.exped{border:1px solid #34d399;}
+  .card.idle{border:1px solid #f59e0b;}
+  .card.exped{border:1px solid #06b6d4;}
   /* タイマーメニュー用：各タイマー左上の控えめな非ベタ塗り丸型ボタン */
   .timer-menu-btn{
     position:absolute;
@@ -128,29 +129,30 @@
     right:-8px;
     bottom:0;
   }
-  .card.stam .timer-menu-btn{border-color:#5aa9ff;}
+  .card.stam .timer-menu-btn{border-color:#4fa3ff;}
   .card.orb .timer-menu-btn{border-color:#a78bfa;}
-  .card.idle .timer-menu-btn{border-color:#f0a85a;}
-  .card.exped .timer-menu-btn{border-color:#34d399;}
+  .card.idle .timer-menu-btn{border-color:#f59e0b;}
+  .card.exped .timer-menu-btn{border-color:#06b6d4;}
   /* 選択・削除確認中の対象を、角丸に沿ったソリッド枠＆ソフト発光で美しく強調（隣接カードとの破線重複・途切れを防止） */
+  /* 長押し対象：ぼかし無しのシャープ輪郭のみ（GPU負荷低減） */
   .longpress-target{
     border-color:var(--danger) !important;
-    box-shadow:0 0 0 1.5px var(--danger), 0 0 10px rgba(255,107,107,0.3) !important;
+    box-shadow:0 0 0 2px var(--danger) !important;
   }
   .card.group.longpress-target{
     border-color:var(--danger) !important;
-    box-shadow:0 0 0 1.5px var(--danger), 0 0 12px rgba(255,107,107,0.3) !important;
+    box-shadow:0 0 0 2px var(--danger) !important;
   }
   .card.group.longpress-target .group-namerow{
-    box-shadow:0 0 0 1px var(--danger);
+    box-shadow:0 0 0 2px var(--danger);
   }
   .divider.longpress-target{
-    box-shadow:0 0 0 1.5px var(--danger), 0 0 10px rgba(255,107,107,0.3) !important;
+    box-shadow:0 0 0 2px var(--danger) !important;
     border-radius:6px;
   }
   .rule-line.longpress-target{
     border-top-color:var(--danger) !important;
-    box-shadow:0 0 8px rgba(255,107,107,0.5);
+    box-shadow:0 0 0 2px var(--danger);
   }
 
   .row{display:flex; align-items:center; gap:3px; min-width:0;}
@@ -158,26 +160,37 @@
   .namerow{margin-bottom:4px;}
   /* タイマーカードは種類に関係なく同じ外寸に揃える。中身だけ配置を変える。 */
   .card.stam, .card.orb, .card.idle, .card.exped{height:56px; min-height:56px;} 
-  /* claim（スタミナ使い切り / 放置=受取 / 遠征=再出発）は太枠線で強調（box-shadowでレイアウトズレ防止） */
-  .card.claim,
-  .card.stam.claim,
-  .card.orb.claim{
+  /* claim / 短押し待機：border と box-shadow を同色・同幅で一致させモアレ・滲みを防止 */
+  .card.stam.claim{
     border-color:#ffd166 !important;
-    box-shadow:0 0 0 1.5px #ffd166 !important;
+    box-shadow:0 0 0 2px #ffd166 !important;
     z-index:2;
   }
-  .card.idle.claim,
+  .card.orb.claim{
+    border-color:#f472b6 !important;
+    box-shadow:0 0 0 2px #f472b6 !important;
+    z-index:2;
+  }
+  .card.idle.claim{
+    border-color:#10b981 !important;
+    box-shadow:0 0 0 2px #10b981 !important;
+    z-index:2;
+  }
   .card.exped.claim{
-    border-color:var(--ok) !important;
-    box-shadow:0 0 0 1.5px var(--ok) !important;
+    border-color:#38bdf8 !important;
+    box-shadow:0 0 0 2px #38bdf8 !important;
     z-index:2;
   }
+  .card.claim{
+    z-index:2;
+  }
+  /* 満タン：外枠を赤 */
   .card.full,
   .card.stam.full,
   .card.orb.full,
   .card.idle.full,
   .card.exped.full{
-    border-color:var(--orange) !important;
+    border-color:#ff6b6b !important;
   }
   .card.stam .clockstack, .card.stam .stammax, .card.stam .slash,
   .card.orb .clockstack, .card.orb .stammax, .card.orb .slash{pointer-events:none;}
@@ -255,10 +268,13 @@
   }
   .clockstack .ok{color:var(--ok); font-size:14px; line-height:18px;}
   .clockstack .full-at{color:var(--danger); font-size:11.5px; font-weight:800; line-height:18px;}
-  /* 満タンまで2時間未満：現在スタミナ・放置数字を赤（予定時刻は触らない） */
+  /* 警告（2時間未満）=オレンジ / 満タン=赤（予定時刻は触らない） */
   [data-role="curWrap"].near,
-  [data-role="curWrap"].near .inline-number-text{color:var(--danger) !important;}
-  .main.near{color:var(--danger) !important;}
+  [data-role="curWrap"].near .inline-number-text{color:#ffab5c !important;}
+  [data-role="curWrap"].full-val,
+  [data-role="curWrap"].full-val .inline-number-text{color:#ff6b6b !important;}
+  .main.near{color:#ffab5c !important;}
+  .main.full-val{color:#ff6b6b !important;}
   .card.stam > .stam-clock,
   .card.idle > .idle-clock,
   .card.exped > .idle-clock{
@@ -283,9 +299,9 @@
     justify-content:center; gap:6px; position:absolute; left:6px; right:6px; bottom:5px;
   }
   .valrow-idle .main{min-width:2.6em; flex:0 0 auto; margin:0; text-align:center; padding-left:0; font-size:19px; line-height:1.1;}
-  /* 放置タイマー：2時間未満は明るめオレンジ、カウントストップ時は赤文字 */
+  /* 放置・遠征：2時間未満はオレンジ、満タン/claim停止は赤文字 */
   .valrow-idle .main.warn{color:#ffab5c !important;}
-  .valrow-idle .main.stop{color:var(--danger) !important;}
+  .valrow-idle .main.stop{color:#ff6b6b !important;}
   /* 数字の操作は透明な ::before ヒットボックスを使わず、実際の数字要素で受ける。 */
   [data-role="curWrap"], [data-role="maxWrap"]{ position:relative; }
   .divider{
@@ -1194,15 +1210,25 @@ function fmtHM(ts){
   const p = n => String(n).padStart(2,'0');
   return p(d.getHours()) + ':' + p(d.getMinutes());
 }
-// 満タン、または満タンまで2時間未満 → 赤
-function isNearFull(remainMs, isFull){
-  return !!isFull || (remainMs > 0 && remainMs < 7200000);
+// 満タンまで2時間未満（満タン自体は含まない）
+function isWarnRemain(remainMs, isFull){
+  return !isFull && remainMs > 0 && remainMs < 7200000;
 }
-// 現在値の赤表示（文字に1回だけ当てる）
-function setNearOnCurrent(editor, near){
+// 現在値の色：警告=オレンジ / 満タン=赤
+function setNearOnCurrent(editor, remainMs, isFull){
   if (!editor || !editor.text) return;
-  if (near) editor.text.style.setProperty('color', 'var(--danger)', 'important');
-  else editor.text.style.removeProperty('color');
+  const wrap = editor.wrap;
+  if (wrap){
+    wrap.classList.toggle('near', isWarnRemain(remainMs, isFull));
+    wrap.classList.toggle('full-val', !!isFull);
+  }
+  if (isFull){
+    editor.text.style.setProperty('color', '#ff6b6b', 'important');
+  } else if (isWarnRemain(remainMs, isFull)){
+    editor.text.style.setProperty('color', '#ffab5c', 'important');
+  } else {
+    editor.text.style.removeProperty('color');
+  }
 }
 
 function timerNeedsTick(it, now){
@@ -2596,7 +2622,7 @@ let updateTimerCard = function(it, r, now){
       const v = String(it.max);
       if (r.maxLabel.textContent !== v) r.maxLabel.textContent = v;
     }
-    setNearOnCurrent(r.curEl, isNearFull(info.remainMs, info.isFull));
+    setNearOnCurrent(r.curEl, info.remainMs, info.isFull);
   } else if (it.type==='orb'){
     const info = orbInfo(it, now);
     const waitChunk = hasUseChunk(it) && pending40Id === it.id;
@@ -2612,7 +2638,7 @@ let updateTimerCard = function(it, r, now){
       const nextTxt = info.isFull ? '' : ('次 ' + fmtCountdown(info.nextInMs));
       if (r.nextRemEl.textContent !== nextTxt) r.nextRemEl.textContent = nextTxt;
     }
-    setNearOnCurrent(r.curEl, isNearFull(info.remainMs, info.isFull));
+    setNearOnCurrent(r.curEl, info.remainMs, info.isFull);
   } else if (it.type==='idle' || it.type==='exped'){
     if (it.state === 'claim' && claimId !== it.id){
       it.state = 'running';
@@ -2846,7 +2872,7 @@ function flushPendingSaveOnHide(){
   }
 }
 
-// 復帰処理：黒幕や無駄な待機・二重描画を省き、即座に差分更新してtick再開
+// 復帰処理：第1フレームでGPU/ビューポート復元を待ち、第2フレームで時刻同期（Freeze復帰の点滅・文字ブレ防止）
 function resumeApp(){
   const now = Date.now();
   syncFullStamItems(now);
@@ -2863,7 +2889,9 @@ function handlePause(){
 
 function handleResume(){
   wasBackgrounded = false;
-  requestAnimationFrame(resumeApp);
+  requestAnimationFrame(()=>{
+    requestAnimationFrame(resumeApp);
+  });
 }
 
 document.addEventListener('visibilitychange', ()=>{
