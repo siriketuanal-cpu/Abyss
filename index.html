@@ -210,7 +210,7 @@
     top:-6px; bottom:-4px; left:-6px; right:-6px;
   }
   .group-namerow .name{
-    font-size:11px; padding:0; font-weight:700; color:var(--accent);
+    font-size:11px; padding:0; font-weight:700; color:#b8bccb;
     flex:0 1 auto; width:auto; box-sizing:border-box;
     line-height:18px; height:18px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   }
@@ -279,6 +279,9 @@
     justify-content:center; gap:6px; position:absolute; left:6px; right:6px; bottom:5px;
   }
   .valrow-idle .main{min-width:2.6em; flex:0 0 auto; margin:0; text-align:center; padding-left:0; font-size:19px; line-height:1.1;}
+  /* 放置タイマー：2時間未満は明るめオレンジ、カウントストップ時は赤文字 */
+  .valrow-idle .main.warn{color:#ffab5c !important;}
+  .valrow-idle .main.stop{color:var(--danger) !important;}
   /* 数字の操作は透明な ::before ヒットボックスを使わず、実際の数字要素で受ける。 */
   [data-role="curWrap"], [data-role="maxWrap"]{ position:relative; }
   .divider{
@@ -2119,7 +2122,7 @@ function renderGroupBody(it){
   const r = refs[it.id];
   if (!r) return;
   if (!Array.isArray(it.children)) it.children = [];
-  it.children = it.children.filter(c => c && typeof c === 'object' && c.id && (c.type === 'stam' || c.type === 'idle'));
+  it.children = it.children.filter(c => c && typeof c === 'object' && c.id && (c.type === 'stam' || c.type === 'idle' || c.type === 'orb'));
   const ids = new Set(it.children.map(c => c.id));
   for (const id of Object.keys(r.childRefs)){
     if (!ids.has(id)) delete r.childRefs[id];
@@ -2595,9 +2598,13 @@ let updateTimerCard = function(it, r, now){
     r.el.classList.toggle('claim', it.state==='claim');
     r.el.classList.toggle('full', info.isFull && it.state!=='claim');
     const runningLabel = (it.countMode === 'up') ? fmtElapsed(info.elapsed) : fmtCountdown(info.remainMs);
-    const label = it.state==='claim' ? '受取' : (info.isFull ? fmtHM(info.fullAt) : runningLabel);
+    const label = it.state==='claim' ? '受取' : (info.isFull ? 'MAX' : runningLabel);
     if (r.curEl.textContent !== label) r.curEl.textContent = label;
-    r.curEl.classList.toggle('near', it.state==='claim' || isNearFull(info.remainMs, info.isFull));
+    const isWarn = !info.isFull && (info.remainMs > 0 && info.remainMs < 7200000);
+    const isStop = info.isFull || it.state==='claim';
+    r.curEl.classList.toggle('warn', isWarn);
+    r.curEl.classList.toggle('stop', isStop);
+    r.curEl.classList.remove('near');
     renderClock(r.clockEl, info.remainMs, info.isFull, now, info.fullAt);
   }
 }
