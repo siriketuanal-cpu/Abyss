@@ -80,6 +80,7 @@
   }
   .iconbtn svg{display:block; pointer-events:none;}
   .iconbtn:hover{opacity:1; background:rgba(255,255,255,0.07); border-color:rgba(255,255,255,0.18);}
+  .iconbtn:active{opacity:1; background:rgba(255,255,255,0.12);}
   #cards{
     flex:1 1 auto; min-height:0; overflow-x:hidden; overflow-y:auto;
     overscroll-behavior:none; -webkit-overflow-scrolling:touch;
@@ -132,6 +133,7 @@
   .card.orb .timer-menu-btn{border-color:#a78bfa;}
   .card.idle .timer-menu-btn{border-color:#f0a85a;}
   .card.exped .timer-menu-btn{border-color:#34d399;}
+  .timer-menu-btn:active{opacity:1; border-color:#fff;}
   /* 選択・削除確認中の対象を、角丸に沿ったソリッド枠＆ソフト発光で美しく強調（隣接カードとの破線重複・途切れを防止） */
   .longpress-target{
     border-color:var(--danger) !important;
@@ -158,7 +160,7 @@
   .namerow{margin-bottom:4px;}
   /* タイマーカードは種類に関係なく同じ外寸に揃える。中身だけ配置を変える。 */
   .card.stam, .card.orb, .card.idle, .card.exped{height:56px; min-height:56px;} 
-  /* claim（スタミナ使い切り / 放置=受取 / 遠征=再出発）は太枠線で強調（box-shadowでレイアウトズレ防止） */
+  /* claim(使い切り計算・受取待機) は選択状態として太枠線強調（box-shadow使用でレイアウトズレ防止） */
   .card.claim,
   .card.stam.claim{
     border-color:#ffd166 !important;
@@ -212,7 +214,7 @@
     top:-6px; bottom:-4px; left:-6px; right:-6px;
   }
   .group-namerow .name{
-    font-size:11px; padding:0; font-weight:700; color:#e8eaef;
+    font-size:11px; padding:0; font-weight:700; color:#b8bccb;
     flex:0 1 auto; width:auto; box-sizing:border-box;
     line-height:18px; height:18px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   }
@@ -320,6 +322,7 @@
     position:absolute;
     top:-8px; left:-8px; right:-8px; bottom:-8px;
   }
+  .header-menu-button:active{opacity:1; border-color:#fff;}
   .header-palette{display:flex; gap:5px; flex-wrap:wrap; justify-content:center; margin:4px 0 2px;}
   .header-swatch{width:26px; height:26px; padding:0; border-radius:50%; border:2px solid var(--line); box-shadow:none;}
   .header-swatch.selected{border-color:#fff; outline:1px solid var(--accent);}
@@ -545,7 +548,8 @@
 <script>
 const STORAGE_KEY = 'freetimer:v1';
 let state = load();
-// アカウント枠外に置かれたタイマーを、起動時にアカウント枠へ収める（既存データ互換）。
+// 旧版で存在し得た「アカウント外タイマー」を起動時にアカウントへ移行。
+// 現行UIではタイマーはアカウント枠の子としてのみ作成する。
 function migrateOrphanTimers(){
   if (!state || !Array.isArray(state.items)) return false;
   const orphan = state.items.filter(it => it && (it.type==='stam' || it.type==='idle' || it.type==='exped' || it.type==='orb'));
@@ -555,14 +559,15 @@ function migrateOrphanTimers(){
   for (let i=0; i<orphan.length; i+=2){
     groups.push({ id:'g' + Date.now().toString(36) + Math.random().toString(36).slice(2,7), type:'group', name:'', children:orphan.slice(i,i+2) });
   }
-  // 最初の孤立タイマー位置にアカウント枠を挿入し、他の順序は維持する。
+  // 最初の孤立タイマーがあった位置に移行後のアカウント枠を挿入し、
+  // それ以外の既存項目の順序はなるべく維持する。
   const firstIndex = state.items.findIndex(it => orphan.includes(it));
   const beforeCount = state.items.slice(0, firstIndex).filter(it => !orphan.includes(it)).length;
   state.items = keep.slice(0,beforeCount).concat(groups, keep.slice(beforeCount));
   saveNow();
   return true;
 }
-if (migrateOrphanTimers()) { /* 一度きりのデータ互換処理 */ }
+if (migrateOrphanTimers()) { /* 旧データの一度きりの移行 */ }
 let refs = {};
 let tickId = null;
 let tickGen = 0;
@@ -662,8 +667,18 @@ if (nameEditOverlayEl){
 }
 
 function normalizeIdleClaim(it){
-  // claim は一時的なUI状態（放置=受取 / 遠征=再出発）。永続化すると claimId とズレるため、読み込み時は running に戻す。
+  // 「受取」は一時的なUI状態。永続化されると claimId（メモリのみ）とズレて
+  // 再起動後も「受取」のまま固まる。読み込み時は必ず running に戻す。
   if (it && (it.type === 'idle' || it.type === 'exped') && it.state === 'claim') it.state = 'running';
+}
+function normalizeOrbItem(it){
+  if (it && it.type === 'stam' && (it.isOrb || it.useMode === 'sub' || (it.max <= 10 && it.intervalMin >= 60))){
+    it.type = 'orb';
+    delete it.isOrb;
+    delete it.useMode;
+    delete it.useChunk;
+    if (!it.orbMode) it.orbMode = 'down';
+  }
 }
 function load(){
   try{
@@ -674,9 +689,11 @@ function load(){
         data.items = data.items.filter(it => it && typeof it === 'object' && it.id);
         data.items.forEach(it=>{
           if (!it) return;
+          normalizeOrbItem(it);
           normalizeIdleClaim(it);
           if (it.type === 'group'){
             if (!Array.isArray(it.children)) it.children = [];
+            it.children.forEach(ch => normalizeOrbItem(ch));
             it.children = it.children.filter(ch => ch && typeof ch === 'object' && ch.id && (ch.type === 'stam' || ch.type === 'idle' || ch.type === 'orb' || ch.type === 'exped'));
             it.children.forEach(ch=>{
               normalizeIdleClaim(ch);
@@ -1206,7 +1223,7 @@ function setNearOnCurrent(editor, near){
 function timerNeedsTick(it, now){
   if (it.type==='stam') return !stamInfo(it, now).isFull;
   if (it.type==='orb') return !orbInfo(it, now).isFull;
-  // claim 中は表示固定のため tick 不要。
+  // 受取待機中は表示が固定なので、毎分tickを止めて無駄なDOM更新をしない。
   if (it.type==='idle' || it.type==='exped') return it.state !== 'claim' && !idleInfo(it, now).isFull;
   return false;
 }
@@ -2040,6 +2057,19 @@ function attachOrbCurrentEditor(curWrap, it){
   return curEditor;
 }
 
+function onOrbCardTap(it, e){
+  if (e){ e.stopPropagation(); e.preventDefault(); }
+  const now = Date.now();
+  const info = orbInfo(it, now);
+  if (info.cur <= 0) return;
+  preserveOrbCycle(it, now);
+  it.current = Math.max(0, info.cur - 1);
+  freezeOrbIfFull(it, now);
+  updateOneTimer(it);
+  startTicking(true);
+  saveAfterPaint();
+}
+
 function buildOrbCard(it){
   const wrap = makeCardEl('orb', it.id, `
     <div class="clockstack orb-clock" data-role="clock"></div>
@@ -2053,9 +2083,9 @@ function buildOrbCard(it){
   const r = { el: wrap, curEl: curEditor, maxLabel: maxWrap,
     clockEl: wrap.querySelector('[data-role="clock"]'),
     nextRemEl: wrap.querySelector('[data-role="nextRem"]'),
-    shortAction: null };
+    shortAction: (e) => onOrbCardTap(it, e) };
   refs[it.id] = r;
-  // オーブはカードタップでの減算機能を外した（数値の直接編集のみ）
+  bindTimerShortAction(wrap, (e) => r.shortAction ? r.shortAction(e) : null);
   return wrap;
 }
 
@@ -2579,7 +2609,7 @@ let updateTimerCard = function(it, r, now){
     r.el.classList.toggle('full', info.isFull && it.state!=='claim');
     const runningLabel = (it.countMode === 'up') ? fmtElapsed(info.elapsed) : fmtCountdown(info.remainMs);
     const fullText = it.type === 'exped' ? '帰還' : 'MAX';
-    const label = it.state==='claim' ? (it.type === 'exped' ? '再出発' : '受取') : (info.isFull ? fullText : runningLabel);
+    const label = it.state==='claim' ? '受取' : (info.isFull ? fullText : runningLabel);
     if (r.curEl.textContent !== label) r.curEl.textContent = label;
     const isWarn = !info.isFull && (info.remainMs > 0 && info.remainMs < 7200000);
     const isStop = info.isFull || it.state==='claim';
