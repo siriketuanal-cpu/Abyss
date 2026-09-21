@@ -134,25 +134,26 @@
   .card.idle .timer-menu-btn{border-color:#f59e0b;}
   .card.exped .timer-menu-btn{border-color:#06b6d4;}
   /* 選択・削除確認中の対象を、角丸に沿ったソリッド枠＆ソフト発光で美しく強調（隣接カードとの破線重複・途切れを防止） */
-  /* 長押し対象：ぼかし無しのシャープ輪郭のみ（GPU負荷低減） */
+  /* 長押し対象：枠色の差し替えのみ（border+shadow二重描画を避ける） */
   .longpress-target{
     border-color:var(--danger) !important;
-    box-shadow:0 0 0 2px var(--danger) !important;
+    box-shadow:none !important;
   }
   .card.group.longpress-target{
     border-color:var(--danger) !important;
-    box-shadow:0 0 0 2px var(--danger) !important;
+    box-shadow:none !important;
   }
   .card.group.longpress-target .group-namerow{
-    box-shadow:0 0 0 2px var(--danger);
+    box-shadow:none;
   }
   .divider.longpress-target{
-    box-shadow:0 0 0 2px var(--danger) !important;
+    border:1px solid var(--danger) !important;
+    box-shadow:none !important;
     border-radius:6px;
   }
   .rule-line.longpress-target{
     border-top-color:var(--danger) !important;
-    box-shadow:0 0 0 2px var(--danger);
+    box-shadow:none !important;
   }
 
   .row{display:flex; align-items:center; gap:3px; min-width:0;}
@@ -160,37 +161,38 @@
   .namerow{margin-bottom:4px;}
   /* タイマーカードは種類に関係なく同じ外寸に揃える。中身だけ配置を変える。 */
   .card.stam, .card.orb, .card.idle, .card.exped{height:56px; min-height:56px;} 
-  /* claim / 短押し待機：border と box-shadow を同色・同幅で一致させモアレ・滲みを防止 */
+  /* claim / 短押し待機：枠色の差し替えのみ（元枠+太shadowの二重描画を避ける） */
   .card.stam.claim{
     border-color:#ffd166 !important;
-    box-shadow:0 0 0 2px #ffd166 !important;
+    box-shadow:none !important;
     z-index:2;
   }
   .card.orb.claim{
     border-color:#f472b6 !important;
-    box-shadow:0 0 0 2px #f472b6 !important;
+    box-shadow:none !important;
     z-index:2;
   }
   .card.idle.claim{
     border-color:#10b981 !important;
-    box-shadow:0 0 0 2px #10b981 !important;
+    box-shadow:none !important;
     z-index:2;
   }
   .card.exped.claim{
     border-color:#38bdf8 !important;
-    box-shadow:0 0 0 2px #38bdf8 !important;
+    box-shadow:none !important;
     z-index:2;
   }
   .card.claim{
     z-index:2;
   }
-  /* 満タン：外枠を赤 */
+  /* 満タン：外枠を赤（色替えのみ） */
   .card.full,
   .card.stam.full,
   .card.orb.full,
   .card.idle.full,
   .card.exped.full{
     border-color:#ff6b6b !important;
+    box-shadow:none !important;
   }
   .card.stam .clockstack, .card.stam .stammax, .card.stam .slash,
   .card.orb .clockstack, .card.orb .stammax, .card.orb .slash{pointer-events:none;}
