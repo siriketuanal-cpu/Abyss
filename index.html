@@ -1170,11 +1170,12 @@ function clampUseChunk(v){
   const n = Math.floor(Number(v) || 0);
   return Math.max(1, Math.min(999, n || 1));
 }
-// 使い切り後の残り。mod: 220→20
+// 使用後の残り。スタミナ=端数(mod) / オーブ=単発引き算
 function remainingAfterUse(cur, it){
   cur = Math.max(0, Math.floor(Number(cur) || 0));
   const fallback = 1;
   const c = clampUseChunk(it && it.useChunk != null ? it.useChunk : fallback);
+  if (it && it.type === 'orb') return Math.max(0, cur - c);
   return cur % c;
 }
 function preserveCycle(it, now){
@@ -1738,7 +1739,7 @@ function orbToastRowsHtml(it){
   return `<label class="toast-field"><span class="toast-color"><span class="toast-label">最大</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${it.max}" maxlength="2" data-role="orbMax" aria-label="最大個数"></span></label>`
     + `<label class="toast-field"><span class="toast-color"><span class="toast-label">回復(${intervalUnit})</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${intervalVal}" maxlength="3" data-role="orbInterval" aria-label="回復時間"></span></label>`
     + `<label class="toast-field"><span class="toast-color"><span class="toast-label" data-role="orbTimeLabel">${timeLabel}</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${fullRemFormatted}" maxlength="5" data-role="orbFullRem" placeholder="17:59" aria-label="${timeLabel}"></span></label>`
-    + `<label class="toast-field"><span class="toast-color"><span class="toast-label">使い切り</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${chunkVal}" maxlength="2" data-role="orbUseChunk" aria-label="使い切り数" placeholder="なし"></span></label>`
+    + `<label class="toast-field"><span class="toast-color"><span class="toast-label">使用</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${chunkVal}" maxlength="2" data-role="orbUseChunk" aria-label="使用数" placeholder="なし"></span></label>`
     + `<button type="button" data-act="toggleOrbMode">${isUp ? '方式：▲ 経過時間(蓄積)' : '方式：▼ 残り時間(減算)'}</button>`;
 }
 
