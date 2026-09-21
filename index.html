@@ -97,6 +97,7 @@
   .card.stam{border:1px solid #5aa9ff;}
   .card.orb{border:1px solid #a78bfa;}
   .card.idle{border:1px solid #f0a85a;}
+  .card.exped{border:1px solid #34d399;}
   /* タイマーメニュー用：各タイマー左上の控えめな非ベタ塗り丸型ボタン */
   .timer-menu-btn{
     position:absolute;
@@ -131,6 +132,7 @@
   .card.stam .timer-menu-btn{border-color:#5aa9ff;}
   .card.orb .timer-menu-btn{border-color:#a78bfa;}
   .card.idle .timer-menu-btn{border-color:#f0a85a;}
+  .card.exped .timer-menu-btn{border-color:#34d399;}
   .timer-menu-btn:active{opacity:1; border-color:#fff;}
   /* 選択・削除確認中の対象を、角丸に沿ったソリッド枠＆ソフト発光で美しく強調（隣接カードとの破線重複・途切れを防止） */
   .longpress-target{
@@ -157,7 +159,7 @@
   .row + .row{margin-top:3px;}
   .namerow{margin-bottom:4px;}
   /* タイマーカードは種類に関係なく同じ外寸に揃える。中身だけ配置を変える。 */
-  .card.stam, .card.orb, .card.idle{height:56px; min-height:56px;} 
+  .card.stam, .card.orb, .card.idle, .card.exped{height:56px; min-height:56px;} 
   /* claim(使い切り計算・受取待機) は選択状態として太枠線強調（box-shadow使用でレイアウトズレ防止） */
   .card.claim,
   .card.stam.claim{
@@ -165,7 +167,8 @@
     box-shadow:0 0 0 1.5px #ffd166 !important;
     z-index:2;
   }
-  .card.idle.claim{
+  .card.idle.claim,
+  .card.exped.claim{
     border-color:var(--ok) !important;
     box-shadow:0 0 0 1.5px var(--ok) !important;
     z-index:2;
@@ -173,12 +176,13 @@
   .card.full,
   .card.stam.full,
   .card.orb.full,
-  .card.idle.full{
+  .card.idle.full,
+  .card.exped.full{
     border-color:var(--orange) !important;
   }
   .card.stam .clockstack, .card.stam .stammax, .card.stam .slash,
   .card.orb .clockstack, .card.orb .stammax, .card.orb .slash{pointer-events:none;}
-  .card.stam, .card.orb, .card.idle{
+  .card.stam, .card.orb, .card.idle, .card.exped{
     padding:6px; display:flex; flex-direction:column; justify-content:center;
   }
   .name{
@@ -257,7 +261,8 @@
   [data-role="curWrap"].near .inline-number-text{color:var(--danger) !important;}
   .main.near{color:var(--danger) !important;}
   .card.stam > .stam-clock,
-  .card.idle > .idle-clock{
+  .card.idle > .idle-clock,
+  .card.exped > .idle-clock{
     position:absolute; right:6px; left:auto; top:1px; margin:0; transform:none; height:18px; line-height:18px;
   }
   .card.orb > .orb-clock{
@@ -517,6 +522,7 @@
 <button class="timerType" data-type="stam">スタミナ</button>
 <button class="timerType" data-type="orb">オーブ</button>
 <button class="timerType" data-type="idle">放置報酬</button>
+<button class="timerType" data-type="exped">遠征</button>
 <button class="onlyTop" data-type="group">アカウント枠</button>
 <button class="onlyTop" data-type="header">見出し</button>
 <button class="onlyTop" data-type="rule">仕切り線</button>
@@ -546,7 +552,7 @@ let state = load();
 // 現行UIではタイマーはアカウント枠の子としてのみ作成する。
 function migrateOrphanTimers(){
   if (!state || !Array.isArray(state.items)) return false;
-  const orphan = state.items.filter(it => it && (it.type==='stam' || it.type==='idle'));
+  const orphan = state.items.filter(it => it && (it.type==='stam' || it.type==='idle' || it.type==='exped' || it.type==='orb'));
   if (!orphan.length) return false;
   const keep = state.items.filter(it => !orphan.includes(it));
   const groups = [];
@@ -663,7 +669,7 @@ if (nameEditOverlayEl){
 function normalizeIdleClaim(it){
   // 「受取」は一時的なUI状態。永続化されると claimId（メモリのみ）とズレて
   // 再起動後も「受取」のまま固まる。読み込み時は必ず running に戻す。
-  if (it && it.type === 'idle' && it.state === 'claim') it.state = 'running';
+  if (it && (it.type === 'idle' || it.type === 'exped') && it.state === 'claim') it.state = 'running';
 }
 function normalizeOrbItem(it){
   if (it && it.type === 'stam' && (it.isOrb || it.useMode === 'sub' || (it.max <= 10 && it.intervalMin >= 60))){
@@ -688,7 +694,7 @@ function load(){
           if (it.type === 'group'){
             if (!Array.isArray(it.children)) it.children = [];
             it.children.forEach(ch => normalizeOrbItem(ch));
-            it.children = it.children.filter(ch => ch && typeof ch === 'object' && ch.id && (ch.type === 'stam' || ch.type === 'idle' || ch.type === 'orb'));
+            it.children = it.children.filter(ch => ch && typeof ch === 'object' && ch.id && (ch.type === 'stam' || ch.type === 'idle' || ch.type === 'orb' || ch.type === 'exped'));
             it.children.forEach(ch=>{
               normalizeIdleClaim(ch);
             });
@@ -992,6 +998,9 @@ function hasUseChunk(it){
 function newIdleItem(durationMin, countMode){
   return { id: uid(), type:'idle', name:'', durationMin, countMode: countMode || 'down', state:'running', start: Date.now() };
 }
+function newExpedItem(durationMin, countMode){
+  return { id: uid(), type:'exped', name:'', durationMin, countMode: countMode || 'down', state:'running', start: Date.now() };
+}
 function newHeaderItem(){
   return { id: uid(), type:'header', name:'', color:'#9b8bff' };
 }
@@ -1215,7 +1224,7 @@ function timerNeedsTick(it, now){
   if (it.type==='stam') return !stamInfo(it, now).isFull;
   if (it.type==='orb') return !orbInfo(it, now).isFull;
   // 受取待機中は表示が固定なので、毎分tickを止めて無駄なDOM更新をしない。
-  if (it.type==='idle') return it.state !== 'claim' && !idleInfo(it, now).isFull;
+  if (it.type==='idle' || it.type==='exped') return it.state !== 'claim' && !idleInfo(it, now).isFull;
   return false;
 }
 function needsTicking(now){
@@ -1261,7 +1270,7 @@ function tickRender(now){
     if (!r) continue;
     if (it.type==='group'){
       for (const child of it.children) updateTimerCard(child, r.childRefs[child.id], now);
-    } else if (it.type==='stam' || it.type==='orb' || it.type==='idle'){
+    } else if (it.type==='stam' || it.type==='orb' || it.type==='idle' || it.type==='exped'){
       updateTimerCard(it, r, now);
     }
   }
@@ -1302,6 +1311,7 @@ function isGroupChildTarget(target){
     target.closest('.card.stam') ||
     target.closest('.card.orb') ||
     target.closest('.card.idle') ||
+    target.closest('.card.exped') ||
     target.closest('.group-empty-add')
   );
 }
@@ -1484,7 +1494,7 @@ function cancelAllPendingStates(){
   }
   if (claimId){
     const claimItem = findItemById(claimId);
-    if (claimItem && claimItem.type === 'idle'){
+    if (claimItem && (claimItem.type === 'idle' || claimItem.type === 'exped')){
       claimItem.state = 'running';
       updateOneTimer(claimItem);
     }
@@ -1507,7 +1517,7 @@ function askRemoveItem(id){
   const isRule = it && it.type === 'rule';
   const isStam = it && it.type === 'stam';
   const isOrb = it && it.type === 'orb';
-  const isIdle = it && it.type === 'idle';
+  const isIdle = it && (it.type === 'idle' || it.type === 'exped');
   const canAdd = isGroup && it.children.length < 4;
   const canInsertOrMove = isHeader || isGroup || isRule;
   const canEditName = isHeader || isGroup;
@@ -2080,7 +2090,7 @@ function buildOrbCard(it){
 }
 
 function buildIdleCard(it){
-  const wrap = makeCardEl('idle', it.id, `
+  const wrap = makeCardEl(it.type, it.id, `
     <div class="clockstack idle-clock" data-role="clock"></div>
     <div class="row valrow-idle">
       <div class="main" data-role="cur"></div>
@@ -2095,7 +2105,7 @@ function buildIdleCard(it){
 function buildTimerChild(it){
   if (it.type==='stam') return buildStamCard(it);
   if (it.type==='orb') return buildOrbCard(it);
-  if (it.type==='idle') return buildIdleCard(it);
+  if (it.type==='idle' || it.type==='exped') return buildIdleCard(it);
   return null;
 }
 function buildGroupCard(it){
@@ -2122,7 +2132,7 @@ function renderGroupBody(it){
   const r = refs[it.id];
   if (!r) return;
   if (!Array.isArray(it.children)) it.children = [];
-  it.children = it.children.filter(c => c && typeof c === 'object' && c.id && (c.type === 'stam' || c.type === 'idle' || c.type === 'orb'));
+  it.children = it.children.filter(c => c && typeof c === 'object' && c.id && (c.type === 'stam' || c.type === 'idle' || c.type === 'orb' || c.type === 'exped'));
   const ids = new Set(it.children.map(c => c.id));
   for (const id of Object.keys(r.childRefs)){
     if (!ids.has(id)) delete r.childRefs[id];
@@ -2493,7 +2503,7 @@ function render(){
 
   for (const it of state.items){
     if (!refs[it.id]){
-      it.type==='stam' ? buildStamCard(it) : it.type==='orb' ? buildOrbCard(it) : it.type==='idle' ? buildIdleCard(it) : it.type==='rule' ? buildRuleCard(it) : it.type==='group' ? buildGroupCard(it) : buildHeaderCard(it);
+      it.type==='stam' ? buildStamCard(it) : it.type==='orb' ? buildOrbCard(it) : (it.type==='idle' || it.type==='exped') ? buildIdleCard(it) : it.type==='rule' ? buildRuleCard(it) : it.type==='group' ? buildGroupCard(it) : buildHeaderCard(it);
     } else if (it.type==='group'){
       renderGroupBody(it);
     }
@@ -2590,7 +2600,7 @@ let updateTimerCard = function(it, r, now){
       if (r.nextRemEl.textContent !== nextTxt) r.nextRemEl.textContent = nextTxt;
     }
     setNearOnCurrent(r.curEl, isNearFull(info.remainMs, info.isFull));
-  } else if (it.type==='idle'){
+  } else if (it.type==='idle' || it.type==='exped'){
     if (it.state === 'claim' && claimId !== it.id){
       it.state = 'running';
     }
@@ -2598,7 +2608,8 @@ let updateTimerCard = function(it, r, now){
     r.el.classList.toggle('claim', it.state==='claim');
     r.el.classList.toggle('full', info.isFull && it.state!=='claim');
     const runningLabel = (it.countMode === 'up') ? fmtElapsed(info.elapsed) : fmtCountdown(info.remainMs);
-    const label = it.state==='claim' ? '受取' : (info.isFull ? 'MAX' : runningLabel);
+    const fullText = it.type === 'exped' ? '帰還' : 'MAX';
+    const label = it.state==='claim' ? '受取' : (info.isFull ? fullText : runningLabel);
     if (r.curEl.textContent !== label) r.curEl.textContent = label;
     const isWarn = !info.isFull && (info.remainMs > 0 && info.remainMs < 7200000);
     const isStop = info.isFull || it.state==='claim';
@@ -2680,6 +2691,22 @@ function openSetup(type){
   } else if (type === 'rule'){
     setupLabelEl.textContent = '仕切り線の色';
     fillColorPalette('#52617a');
+  } else if (type === 'exped'){
+    setupLabelEl.textContent = '遠征タイマーの設定';
+    setupIdleMode = 'down';
+    setupFieldsEl.innerHTML = `<div style="width:100%;margin-bottom:6px;">`
+      + idleModeRowHtml(setupIdleMode)
+      + `</div>`
+      + `<input type="text" inputmode="numeric" pattern="[0-9]*" id="setupH" value="4"><span>h</span>`
+      + `<input type="text" inputmode="numeric" pattern="[0-9]*" id="setupM" value="0"><span>m</span>`;
+    const modeBtn = setupFieldsEl.querySelector('[data-role="idleModeToggle"]');
+    if (modeBtn){
+      bindTapDown(modeBtn, (e)=>{
+        e.stopPropagation();
+        setupIdleMode = setupIdleMode === 'up' ? 'down' : 'up';
+        modeBtn.textContent = setupIdleMode === 'up' ? '▲ カウントアップ' : '▼ カウントダウン';
+      });
+    }
   } else {
     setupLabelEl.textContent = '放置報酬の設定';
     setupIdleMode = 'down';
@@ -2754,6 +2781,10 @@ function confirmSetup(){
   } else if (setupType === 'rule'){
     const color = setupFieldsEl.dataset.color || '#52617a';
     pushTopItem(newRuleItem(color));
+  } else if (setupType === 'exped'){
+    const h = clampInt(setupFieldsEl.querySelector('#setupH')?.value, 0, 999, 4);
+    const m = clampInt(setupFieldsEl.querySelector('#setupM')?.value, 0, 59, 0);
+    if (!pushNewTimer(newExpedItem(h*60+m, setupIdleMode))) return;
   } else if (setupType === 'idle'){
     const h = clampInt(setupFieldsEl.querySelector('#setupH')?.value, 0, 999, 12);
     const m = clampInt(setupFieldsEl.querySelector('#setupM')?.value, 0, 59, 0);
@@ -2948,13 +2979,20 @@ bindTapDown(document.getElementById('updateBtn'), ()=>{
   location.href = 'update.html?r=' + Date.now().toString(36);
 });
 
-// Service worker: register once, never poll for updates automatically.
+// Service worker: プレビュー・iframe環境ではSWを解除してキャッシュ滞留を防止
+const isIframe = window.self !== window.top;
 if ('serviceWorker' in navigator){
-  window.addEventListener('load', ()=>{
-    navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(err => {
-      console.warn('ServiceWorker registration bypassed:', err?.message || err);
+  if (isIframe) {
+    navigator.serviceWorker.getRegistrations().then(regs => {
+      regs.forEach(r => r.unregister());
+    }).catch(()=>{});
+  } else {
+    window.addEventListener('load', ()=>{
+      navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(err => {
+        console.warn('ServiceWorker registration bypassed:', err?.message || err);
+      });
     });
-  });
+  }
 }
 </script>
 </body>

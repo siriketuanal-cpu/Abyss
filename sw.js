@@ -1,5 +1,6 @@
-// キャッシュ名固定。中身の差し替えは update.html（SW解除＋Cache削除＋no-store取得）で行う。
-const CACHE_NAME = 'v50';
+// 【重要】TWA起動時のブラウザアイコン表示抑制・高速起動・オフライン動作のため、完全キャッシュ優先（Cache-First）を維持すること。
+// キャッシュ名固定。中身の差し替えは update.html（SW解除＋Cache削除＋no-store取得）でのみ行う。
+const CACHE_NAME = 'v51';
 const ASSETS = [
   './',
   './index.html',
@@ -33,7 +34,7 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(fetch(event.request, { cache: 'no-store' }));
     return;
   }
-  // 通常はキャッシュ優先。TWA起動時の不要なネットワーク待ち・通信を避ける。
+  // 通常はキャッシュ優先。TWA起動時の不要なネットワーク待ち・通信（ブラウザアイコン表示）を避ける。
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
