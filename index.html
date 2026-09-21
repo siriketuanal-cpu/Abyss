@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="ja" style="background-color:#0b0b14">
+
+<html lang="ja">
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no, interactive-widget=overlays-content" name="viewport"/>
@@ -13,6 +14,7 @@
 <link href="icon-192.png" rel="icon"/>
 <link href="icon-192.png" rel="apple-touch-icon"/>
 <style>
+  html{background:#0b0b14;}
   :root{
     --bg:#0b0b14; --card:#15151f; --card2:#1b1b28; --line:#2a2a3a;
     --text:#eceef2; --sub:#8a8ea3; --accent:#9b8bff; --blue:#4fa3ff; --orange:#ffab5c;
@@ -27,7 +29,7 @@
     font-family:var(--timer-number-font);
   }
   /* body は固定。スクロールは #cards のみ → キーボード開閉の黒残り・二重描画を防ぐ */
-  html,body{height:100%; overflow:hidden; overscroll-behavior:none; background-color:#0b0b14;}
+  html,body{height:100%; overflow:hidden; overscroll-behavior:none;}
   body{
     margin:0; background:var(--bg); color:var(--text);
     font-family:Roboto,"Noto Sans JP",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
@@ -90,14 +92,12 @@
     background:var(--card); border:1px solid var(--line); border-radius:10px;
     padding:6px 6px; position:relative; min-width:0;
     touch-action:pan-y; -webkit-touch-callout:none; -webkit-tap-highlight-color:transparent;
-    contain:layout style;
-    transform:translateZ(0);
   }
-  /* タイマー枠：種別ごとの独立カラー（被りなし） */
-  .card.stam{border:1px solid #4fa3ff;}
+  /* タイマー枠：通常時は細めの色分け線 */
+  .card.stam{border:1px solid #5aa9ff;}
   .card.orb{border:1px solid #a78bfa;}
-  .card.idle{border:1px solid #f59e0b;}
-  .card.exped{border:1px solid #06b6d4;}
+  .card.idle{border:1px solid #f0a85a;}
+  .card.exped{border:1px solid #34d399;}
   /* タイマーメニュー用：各タイマー左上の控えめな非ベタ塗り丸型ボタン */
   .timer-menu-btn{
     position:absolute;
@@ -129,70 +129,46 @@
     right:-8px;
     bottom:0;
   }
-  .card.stam .timer-menu-btn{border-color:#4fa3ff;}
+  .card.stam .timer-menu-btn{border-color:#5aa9ff;}
   .card.orb .timer-menu-btn{border-color:#a78bfa;}
-  .card.idle .timer-menu-btn{border-color:#f59e0b;}
-  .card.exped .timer-menu-btn{border-color:#06b6d4;}
-  /* 選択・削除確認中の対象を、角丸に沿ったソリッド枠＆ソフト発光で美しく強調（隣接カードとの破線重複・途切れを防止） */
-  /* 長押し対象：border色＋同色の外側2px（ぼかし無し）で太線。レイアウトは変えず二重に見えない */
-  .longpress-target{
-    border-color:#ff6b6b !important;
-    box-shadow:0 0 0 2px #ff6b6b !important;
-  }
-  .card.group.longpress-target{
-    border-color:#ff6b6b !important;
-    box-shadow:0 0 0 2px #ff6b6b !important;
-  }
-  .card.group.longpress-target .group-namerow{
-    box-shadow:none;
+  .card.idle .timer-menu-btn{border-color:#f0a85a;}
+  .card.exped .timer-menu-btn{border-color:#34d399;}
+  /* 選択・削除確認中の対象：ぼかし無しのシャープな太線（カードは枠の内側に描画） */
+  .longpress-target{ border-color:var(--danger) !important; }
+  /* 同じ !important の claim / full 枠色に負けないよう、クラスを重ねて詳細度を上げている */
+  .card.longpress-target.longpress-target.longpress-target{
+    border-color:var(--danger) !important;
+    box-shadow:inset 0 0 0 1.5px var(--danger) !important;
   }
   .divider.longpress-target{
-    border-color:#ff6b6b !important;
-    box-shadow:0 0 0 2px #ff6b6b !important;
+    box-shadow:0 0 0 1.5px var(--danger) !important;
     border-radius:6px;
   }
-  .rule-line.longpress-target{
-    border-top-color:#ff6b6b !important;
-    box-shadow:0 0 0 2px #ff6b6b !important;
-  }
+  .rule-line.longpress-target{ border-top-color:var(--danger) !important; }
 
   .row{display:flex; align-items:center; gap:3px; min-width:0;}
   .row + .row{margin-top:3px;}
   .namerow{margin-bottom:4px;}
   /* タイマーカードは種類に関係なく同じ外寸に揃える。中身だけ配置を変える。 */
   .card.stam, .card.orb, .card.idle, .card.exped{height:56px; min-height:56px;} 
-  /* claim / 短押し：1px枠＋同色の外側2px（ぼかし無し）→ 連続した太線。幅はレイアウトに影響しない */
+  /* claim（スタミナ使い切り / 放置=受取 / 遠征=再出発）は太枠線で強調。
+     ぼかし無しのシャープな inset 影＝枠の内側だけに描く（外へはみ出さない→隣カード/枠と重ならない。レイアウトも動かない） */
+  .card.claim,
   .card.stam.claim{
     border-color:#ffd166 !important;
-    box-shadow:0 0 0 2px #ffd166 !important;
-    z-index:2;
+    box-shadow:inset 0 0 0 1.5px #ffd166 !important;
   }
-  .card.orb.claim{
-    border-color:#f472b6 !important;
-    box-shadow:0 0 0 2px #f472b6 !important;
-    z-index:2;
-  }
-  .card.idle.claim{
-    border-color:#10b981 !important;
-    box-shadow:0 0 0 2px #10b981 !important;
-    z-index:2;
-  }
+  .card.idle.claim,
   .card.exped.claim{
-    border-color:#38bdf8 !important;
-    box-shadow:0 0 0 2px #38bdf8 !important;
-    z-index:2;
+    border-color:var(--ok) !important;
+    box-shadow:inset 0 0 0 1.5px var(--ok) !important;
   }
-  .card.claim{
-    z-index:2;
-  }
-  /* 満タン：同手法で赤の太線 */
   .card.full,
   .card.stam.full,
   .card.orb.full,
   .card.idle.full,
   .card.exped.full{
-    border-color:#ff6b6b !important;
-    box-shadow:0 0 0 2px #ff6b6b !important;
+    border-color:var(--orange) !important;
   }
   .card.stam .clockstack, .card.stam .stammax, .card.stam .slash,
   .card.orb .clockstack, .card.orb .stammax, .card.orb .slash{pointer-events:none;}
@@ -214,18 +190,23 @@
   .card.group.three{grid-column:span 3;}
   .card.group.four{grid-column:span 4;}
   .card.group.layout-2x2{grid-column:span 2;}
+  /* 名前タグ：1文字目の開始位置を枠の中央あたり(--name-start)に固定し、右へ伸ばす。
+     背景色で枠線を途切れさせる見た目（ネームタグ風）は従来どおり。1タイマー枠は幅が狭いので開始位置を左寄せ気味に。 */
+  .card.group{ --name-start:50%; }
+  .card.group.single{ --name-start:30%; }
   .group-namerow{
-    position:absolute; top:-9px; left:8px;
+    position:absolute; top:-9px; left:calc(var(--name-start) - 6px);
     margin:0; padding:0 6px; gap:0; z-index:3;
     min-height:0; height:18px; line-height:18px;
     display:inline-flex; align-items:center;
     background:var(--bg); border-radius:4px;
-    max-width:calc(100% - 16px);
+    max-width:calc(100% - var(--name-start) - 2px);
   }
   .group-namerow::before{
+    /* 透明ヒットエリア。下側は丸ボタンの判定(上端 約+9px)と重ならないところまで */
     content:'';
     position:absolute;
-    top:-6px; bottom:-4px; left:-6px; right:-6px;
+    top:-6px; bottom:0; left:-4px; right:-4px;
   }
   .group-namerow .name{
     font-size:11px; padding:0; font-weight:700; color:#e8eaef;
@@ -270,13 +251,10 @@
   }
   .clockstack .ok{color:var(--ok); font-size:14px; line-height:18px;}
   .clockstack .full-at{color:var(--danger); font-size:11.5px; font-weight:800; line-height:18px;}
-  /* 警告（2時間未満）=オレンジ / 満タン=赤（予定時刻は触らない） */
+  /* 満タンまで2時間未満：現在スタミナ・放置数字を赤（予定時刻は触らない） */
   [data-role="curWrap"].near,
-  [data-role="curWrap"].near .inline-number-text{color:#ffab5c !important;}
-  [data-role="curWrap"].full-val,
-  [data-role="curWrap"].full-val .inline-number-text{color:#ff6b6b !important;}
-  .main.near{color:#ffab5c !important;}
-  .main.full-val{color:#ff6b6b !important;}
+  [data-role="curWrap"].near .inline-number-text{color:var(--danger) !important;}
+  .main.near{color:var(--danger) !important;}
   .card.stam > .stam-clock,
   .card.idle > .idle-clock,
   .card.exped > .idle-clock{
@@ -301,9 +279,9 @@
     justify-content:center; gap:6px; position:absolute; left:6px; right:6px; bottom:5px;
   }
   .valrow-idle .main{min-width:2.6em; flex:0 0 auto; margin:0; text-align:center; padding-left:0; font-size:19px; line-height:1.1;}
-  /* 放置・遠征：2時間未満はオレンジ、満タン/claim停止は赤文字 */
+  /* 放置タイマー：2時間未満は明るめオレンジ、カウントストップ時は赤文字 */
   .valrow-idle .main.warn{color:#ffab5c !important;}
-  .valrow-idle .main.stop{color:#ff6b6b !important;}
+  .valrow-idle .main.stop{color:var(--danger) !important;}
   /* 数字の操作は透明な ::before ヒットボックスを使わず、実際の数字要素で受ける。 */
   [data-role="curWrap"], [data-role="maxWrap"]{ position:relative; }
   .divider{
@@ -349,10 +327,12 @@
     height:0; margin:3px 2px; padding:0;
     border:0; border-top:2px solid #52617a;
     touch-action:pan-y; -webkit-touch-callout:none;
+    pointer-events:none; /* 線そのものは反応させず、右端の透明ゾーンだけがメニュー用 */
   }
   .rule-line::before{
-    /* レイアウトを押し広げずに長押し判定だけ広げる透明ヒットエリア */
-    content:''; position:absolute; left:0; right:0; top:-10px; bottom:-10px;
+    /* レイアウトを押し広げない透明ヒットエリア（右端・カード間の隙間に収まる高さ） */
+    content:''; position:absolute; right:0; width:40px; top:-10px; bottom:-10px;
+    pointer-events:auto;
   }
   #toast{
     /* 画面中央。必要な設定だけを横並びにして、コンパクト＆高コントラストに。 */
@@ -360,7 +340,7 @@
     transform:translate(-50%, -50%); width:min(76vw, 250px); max-width:78%;
     background:#202127; color:var(--text); border:1px solid #4a5160;
     border-radius:12px; padding:10px 10px 8px; font-size:12px; z-index:30;
-    display:none; box-shadow:0 12px 32px rgba(0,0,0,.6);
+    display:none; box-shadow:0 0 0 1px rgba(255,255,255,.05), 0 6px 0 rgba(0,0,0,.4);
   }
   #toast.show{display:block;}
   #toast .toast-fields{
@@ -468,7 +448,7 @@
     transform:translate(-50%, -50%); width:min(92vw, 340px);
     background:var(--card); border:1px solid var(--line); border-radius:14px;
     padding:16px; display:none; flex-direction:column; gap:12px; z-index:25;
-    box-shadow:0 12px 32px rgba(0,0,0,.45);
+    box-shadow:0 0 0 1px rgba(255,255,255,.05), 0 6px 0 rgba(0,0,0,.35);
   }
   #setupPanel.show{display:flex;}
   #setupPanel .setupLabel{font-size:13px; color:var(--sub); text-align:center;}
@@ -498,7 +478,7 @@
   #nameEditPanel{
     width:min(92vw, 340px); max-width:100%; background:var(--card); border:1px solid var(--line);
     border-radius:14px; padding:16px; display:flex; flex-direction:column; gap:12px;
-    box-shadow:0 12px 32px rgba(0,0,0,.6);
+    box-shadow:0 0 0 1px rgba(255,255,255,.05), 0 6px 0 rgba(0,0,0,.4);
     pointer-events:auto;
   }
   #nameEditLabel{font-size:13px; color:var(--sub); text-align:center;}
@@ -995,7 +975,7 @@ function newOrbItem(intervalMin, max){
   };
 }
 function hasUseChunk(it){
-  return !!(it && (it.type === 'stam' || it.type === 'orb') && it.useChunk != null && Number(it.useChunk) > 0);
+  return !!(it && it.type === 'stam' && it.useChunk != null && Number(it.useChunk) > 0);
 }
 function newIdleItem(durationMin, countMode){
   return { id: uid(), type:'idle', name:'', durationMin, countMode: countMode || 'down', state:'running', start: Date.now() };
@@ -1188,12 +1168,11 @@ function clampUseChunk(v){
   const n = Math.floor(Number(v) || 0);
   return Math.max(1, Math.min(999, n || 1));
 }
-// 使用後の残り。スタミナ=端数(mod) / オーブ=単発引き算
+// 使い切り後の残り。mod: 220→20
 function remainingAfterUse(cur, it){
   cur = Math.max(0, Math.floor(Number(cur) || 0));
   const fallback = 1;
   const c = clampUseChunk(it && it.useChunk != null ? it.useChunk : fallback);
-  if (it && it.type === 'orb') return Math.max(0, cur - c);
   return cur % c;
 }
 function preserveCycle(it, now){
@@ -1212,25 +1191,15 @@ function fmtHM(ts){
   const p = n => String(n).padStart(2,'0');
   return p(d.getHours()) + ':' + p(d.getMinutes());
 }
-// 満タンまで2時間未満（満タン自体は含まない）
-function isWarnRemain(remainMs, isFull){
-  return !isFull && remainMs > 0 && remainMs < 7200000;
+// 満タン、または満タンまで2時間未満 → 赤
+function isNearFull(remainMs, isFull){
+  return !!isFull || (remainMs > 0 && remainMs < 7200000);
 }
-// 現在値の色：警告=オレンジ / 満タン=赤
-function setNearOnCurrent(editor, remainMs, isFull){
+// 現在値の赤表示（文字に1回だけ当てる）
+function setNearOnCurrent(editor, near){
   if (!editor || !editor.text) return;
-  const wrap = editor.wrap;
-  if (wrap){
-    wrap.classList.toggle('near', isWarnRemain(remainMs, isFull));
-    wrap.classList.toggle('full-val', !!isFull);
-  }
-  if (isFull){
-    editor.text.style.setProperty('color', '#ff6b6b', 'important');
-  } else if (isWarnRemain(remainMs, isFull)){
-    editor.text.style.setProperty('color', '#ffab5c', 'important');
-  } else {
-    editor.text.style.removeProperty('color');
-  }
+  if (near) editor.text.style.setProperty('color', 'var(--danger)', 'important');
+  else editor.text.style.removeProperty('color');
 }
 
 function timerNeedsTick(it, now){
@@ -1317,81 +1286,6 @@ function isEditTarget(target){
   );
 }
 
-// グループ枠に長押しを付けた際、内部の子タイマーや＋ボタンへのタッチは除外
-function isGroupChildTarget(target){
-  if (!target || !target.closest) return false;
-  return !!(
-    target.closest('.card.stam') ||
-    target.closest('.card.orb') ||
-    target.closest('.card.idle') ||
-    target.closest('.card.exped') ||
-    target.closest('.group-empty-add')
-  );
-}
-
-// グループ名や仕切り線の長押し削除
-function bindLongPressDelete(el, id){
-  const HOLD_MS = 520, MOVE_PX = 24;
-  let timer = null, active = false, moved = false;
-  let sx = 0, sy = 0, pid = null;
-
-  const isPrimary = e => e.isPrimary !== false && !(e.pointerType==='mouse' && e.button!==0);
-  const clearSelection = ()=>{ try{ window.getSelection()?.removeAllRanges(); }catch(e){} };
-  const cleanup = ()=>{
-    if (timer !== null){ clearTimeout(timer); timer = null; }
-    active = false; moved = false; pid = null;
-  };
-
-  el.addEventListener('pointerdown', e=>{
-    if (!isPrimary(e) || active) return;
-    if (isEditTarget(e.target)) return;
-    if (isGroupChildTarget(e.target)) return;
-    if (editingId != null) return;
-
-    active = true; moved = false;
-    sx = e.clientX; sy = e.clientY; pid = e.pointerId;
-
-    timer = setTimeout(()=>{
-      if (!active || moved) return;
-      timer = null;
-      clearSelection();
-      try {
-        const ae = document.activeElement;
-        if (ae && el.contains(ae) && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')){
-          ae.blur();
-        }
-      } catch (err) {}
-      askRemoveItem(id);
-    }, HOLD_MS);
-  }, {capture:true, passive:false});
-
-  el.addEventListener('pointermove', e=>{
-    if (!active || e.pointerId !== pid) return;
-    if (Math.hypot(e.clientX-sx, e.clientY-sy) > MOVE_PX){
-      moved = true;
-      if (timer !== null){ clearTimeout(timer); timer = null; }
-    }
-  }, {capture:true, passive:true});
-
-  el.addEventListener('pointerup', ()=>{
-    cleanup();
-  }, {capture:true, passive:true});
-
-  el.addEventListener('pointercancel', ()=>{
-    cleanup();
-  }, {capture:true, passive:true});
-
-  el.addEventListener('contextmenu', e=>{
-    if (targetInGroupName(e.target, el)){
-      e.preventDefault(); e.stopPropagation(); clearSelection();
-    }
-  });
-}
-function targetInGroupName(target, el){
-  if (!target || !el || !el.contains(target)) return false;
-  return !isGroupChildTarget(target);
-}
-
 // タイマーカード用の通常タップだけを高速処理。
 function bindTimerShortAction(el, shortAction){
   let active = false, moved = false, pid = null;
@@ -1425,10 +1319,13 @@ function bindTimerShortAction(el, shortAction){
 }
 let toastTapDownHandler = null;
 let longPressTargetEl = null;
+let menuOpenRaf = 0;
 function clearLongPressTarget(){
-  if (longPressTargetEl){
-    longPressTargetEl.classList.remove('longpress-target');
-    longPressTargetEl = null;
+  longPressTargetEl = null;
+  // 取りこぼし防止：参照がずれても赤枠が残らないよう、残っているものを全部外す
+  if (cardsEl){
+    const left = cardsEl.querySelectorAll('.longpress-target');
+    for (let i = 0; i < left.length; i++) left[i].classList.remove('longpress-target');
   }
 }
 // トースト＝確認UI専用。開く/閉じる/2段階確定をここに集約。
@@ -1754,7 +1651,7 @@ function orbToastRowsHtml(it){
   const intervalUnit = isHours ? '時間' : '分';
   const info = orbInfo(it, Date.now());
   const isUp = it.orbMode === 'up';
-  const timeLabel = isUp ? '蓄積' : '全回復';
+  const timeLabel = isUp ? '蓄積時間' : '全回復';
   const oneOrbMin = Math.max(1, it.intervalMin);
   const totalMin = isUp
     ? (info.isFull ? (it.max * oneOrbMin) : Math.floor(info.cur * oneOrbMin + Math.max(0, oneOrbMin * 60000 - info.nextInMs) / 60000))
@@ -1762,12 +1659,10 @@ function orbToastRowsHtml(it){
   const rh = Math.floor(totalMin / 60);
   const rm = totalMin % 60;
   const fullRemFormatted = String(rh).padStart(2, '0') + ':' + String(rm).padStart(2, '0');
-  const chunkVal = it.useChunk != null ? clampUseChunk(it.useChunk) : '';
 
   return `<label class="toast-field"><span class="toast-color"><span class="toast-label">最大</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${it.max}" maxlength="2" data-role="orbMax" aria-label="最大個数"></span></label>`
     + `<label class="toast-field"><span class="toast-color"><span class="toast-label">回復(${intervalUnit})</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${intervalVal}" maxlength="3" data-role="orbInterval" aria-label="回復時間"></span></label>`
-    + `<label class="toast-field"><span class="toast-color"><span class="toast-label" data-role="orbTimeLabel">${timeLabel}</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${fullRemFormatted}" maxlength="5" data-role="orbFullRem" placeholder="17:59" aria-label="${timeLabel}"></span></label>`
-    + `<label class="toast-field"><span class="toast-color"><span class="toast-label">使用</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${chunkVal}" maxlength="2" data-role="orbUseChunk" aria-label="使用数" placeholder="なし"></span></label>`
+    + `<label class="toast-field wide"><span class="toast-color"><span class="toast-label" data-role="orbTimeLabel">${timeLabel}</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${fullRemFormatted}" maxlength="5" data-role="orbFullRem" placeholder="17:59" aria-label="${timeLabel}"></span></label>`
     + `<button type="button" data-act="toggleOrbMode">${isUp ? '方式：▲ 経過時間(蓄積)' : '方式：▼ 残り時間(減算)'}</button>`;
 }
 
@@ -1846,33 +1741,6 @@ function bindOrbToastRows(it){
     orbFullRemEl.addEventListener('blur', applyOrbFullRem);
     orbFullRemEl.addEventListener('keydown', e=>{ if (e.key === 'Enter'){ e.preventDefault(); orbFullRemEl.blur(); } });
     orbFullRemEl.addEventListener('pointerdown', e=>e.stopPropagation());
-  }
-
-  const chunkEl = toastEl.querySelector('input[data-role="orbUseChunk"]');
-  if (chunkEl){
-    chunkEl.addEventListener('focus', ()=>{ chunkEl.value = ''; });
-    const applyChunk = ()=>{
-      const raw = String(chunkEl.value || '').replace(/\D/g, '');
-      const num = Number(raw);
-      if (raw === '' || num === 0){
-        delete it.useChunk;
-        chunkEl.value = '';
-        if (pending40Id === it.id){ pending40Id = null; paintUseChunkPreview(it.id); }
-      } else {
-        it.useChunk = clampUseChunk(num);
-        chunkEl.value = String(it.useChunk);
-        if (pending40Id === it.id) paintUseChunkPreview(it.id);
-      }
-      if (refs[it.id]) refs[it.id].shortAction = hasUseChunk(it) ? (e) => onUseChunkTap(it, e) : null;
-      updateOneTimer(it);
-      save();
-    };
-    chunkEl.addEventListener('change', applyChunk);
-    chunkEl.addEventListener('blur', applyChunk);
-    chunkEl.addEventListener('keydown', e=>{
-      if (e.key === 'Enter'){ e.preventDefault(); chunkEl.blur(); }
-    });
-    chunkEl.addEventListener('pointerdown', e=>e.stopPropagation());
   }
 }
 
@@ -2033,14 +1901,11 @@ function onUseChunkTap(it, e){
   if (e){ e.stopPropagation(); e.preventDefault(); }
   if (!hasUseChunk(it)) return;
   const now = Date.now();
-  const isOrb = it.type === 'orb';
-  const info = isOrb ? orbInfo(it, now) : stamInfo(it, now);
+  const info = stamInfo(it, now);
   if (pending40Id === it.id){
-    if (isOrb) preserveOrbCycle(it, now);
-    else preserveCycle(it, now);
+    preserveCycle(it, now);
     it.current = remainingAfterUse(info.cur, it);
-    if (isOrb) freezeOrbIfFull(it, now);
-    else freezeIfFull(it, now);
+    freezeIfFull(it, now);
     pending40Id = null;
     paintUseChunkPreview(it.id);
     startTicking(true);
@@ -2091,20 +1956,13 @@ function applyOrbInput(it, rawVal, now){
 }
 
 function attachOrbCurrentEditor(curWrap, it){
-  const clearChunkPreview = ()=>{
-    if (hasUseChunk(it) && pending40Id === it.id){
-      pending40Id = null;
-      paintUseChunkPreview(it.id);
-    }
-  };
   const curEditor = createInlineNumber(orbInfo(it, Date.now()).cur, value => {
     const now = Date.now();
     applyOrbInput(it, value, now);
-    clearChunkPreview();
     updateOneTimer(it);
     startTicking(true);
     saveAfterPaint();
-  }, it.id + ':cur', clearChunkPreview, 4);
+  }, it.id + ':cur', null, 4);
   curWrap.appendChild(curEditor.wrap);
   return curEditor;
 }
@@ -2122,9 +1980,9 @@ function buildOrbCard(it){
   const r = { el: wrap, curEl: curEditor, maxLabel: maxWrap,
     clockEl: wrap.querySelector('[data-role="clock"]'),
     nextRemEl: wrap.querySelector('[data-role="nextRem"]'),
-    shortAction: hasUseChunk(it) ? (e) => onUseChunkTap(it, e) : null };
+    shortAction: null };
   refs[it.id] = r;
-  bindTimerShortAction(wrap, (e) => r.shortAction ? r.shortAction(e) : null);
+  // オーブはカードタップでの減算機能を外した（数値の直接編集のみ）
   return wrap;
 }
 
@@ -2163,7 +2021,6 @@ function buildGroupCard(it){
   refs[it.id] = { el: wrap, nameEl: nameEditor.wrap, nameEditor,
     bodyEl: wrap.querySelector('[data-role="body"]'),
     childRefs: {} };
-  bindLongPressDelete(wrap, it.id);
   renderGroupBody(it);
   return wrap;
 }
@@ -2223,11 +2080,12 @@ function buildRuleCard(it){
   wrap.style.borderTopColor = it.color || '#52617a';
   wrap.innerHTML = '';
   refs[it.id] = { el: wrap };
-  bindLongPressDelete(wrap, it.id);
   return wrap;
 }
 
-const MENU_BTN_SEL = '.timer-menu-btn, .header-menu-button';
+// トーストメニューを開く入口はすべてここに集約（#cards への委譲・pointerdown）。
+// タイマー丸ボタン／見出し丸ボタン／アカウント名ラベル／仕切り線の右端ゾーン。
+const MENU_BTN_SEL = '.timer-menu-btn, .header-menu-button, .group-namerow, .rule-line';
 function bindMenuButtonDelegation(){
   if (!cardsEl) return;
   const isPrimary = e => e.isPrimary !== false && !(e.pointerType === 'mouse' && e.button !== 0);
@@ -2263,7 +2121,8 @@ function bindMenuButtonDelegation(){
     window.addEventListener('pointercancel', blockUntilUp, {capture:true, passive:false});
     window.addEventListener('click', blockUntilUp, {capture:true, passive:false});
 
-    requestAnimationFrame(()=>{
+    menuOpenRaf = requestAnimationFrame(()=>{
+      menuOpenRaf = 0;
       askRemoveItem(id);
       if (toastEl){
         toastEl.style.pointerEvents = 'none';
@@ -2276,6 +2135,10 @@ function bindMenuButtonDelegation(){
     e.preventDefault();
     e.stopPropagation();
   }, {capture:true, passive:false});
+  // 入口を長押ししてもOSの選択・メニューを出さない
+  cardsEl.addEventListener('contextmenu', e=>{
+    if (menuBtnOf(e)) e.preventDefault();
+  });
 }
 bindMenuButtonDelegation();
 
@@ -2529,7 +2392,7 @@ function findItemById(id){
 }
 function paintUseChunkPreview(id){
   const it = findItemById(id);
-  if (it && (it.type === 'stam' || it.type === 'orb')) updateOneTimer(it);
+  if (it && it.type === 'stam') updateOneTimer(it);
 }
 function render(){
   const now = Date.now();
@@ -2624,14 +2487,12 @@ let updateTimerCard = function(it, r, now){
       const v = String(it.max);
       if (r.maxLabel.textContent !== v) r.maxLabel.textContent = v;
     }
-    setNearOnCurrent(r.curEl, info.remainMs, info.isFull);
+    setNearOnCurrent(r.curEl, isNearFull(info.remainMs, info.isFull));
   } else if (it.type==='orb'){
     const info = orbInfo(it, now);
-    const waitChunk = hasUseChunk(it) && pending40Id === it.id;
     r.el.classList.toggle('full', info.isFull);
-    r.el.classList.toggle('claim', waitChunk);
     renderClock(r.clockEl, info.remainMs, info.isFull, now, info.fullAt);
-    if (r.curEl && !r.curEl.isEditing()) r.curEl.setText(waitChunk ? remainingAfterUse(info.cur, it) : info.cur);
+    if (r.curEl && !r.curEl.isEditing()) r.curEl.setText(info.cur);
     if (r.maxLabel){
       const v = String(it.max);
       if (r.maxLabel.textContent !== v) r.maxLabel.textContent = v;
@@ -2640,7 +2501,7 @@ let updateTimerCard = function(it, r, now){
       const nextTxt = info.isFull ? '' : ('次 ' + fmtCountdown(info.nextInMs));
       if (r.nextRemEl.textContent !== nextTxt) r.nextRemEl.textContent = nextTxt;
     }
-    setNearOnCurrent(r.curEl, info.remainMs, info.isFull);
+    setNearOnCurrent(r.curEl, isNearFull(info.remainMs, info.isFull));
   } else if (it.type==='idle' || it.type==='exped'){
     if (it.state === 'claim' && claimId !== it.id){
       it.state = 'running';
@@ -2874,25 +2735,33 @@ function flushPendingSaveOnHide(){
   }
 }
 
-// 復帰処理：第1フレームでGPU/ビューポート復元を待ち、第2フレームで時刻同期（Freeze復帰の点滅・文字ブレ防止）
+// 復帰処理：黒幕や無駄な待機・二重描画を省き、即座に差分更新してtick再開
 function resumeApp(){
-  const now = Date.now();
-  syncFullStamItems(now);
-  tickRender(now);
+  tickRender(Date.now()); // tickRender内でsyncFullStamItemsも実行される
   startTicking(true);
 }
 
+let resumeRaf = 0;
 function handlePause(){
   flushPendingSaveOnHide();
   wasBackgrounded = true;
+  if (resumeRaf){ cancelAnimationFrame(resumeRaf); resumeRaf = 0; }
+  if (menuOpenRaf){ cancelAnimationFrame(menuOpenRaf); menuOpenRaf = 0; }
   tickGen++;
   if (tickId){ clearTimeout(tickId); tickId = null; }
 }
 
+// ダブルRAF：1フレーム目でGPU描画領域の復元・ビューポート確定を待ち、2フレーム目で時刻同期。
+// visibilitychange / resume / pageshow / focus が連発しても1回に集約する。
 function handleResume(){
   wasBackgrounded = false;
-  requestAnimationFrame(()=>{
-    requestAnimationFrame(resumeApp);
+  if (resumeRaf) return;
+  resumeRaf = requestAnimationFrame(()=>{
+    resumeRaf = requestAnimationFrame(()=>{
+      resumeRaf = 0;
+      if (document.hidden) return;
+      resumeApp();
+    });
   });
 }
 
@@ -2908,9 +2777,6 @@ document.addEventListener('resume', handleResume);
 window.addEventListener('pagehide', handlePause);
 window.addEventListener('beforeunload', flushPendingSaveOnHide);
 window.addEventListener('pageshow', (e)=>{ handleResume(); });
-window.addEventListener('focus', ()=>{
-  if (!document.hidden) handleResume();
-});
 
 /* ═══════════════ 機種差フィット（ここから）═══════════════ */
 (function(){
