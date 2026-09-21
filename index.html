@@ -160,7 +160,8 @@
   .card.stam, .card.orb, .card.idle, .card.exped{height:56px; min-height:56px;} 
   /* claim（スタミナ使い切り / 放置=受取 / 遠征=再出発）は太枠線で強調（box-shadowでレイアウトズレ防止） */
   .card.claim,
-  .card.stam.claim{
+  .card.stam.claim,
+  .card.orb.claim{
     border-color:#ffd166 !important;
     box-shadow:0 0 0 1.5px #ffd166 !important;
     z-index:2;
@@ -976,7 +977,7 @@ function newOrbItem(intervalMin, max){
   };
 }
 function hasUseChunk(it){
-  return !!(it && it.type === 'stam' && it.useChunk != null && Number(it.useChunk) > 0);
+  return !!(it && (it.type === 'stam' || it.type === 'orb') && it.useChunk != null && Number(it.useChunk) > 0);
 }
 function newIdleItem(durationMin, countMode){
   return { id: uid(), type:'idle', name:'', durationMin, countMode: countMode || 'down', state:'running', start: Date.now() };
@@ -1724,7 +1725,7 @@ function orbToastRowsHtml(it){
   const intervalUnit = isHours ? '時間' : '分';
   const info = orbInfo(it, Date.now());
   const isUp = it.orbMode === 'up';
-  const timeLabel = isUp ? '蓄積時間' : '全回復';
+  const timeLabel = isUp ? '蓄積' : '全回復';
   const oneOrbMin = Math.max(1, it.intervalMin);
   const totalMin = isUp
     ? (info.isFull ? (it.max * oneOrbMin) : Math.floor(info.cur * oneOrbMin + Math.max(0, oneOrbMin * 60000 - info.nextInMs) / 60000))
@@ -1732,10 +1733,12 @@ function orbToastRowsHtml(it){
   const rh = Math.floor(totalMin / 60);
   const rm = totalMin % 60;
   const fullRemFormatted = String(rh).padStart(2, '0') + ':' + String(rm).padStart(2, '0');
+  const chunkVal = it.useChunk != null ? clampUseChunk(it.useChunk) : '';
 
   return `<label class="toast-field"><span class="toast-color"><span class="toast-label">最大</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${it.max}" maxlength="2" data-role="orbMax" aria-label="最大個数"></span></label>`
     + `<label class="toast-field"><span class="toast-color"><span class="toast-label">回復(${intervalUnit})</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${intervalVal}" maxlength="3" data-role="orbInterval" aria-label="回復時間"></span></label>`
-    + `<label class="toast-field wide"><span class="toast-color"><span class="toast-label" data-role="orbTimeLabel">${timeLabel}</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${fullRemFormatted}" maxlength="5" data-role="orbFullRem" placeholder="17:59" aria-label="${timeLabel}"></span></label>`
+    + `<label class="toast-field"><span class="toast-color"><span class="toast-label" data-role="orbTimeLabel">${timeLabel}</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${fullRemFormatted}" maxlength="5" data-role="orbFullRem" placeholder="17:59" aria-label="${timeLabel}"></span></label>`
+    + `<label class="toast-field"><span class="toast-color"><span class="toast-label">使い切り</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${chunkVal}" maxlength="2" data-role="orbUseChunk" aria-label="使い切り数" placeholder="なし"></span></label>`
     + `<button type="button" data-act="toggleOrbMode">${isUp ? '方式：▲ 経過時間(蓄積)' : '方式：▼ 残り時間(減算)'}</button>`;
 }
 
@@ -1814,6 +1817,33 @@ function bindOrbToastRows(it){
     orbFullRemEl.addEventListener('blur', applyOrbFullRem);
     orbFullRemEl.addEventListener('keydown', e=>{ if (e.key === 'Enter'){ e.preventDefault(); orbFullRemEl.blur(); } });
     orbFullRemEl.addEventListener('pointerdown', e=>e.stopPropagation());
+  }
+
+  const chunkEl = toastEl.querySelector('input[data-role="orbUseChunk"]');
+  if (chunkEl){
+    chunkEl.addEventListener('focus', ()=>{ chunkEl.value = ''; });
+    const applyChunk = ()=>{
+      const raw = String(chunkEl.value || '').replace(/\D/g, '');
+      const num = Number(raw);
+      if (raw === '' || num === 0){
+        delete it.useChunk;
+        chunkEl.value = '';
+        if (pending40Id === it.id){ pending40Id = null; paintUseChunkPreview(it.id); }
+      } else {
+        it.useChunk = clampUseChunk(num);
+        chunkEl.value = String(it.useChunk);
+        if (pending40Id === it.id) paintUseChunkPreview(it.id);
+      }
+      if (refs[it.id]) refs[it.id].shortAction = hasUseChunk(it) ? (e) => onUseChunkTap(it, e) : null;
+      updateOneTimer(it);
+      save();
+    };
+    chunkEl.addEventListener('change', applyChunk);
+    chunkEl.addEventListener('blur', applyChunk);
+    chunkEl.addEventListener('keydown', e=>{
+      if (e.key === 'Enter'){ e.preventDefault(); chunkEl.blur(); }
+    });
+    chunkEl.addEventListener('pointerdown', e=>e.stopPropagation());
   }
 }
 
@@ -1974,11 +2004,14 @@ function onUseChunkTap(it, e){
   if (e){ e.stopPropagation(); e.preventDefault(); }
   if (!hasUseChunk(it)) return;
   const now = Date.now();
-  const info = stamInfo(it, now);
+  const isOrb = it.type === 'orb';
+  const info = isOrb ? orbInfo(it, now) : stamInfo(it, now);
   if (pending40Id === it.id){
-    preserveCycle(it, now);
+    if (isOrb) preserveOrbCycle(it, now);
+    else preserveCycle(it, now);
     it.current = remainingAfterUse(info.cur, it);
-    freezeIfFull(it, now);
+    if (isOrb) freezeOrbIfFull(it, now);
+    else freezeIfFull(it, now);
     pending40Id = null;
     paintUseChunkPreview(it.id);
     startTicking(true);
@@ -2029,13 +2062,20 @@ function applyOrbInput(it, rawVal, now){
 }
 
 function attachOrbCurrentEditor(curWrap, it){
+  const clearChunkPreview = ()=>{
+    if (hasUseChunk(it) && pending40Id === it.id){
+      pending40Id = null;
+      paintUseChunkPreview(it.id);
+    }
+  };
   const curEditor = createInlineNumber(orbInfo(it, Date.now()).cur, value => {
     const now = Date.now();
     applyOrbInput(it, value, now);
+    clearChunkPreview();
     updateOneTimer(it);
     startTicking(true);
     saveAfterPaint();
-  }, it.id + ':cur', null, 4);
+  }, it.id + ':cur', clearChunkPreview, 4);
   curWrap.appendChild(curEditor.wrap);
   return curEditor;
 }
@@ -2053,9 +2093,9 @@ function buildOrbCard(it){
   const r = { el: wrap, curEl: curEditor, maxLabel: maxWrap,
     clockEl: wrap.querySelector('[data-role="clock"]'),
     nextRemEl: wrap.querySelector('[data-role="nextRem"]'),
-    shortAction: null };
+    shortAction: hasUseChunk(it) ? (e) => onUseChunkTap(it, e) : null };
   refs[it.id] = r;
-  // オーブはカードタップでの減算機能を外した（数値の直接編集のみ）
+  bindTimerShortAction(wrap, (e) => r.shortAction ? r.shortAction(e) : null);
   return wrap;
 }
 
@@ -2460,7 +2500,7 @@ function findItemById(id){
 }
 function paintUseChunkPreview(id){
   const it = findItemById(id);
-  if (it && it.type === 'stam') updateOneTimer(it);
+  if (it && (it.type === 'stam' || it.type === 'orb')) updateOneTimer(it);
 }
 function render(){
   const now = Date.now();
@@ -2558,9 +2598,11 @@ let updateTimerCard = function(it, r, now){
     setNearOnCurrent(r.curEl, isNearFull(info.remainMs, info.isFull));
   } else if (it.type==='orb'){
     const info = orbInfo(it, now);
+    const waitChunk = hasUseChunk(it) && pending40Id === it.id;
     r.el.classList.toggle('full', info.isFull);
+    r.el.classList.toggle('claim', waitChunk);
     renderClock(r.clockEl, info.remainMs, info.isFull, now, info.fullAt);
-    if (r.curEl && !r.curEl.isEditing()) r.curEl.setText(info.cur);
+    if (r.curEl && !r.curEl.isEditing()) r.curEl.setText(waitChunk ? remainingAfterUse(info.cur, it) : info.cur);
     if (r.maxLabel){
       const v = String(it.max);
       if (r.maxLabel.textContent !== v) r.maxLabel.textContent = v;
