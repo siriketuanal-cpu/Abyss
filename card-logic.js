@@ -223,7 +223,7 @@ function findItemById(id){
 }
 function paintUseChunkPreview(id){
   const it = findItemById(id);
-  if (it && it.type === 'stam') updateOneTimer(it);
+  if (it && (it.type === 'stam' || it.type === 'orb')) updateOneTimer(it);
 }
 function render(){
   const now = Date.now();
@@ -322,16 +322,23 @@ let updateTimerCard = function(it, r, now){
     if (r.el){ fitObserve(r.el); fitApply(r.el); }
   } else if (it.type==='orb'){
     const info = orbInfo(it, now);
+    const waitChunk = hasUseChunk(it) && pending40Id === it.id;
     r.el.classList.toggle('full', info.isFull);
+    r.el.classList.toggle('claim', waitChunk);
     renderClock(r.clockEl, info.remainMs, info.isFull, now, info.fullAt);
-    if (r.curEl && !r.curEl.isEditing()) r.curEl.setText(info.cur);
+    if (r.curEl && !r.curEl.isEditing()) r.curEl.setText(waitChunk ? remainingAfterUse(info.cur, it) : info.cur);
     if (r.maxLabel){
       const v = String(it.max);
       if (r.maxLabel.textContent !== v) r.maxLabel.textContent = v;
     }
     if (r.nextRemEl){
-      const nextTxt = info.isFull ? '' : ('次 ' + fmtCountdown(info.nextInMs));
-      if (r.nextRemEl.textContent !== nextTxt) r.nextRemEl.textContent = nextTxt;
+      if (info.isFull){
+        if (r.nextRemEl.style.display !== 'none') r.nextRemEl.style.display = 'none';
+      } else {
+        if (r.nextRemEl.style.display !== '') r.nextRemEl.style.display = '';
+        const cd = fmtCountdown(info.nextInMs);
+        if (r.nextValEl && r.nextValEl.textContent !== cd) r.nextValEl.textContent = cd;
+      }
     }
     setNearOnCurrent(r.curEl, isNearFull(info.remainMs, info.isFull));
   } else if (it.type==='idle' || it.type==='exped'){

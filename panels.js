@@ -92,6 +92,12 @@ function openSetup(type){
           <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupOrbHours" value="6" maxlength="3" aria-label="回復時間">
         </span>
       </label>
+      <label class="toast-field wide">
+        <span class="toast-color">
+          <span class="toast-label">消費数</span>
+          <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupOrbChunk" value="" maxlength="2" placeholder="なし" aria-label="消費数">
+        </span>
+      </label>
       <div class="toast-field wide">
         <span class="toast-color">
           <span class="toast-label">方式</span>
@@ -215,7 +221,9 @@ function confirmSetup(){
   } else if (setupType === 'orb'){
     const hours = clampInt(setupFieldsEl.querySelector('#setupOrbHours')?.value, 1, 999, 6);
     const max = clampInt(setupFieldsEl.querySelector('#setupMax')?.value, 1, 99, 4);
-    const item = newOrbItem(hours * 60, max);
+    const chunkRaw = String(setupFieldsEl.querySelector('#setupOrbChunk')?.value || '').replace(/\D/g, '');
+    const useChunk = chunkRaw === '' ? null : clampUseChunk(chunkRaw);
+    const item = newOrbItem(hours * 60, max, useChunk);
     item.orbMode = setupOrbMode || 'down';
     if (!pushNewTimer(item)) return;
   } else if (setupType === 'rule'){

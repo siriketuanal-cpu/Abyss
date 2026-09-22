@@ -61,11 +61,18 @@ function onUseChunkTap(it, e){
   if (e){ e.stopPropagation(); e.preventDefault(); }
   if (!hasUseChunk(it)) return;
   const now = Date.now();
-  const info = stamInfo(it, now);
+  const isOrb = it.type === 'orb';
+  const info = isOrb ? orbInfo(it, now) : stamInfo(it, now);
   if (pending40Id === it.id){
-    preserveCycle(it, now);
-    it.current = remainingAfterUse(info.cur, it);
-    freezeIfFull(it, now);
+    if (isOrb){
+      preserveOrbCycle(it, now);
+      it.current = remainingAfterUse(info.cur, it);
+      freezeOrbIfFull(it, now);
+    } else {
+      preserveCycle(it, now);
+      it.current = remainingAfterUse(info.cur, it);
+      freezeIfFull(it, now);
+    }
     pending40Id = null;
     paintUseChunkPreview(it.id);
     startTicking(true);
@@ -116,21 +123,31 @@ function applyOrbInput(it, rawVal, now){
 }
 
 function attachOrbCurrentEditor(curWrap, it){
+  const clearChunkPreview = ()=>{
+    if (hasUseChunk(it) && pending40Id === it.id){
+      pending40Id = null;
+      paintUseChunkPreview(it.id);
+    }
+  };
   const curEditor = createInlineNumber(orbInfo(it, Date.now()).cur, value => {
     const now = Date.now();
     applyOrbInput(it, value, now);
     updateOneTimer(it);
     startTicking(true);
     saveAfterPaint();
-  }, it.id + ':cur', null, 4);
+  }, it.id + ':cur', clearChunkPreview, 4);
   curWrap.appendChild(curEditor.wrap);
   return curEditor;
 }
 
 function buildOrbCard(it){
   const wrap = makeCardEl('orb', it.id, `
-    <div class="clockstack orb-clock" data-role="clock"></div>
-    <div class="orb-next-rem" data-role="nextRem"></div>
+    <div class="orb-toprow">
+      <div class="orb-next-rem" data-role="nextRem">
+        <span class="orb-next-lbl">次</span><span class="orb-next-val" data-role="nextVal"></span>
+      </div>
+      <div class="clockstack orb-clock" data-role="clock"></div>
+    </div>
     ${valrowStamHtml()}
   `);
   const curWrap = wrap.querySelector('[data-role="curWrap"]');
@@ -140,9 +157,10 @@ function buildOrbCard(it){
   const r = { el: wrap, curEl: curEditor, maxLabel: maxWrap,
     clockEl: wrap.querySelector('[data-role="clock"]'),
     nextRemEl: wrap.querySelector('[data-role="nextRem"]'),
-    shortAction: null };
+    nextValEl: wrap.querySelector('[data-role="nextVal"]'),
+    shortAction: hasUseChunk(it) ? (e) => onUseChunkTap(it, e) : null };
   refs[it.id] = r;
-  // オーブはカードタップでの減算機能を外した（数値の直接編集のみ）
+  bindTimerShortAction(wrap, (e) => r.shortAction ? r.shortAction(e) : null);
   return wrap;
 }
 

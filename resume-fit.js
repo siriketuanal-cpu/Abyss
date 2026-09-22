@@ -175,6 +175,8 @@ document.addEventListener('paste', (e)=> e.preventDefault());
 
 // ── 完全オフライン保護 ＆ 強力スマート更新（In-App Smart Update） ──
 let isUpdating = false;
+let lastUpdateCheckTime = 0;
+
 async function performSmartUpdate(){
   if (isUpdating) return;
   const btn = document.getElementById('updateBtn');
@@ -191,6 +193,11 @@ async function performSmartUpdate(){
   showNotice('最新版を確認中…', 0);
 
   const bust = Date.now().toString(36);
+  const now = Date.now();
+  // 4秒以内の連続タップは強制リフレッシュモード
+  const forceRefresh = (now - lastUpdateCheckTime < 4000);
+  lastUpdateCheckTime = now;
+
   const files = [
     './index.html',
     './styles.css',
@@ -210,45 +217,74 @@ async function performSmartUpdate(){
   ];
 
   try {
-    // 2. ネットワーク接続の実際の疎通テスト（超軽量 ping）
-    const pingRes = await fetch('./manifest.json?ping=' + bust, {
+    // 2. ネットワーク疎通確認 & 最新の sw.js を取得して更新差分をチェック
+    const swRes = await fetch('./sw.js?check=' + bust, {
       method: 'GET',
       cache: 'no-store',
       credentials: 'same-origin'
     });
-    if (!pingRes.ok) throw new Error('Network ping failed');
+    if (!swRes.ok) throw new Error('Network check failed');
+    const newSwText = await swRes.text();
 
-    showNotice('最新データを取得中…', 0);
+    // 現在キャッシュされている sw.js と比較
+    let currentSwText = '';
+    if ('caches' in window){
+      try {
+        const cachedSw = await caches.match('./sw.js');
+        if (cachedSw) currentSwText = await cachedSw.text();
+      } catch(e){}
+    }
+
+    const hasUpdate = forceRefresh || !currentSwText || (currentSwText !== newSwText);
+
+    if (!hasUpdate){
+      // サーバー上に差分なし：無駄な再起動を省き、最新であることを通知
+      if (btn) btn.classList.remove('spin');
+      isUpdating = false;
+      showNotice('すでに最新バージョンです（更新なし）', 2500);
+      return;
+    }
+
+    showNotice(forceRefresh ? '強制再取得中…' : '新バージョンを検出！更新中…', 0);
 
     // 3. 全アセットをネットワークから直接キャッシュを無視して一括取得
-    await Promise.all(files.map(f =>
-      fetch(f + '?r=' + bust, { cache: 'no-store', credentials: 'same-origin' })
-        .then(res => {
-          if (!res.ok) throw new Error(`${f} (${res.status})`);
-          return res;
-        })
-    ));
+    const fetchedResults = await Promise.all(files.map(async f => {
+      const res = await fetch(f + '?r=' + bust, { cache: 'no-store', credentials: 'same-origin' });
+      if (!res.ok) throw new Error(`${f} (${res.status})`);
+      return { path: f, res };
+    }));
 
     showNotice('キャッシュを更新中…', 0);
 
-    // 4. Cache Storage を安全にクリア（全取得成功後なので安全）
-    if ('caches' in window){
-      const keys = await caches.keys();
-      if ('serviceWorker' in navigator){
-        const regs = await navigator.serviceWorker.getRegistrations();
-        for (const reg of regs){
-          try { await reg.update(); } catch(e){}
-        }
-      }
-      await Promise.all(keys.map(k => caches.delete(k)));
+    // 4. 古いSWを一度解除し、新しいCache Storageに直接書き込み
+    if ('serviceWorker' in navigator){
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
     }
 
-    showNotice('更新完了！再起動します…', 1500);
+    if ('caches' in window){
+      const match = newSwText.match(/CACHE_NAME\s*=\s*['"]([^'"]+)['"]/);
+      const cacheName = match ? match[1] : ('v' + bust);
+      
+      const newCache = await caches.open(cacheName);
+      for (const item of fetchedResults){
+        await newCache.put(item.path, item.res.clone());
+        if (item.path === './index.html'){
+          await newCache.put('./', item.res.clone());
+        }
+      }
 
-    // 5. 新バージョンで安全にリロード（ブラウザキャッシュをバイパス）
+      // 古いキャッシュをクリア
+      const allKeys = await caches.keys();
+      await Promise.all(allKeys.filter(k => k !== cacheName).map(k => caches.delete(k)));
+    }
+
+    showNotice('更新完了！再起動します…', 1200);
+
+    // 5. 新バージョンで確実に再読み込み＆完全再描画
     setTimeout(()=>{
       location.replace('./index.html?r=' + bust);
-    }, 500);
+    }, 400);
 
   } catch(err){
     console.warn('Smart update failed:', err);

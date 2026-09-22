@@ -13,9 +13,9 @@ function newStamItem(intervalMin, max, useChunk){
   if (useChunk != null && Number(useChunk) > 0) item.useChunk = clampUseChunk(useChunk);
   return item;
 }
-function newOrbItem(intervalMin, max){
+function newOrbItem(intervalMin, max, useChunk){
   const m = clampInt(max, 1, 99, 4);
-  return {
+  const item = {
     id: uid(),
     type: 'orb',
     name: '',
@@ -25,9 +25,13 @@ function newOrbItem(intervalMin, max){
     start: Date.now(),
     orbMode: 'down'
   };
+  if (useChunk != null && Number(useChunk) > 0) item.useChunk = clampUseChunk(useChunk);
+  return item;
 }
 function hasUseChunk(it){
-  return !!(it && it.type === 'stam' && it.useChunk != null && Number(it.useChunk) > 0);
+  if (!it || it.useChunk == null) return false;
+  const n = Number(it.useChunk);
+  return Number.isFinite(n) && n > 0 && (it.type === 'stam' || it.type === 'orb');
 }
 function newIdleItem(durationMin, countMode){
   return { id: uid(), type:'idle', name:'', durationMin, countMode: countMode || 'down', state:'running', start: Date.now() };
@@ -220,11 +224,14 @@ function clampUseChunk(v){
   const n = Math.floor(Number(v) || 0);
   return Math.max(1, Math.min(999, n || 1));
 }
-// 使い切り後の残り。mod: 220→20
+// 使い切り後の残り。スタミナは剰余（220→20）、オーブは設定数だけ単発減算（5→4）
 function remainingAfterUse(cur, it){
   cur = Math.max(0, Math.floor(Number(cur) || 0));
   const fallback = 1;
   const c = clampUseChunk(it && it.useChunk != null ? it.useChunk : fallback);
+  if (it && it.type === 'orb'){
+    return Math.max(0, cur - c);
+  }
   return cur % c;
 }
 function preserveCycle(it, now){

@@ -9,12 +9,20 @@ function showConfirmToast(html, onAct){
   const onClick = (e)=>{
     const btn = e.target.closest('button[data-act]');
     if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
     const act = btn.dataset.act;
 
     // トグル系：トーストを閉じずに即時切り替え＆表示更新
     if (act && act.startsWith('toggle')){
       if (typeof onAct === 'function') onAct(act, btn);
       return;
+    }
+
+    // トーストを閉じた瞬間に背後要素がタップ反応・ハイライトを受けるのを防止
+    if (cardsEl){
+      cardsEl.style.pointerEvents = 'none';
+      setTimeout(()=>{ if (cardsEl) cardsEl.style.pointerEvents = ''; }, 180);
     }
 
     // 移動系：即時移動しつつトーストを閉じる
@@ -95,17 +103,39 @@ function askRemoveItem(id){
   const moveButtons = canInsertOrMove
     ? `<div class="toast-fields-btns"><button type="button" data-act="moveUp">↑ 上へ移動</button><button type="button" data-act="moveDown">↓ 下へ移動</button></div>`
     : '';
-  const fields =
-    (colorDefault ? `<label class="toast-field"><span class="toast-color"><span class="toast-label">色</span><input type="color" value="${colorDefault}" aria-label="色"></span></label>` : '')
-    + (isStam ? stamToastRowsHtml(it) : '')
-    + (isOrb ? orbToastRowsHtml(it) : '')
-    + (isHeader ? `<button type="button" data-act="toggleFoldLock">${it.foldLock ? '折りたたみ：🔒 固定中' : '折りたたみ：🔓 開閉可能'}</button>` : '')
-    + (isGroup ? `<button type="button" data-act="toggleGroupLayout">${it.layout === '2x2' ? '配置：⊞ 2×2' : '配置：☰ 1行'}</button>` : '')
-    + (canEditName ? `<button type="button" data-act="editName">${isHeader ? '見出し名を変更' : 'アカウント名を変更'}</button>` : '')
-    + (canAdd ? '<button type="button" data-act="add">＋ タイマーを追加</button>' : '')
-    + (canInsertOrMove ? '<button type="button" data-act="insertBelow">＋ 下に枠を挿入</button>' : '')
-    + moveButtons
-    + (isIdle ? idleToastRowsHtml(it) : '');   // 放置：設定時間／残り時間の入力行
+
+  let fields = '';
+  if (isGroup){
+    fields = `
+      <button type="button" data-act="editName">アカウント名を変更</button>
+      <label class="toast-field"><span class="toast-color"><span class="toast-label">枠色</span><input type="color" value="${colorDefault}" aria-label="枠色"></span></label>
+      <button type="button" class="toast-half-btn" data-act="toggleGroupLayout">${it.layout === '2x2' ? '配置：⊞ 2×2' : '配置：☰ 1行'}</button>
+      <div class="toast-fields-btns">
+        ${canAdd ? '<button type="button" data-act="add">タイマー追加</button>' : ''}
+        <button type="button" data-act="insertBelow"${!canAdd ? ' style="grid-column:1/-1;"' : ''}>枠を追加</button>
+      </div>
+      ${moveButtons}
+    `;
+  } else if (isHeader){
+    fields = `
+      <button type="button" data-act="editName">見出し名を変更</button>
+      <label class="toast-field"><span class="toast-color"><span class="toast-label">色</span><input type="color" value="${colorDefault}" aria-label="色"></span></label>
+      <button type="button" class="toast-half-btn" data-act="toggleFoldLock">${it.foldLock ? '折りたたみ：🔒' : '折りたたみ：🔓'}</button>
+      <button type="button" data-act="insertBelow">枠を追加</button>
+      ${moveButtons}
+    `;
+  } else if (isRule){
+    fields = `
+      <label class="toast-field wide"><span class="toast-color"><span class="toast-label">色</span><input type="color" value="${colorDefault}" aria-label="色"></span></label>
+      <button type="button" data-act="insertBelow">枠を追加</button>
+      ${moveButtons}
+    `;
+  } else {
+    fields = (isStam ? stamToastRowsHtml(it) : '')
+      + (isOrb ? orbToastRowsHtml(it) : '')
+      + (isIdle ? idleToastRowsHtml(it) : '');
+  }
+
   const extra = fields ? `<div class="toast-fields">${fields}</div>` : '';
   showConfirmToast(
     extra
@@ -127,7 +157,7 @@ function askRemoveItem(id){
       else if (act === 'toggleFoldLock'){
         it.foldLock = !it.foldLock;
         if (it.foldLock) it.collapsed = false;
-        if (btn) btn.textContent = it.foldLock ? '折りたたみ：🔒 固定中' : '折りたたみ：🔓 開閉可能';
+        if (btn) btn.textContent = it.foldLock ? '折りたたみ：🔒' : '折りたたみ：🔓';
         save(); render();
       }
       else if (act === 'toggleOrbMode'){

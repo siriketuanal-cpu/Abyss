@@ -118,14 +118,42 @@ function orbToastRowsHtml(it){
   const rh = Math.floor(totalMin / 60);
   const rm = totalMin % 60;
   const fullRemFormatted = String(rh).padStart(2, '0') + ':' + String(rm).padStart(2, '0');
+  const chunkVal = it.useChunk != null ? clampUseChunk(it.useChunk) : '';
 
   return `<label class="toast-field"><span class="toast-color"><span class="toast-label">最大</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${it.max}" maxlength="2" data-role="orbMax" aria-label="最大個数"></span></label>`
     + `<label class="toast-field"><span class="toast-color"><span class="toast-label">回復(${intervalUnit})</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${intervalVal}" maxlength="3" data-role="orbInterval" aria-label="回復時間"></span></label>`
-    + `<label class="toast-field wide"><span class="toast-color"><span class="toast-label" data-role="orbTimeLabel">${timeLabel}</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${fullRemFormatted}" maxlength="5" data-role="orbFullRem" placeholder="17:59" aria-label="${timeLabel}"></span></label>`
+    + `<label class="toast-field"><span class="toast-color"><span class="toast-label" data-role="orbTimeLabel">${timeLabel}</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${fullRemFormatted}" maxlength="5" data-role="orbFullRem" placeholder="00:00" aria-label="${timeLabel}"></span></label>`
+    + `<label class="toast-field"><span class="toast-color"><span class="toast-label">消費数</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${chunkVal}" maxlength="2" data-role="useChunk" aria-label="消費数" placeholder="なし"></span></label>`
     + `<button type="button" data-act="toggleOrbMode">${isUp ? '方式：▲ 経過時間(蓄積)' : '方式：▼ 残り時間(減算)'}</button>`;
 }
 
 function bindOrbToastRows(it){
+  const chunkEl = toastEl.querySelector('input[data-role="useChunk"]');
+  if (chunkEl){
+    chunkEl.addEventListener('focus', ()=>{ chunkEl.value = ''; });
+    const applyChunk = ()=>{
+      const raw = String(chunkEl.value || '').replace(/\D/g, '');
+      const num = Number(raw);
+      if (raw === '' || num === 0){
+        delete it.useChunk;
+        chunkEl.value = '';
+        if (pending40Id === it.id){ pending40Id = null; paintUseChunkPreview(it.id); }
+      } else {
+        it.useChunk = clampUseChunk(num);
+        chunkEl.value = String(it.useChunk);
+        if (pending40Id === it.id) paintUseChunkPreview(it.id);
+      }
+      if (refs[it.id]) refs[it.id].shortAction = hasUseChunk(it) ? (e) => onUseChunkTap(it, e) : null;
+      updateOneTimer(it);
+      save();
+    };
+    chunkEl.addEventListener('change', applyChunk);
+    chunkEl.addEventListener('keydown', e=>{
+      if (e.key === 'Enter'){ e.preventDefault(); chunkEl.blur(); }
+    });
+    chunkEl.addEventListener('pointerdown', e=>e.stopPropagation());
+  }
+
   const maxEl = toastEl.querySelector('input[data-role="orbMax"]');
   if (maxEl){
     maxEl.addEventListener('focus', ()=>{ maxEl.value = ''; });

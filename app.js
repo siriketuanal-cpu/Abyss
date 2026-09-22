@@ -1,3 +1,6 @@
+// state.js: データモデル・保存/読込・名前編集ポップアップ・汎用UI部品(createInlineNumber/Text等)
+// この並び順(index.htmlの<script>タグの順番)を変えると、他ファイルの関数/変数を先に参照してエラーになる場合があります。
+
 const STORAGE_KEY = 'freetimer:v1';
 let state = load();
 // アカウント枠外に置かれたタイマーを、起動時にアカウント枠へ収める（既存データ互換）。
@@ -185,10 +188,7 @@ function save(immediate){ requestSave(immediate ? 'now' : 'debounced'); }
 function saveAfterPaint(){ requestSave('afterPaint'); }
 
 function uid(){ return 'x' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
-function clampInt(v, min, max, fallback){
-  const n = parseInt(v, 10);
-  return isNaN(n) ? (fallback != null ? fallback : min) : Math.max(min, Math.min(max, n));
-}
+// clampInt はここではなく card-logic.js 側で定義（旧app.js時代に同名関数が2つあり、後勝ちでそちらが有効だった名残）。
 
 // アプリ内のタップ操作は pointerdown に統一。ネイティブ入力の編集開始だけは、
 // 長押しでキーボードを出さないため短い指離し時にfocusする。
@@ -404,6 +404,8 @@ function createInlineText(initialValue, placeholder, _onCommit){
     isEditing: () => false
   };
 }
+// engine.js: タイマー項目の生成・残り時間計算(stam/orb/idle)・tick判定
+// この並び順(index.htmlの<script>タグの順番)を変えると、他ファイルの関数/変数を先に参照してエラーになる場合があります。
 
 function newStamItem(intervalMin, max, useChunk){
   const m = clampInt(max, 1, 999, 100);
@@ -417,9 +419,9 @@ function newStamItem(intervalMin, max, useChunk){
   if (useChunk != null && Number(useChunk) > 0) item.useChunk = clampUseChunk(useChunk);
   return item;
 }
-function newOrbItem(intervalMin, max){
+function newOrbItem(intervalMin, max, useChunk){
   const m = clampInt(max, 1, 99, 4);
-  return {
+  const item = {
     id: uid(),
     type: 'orb',
     name: '',
@@ -429,9 +431,13 @@ function newOrbItem(intervalMin, max){
     start: Date.now(),
     orbMode: 'down'
   };
+  if (useChunk != null && Number(useChunk) > 0) item.useChunk = clampUseChunk(useChunk);
+  return item;
 }
 function hasUseChunk(it){
-  return !!(it && it.type === 'stam' && it.useChunk != null && Number(it.useChunk) > 0);
+  if (!it || it.useChunk == null) return false;
+  const n = Number(it.useChunk);
+  return Number.isFinite(n) && n > 0 && (it.type === 'stam' || it.type === 'orb');
 }
 function newIdleItem(durationMin, countMode){
   return { id: uid(), type:'idle', name:'', durationMin, countMode: countMode || 'down', state:'running', start: Date.now() };
@@ -624,11 +630,14 @@ function clampUseChunk(v){
   const n = Math.floor(Number(v) || 0);
   return Math.max(1, Math.min(999, n || 1));
 }
-// 使い切り後の残り。mod: 220→20
+// 使い切り後の残り。スタミナは剰余（220→20）、オーブは設定数だけ単発減算（5→4）
 function remainingAfterUse(cur, it){
   cur = Math.max(0, Math.floor(Number(cur) || 0));
   const fallback = 1;
   const c = clampUseChunk(it && it.useChunk != null ? it.useChunk : fallback);
+  if (it && it.type === 'orb'){
+    return Math.max(0, cur - c);
+  }
   return cur % c;
 }
 function preserveCycle(it, now){
@@ -797,7 +806,9 @@ function closeToast(){
     toastEl.removeEventListener('pointerdown', toastTapDownHandler);
     toastTapDownHandler = null;
   }
-}
+}// toast-core.js: トーストメニューの開閉・削除確認(askRemoveItem)本体
+// この並び順(index.htmlの<script>タグの順番)を変えると、他ファイルの関数/変数を先に参照してエラーになる場合があります。
+
 function showConfirmToast(html, onAct){
   if (!toastEl) return;
   closeToast();
@@ -806,12 +817,20 @@ function showConfirmToast(html, onAct){
   const onClick = (e)=>{
     const btn = e.target.closest('button[data-act]');
     if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
     const act = btn.dataset.act;
 
     // トグル系：トーストを閉じずに即時切り替え＆表示更新
     if (act && act.startsWith('toggle')){
       if (typeof onAct === 'function') onAct(act, btn);
       return;
+    }
+
+    // トーストを閉じた瞬間に背後要素がタップ反応・ハイライトを受けるのを防止
+    if (cardsEl){
+      cardsEl.style.pointerEvents = 'none';
+      setTimeout(()=>{ if (cardsEl) cardsEl.style.pointerEvents = ''; }, 180);
     }
 
     // 移動系：即時移動しつつトーストを閉じる
@@ -887,22 +906,44 @@ function askRemoveItem(id){
   const canAdd = isGroup && it.children.length < 4;
   const canInsertOrMove = isHeader || isGroup || isRule;
   const canEditName = isHeader || isGroup;
-  const colorDefault = isHeader ? (it.color || '#9b8bff') : (isRule ? (it.color || '#52617a') : null);
+  const colorDefault = isHeader ? (it.color || '#9b8bff') : (isRule ? (it.color || '#52617a') : (isGroup ? (it.color || '#555b68') : null));
 
   const moveButtons = canInsertOrMove
     ? `<div class="toast-fields-btns"><button type="button" data-act="moveUp">↑ 上へ移動</button><button type="button" data-act="moveDown">↓ 下へ移動</button></div>`
     : '';
-  const fields =
-    (colorDefault ? `<label class="toast-field"><span class="toast-color"><span class="toast-label">色</span><input type="color" value="${colorDefault}" aria-label="色"></span></label>` : '')
-    + (isStam ? stamToastRowsHtml(it) : '')
-    + (isOrb ? orbToastRowsHtml(it) : '')
-    + (isHeader ? `<button type="button" data-act="toggleFoldLock">${it.foldLock ? '折りたたみ：🔒 固定中' : '折りたたみ：🔓 開閉可能'}</button>` : '')
-    + (isGroup ? `<button type="button" data-act="toggleGroupLayout">${it.layout === '2x2' ? '配置：⊞ 2×2' : '配置：☰ 1行'}</button>` : '')
-    + (canEditName ? `<button type="button" data-act="editName">${isHeader ? '見出し名を変更' : 'アカウント名を変更'}</button>` : '')
-    + (canAdd ? '<button type="button" data-act="add">＋ タイマーを追加</button>' : '')
-    + (canInsertOrMove ? '<button type="button" data-act="insertBelow">＋ 下に枠を挿入</button>' : '')
-    + moveButtons
-    + (isIdle ? idleToastRowsHtml(it) : '');   // 放置：設定時間／残り時間の入力行
+
+  let fields = '';
+  if (isGroup){
+    fields = `
+      <button type="button" data-act="editName">アカウント名を変更</button>
+      <label class="toast-field"><span class="toast-color"><span class="toast-label">枠色</span><input type="color" value="${colorDefault}" aria-label="枠色"></span></label>
+      <button type="button" class="toast-half-btn" data-act="toggleGroupLayout">${it.layout === '2x2' ? '配置：⊞ 2×2' : '配置：☰ 1行'}</button>
+      <div class="toast-fields-btns">
+        ${canAdd ? '<button type="button" data-act="add">タイマー追加</button>' : ''}
+        <button type="button" data-act="insertBelow"${!canAdd ? ' style="grid-column:1/-1;"' : ''}>枠を追加</button>
+      </div>
+      ${moveButtons}
+    `;
+  } else if (isHeader){
+    fields = `
+      <button type="button" data-act="editName">見出し名を変更</button>
+      <label class="toast-field"><span class="toast-color"><span class="toast-label">色</span><input type="color" value="${colorDefault}" aria-label="色"></span></label>
+      <button type="button" class="toast-half-btn" data-act="toggleFoldLock">${it.foldLock ? '折りたたみ：🔒' : '折りたたみ：🔓'}</button>
+      <button type="button" data-act="insertBelow">枠を追加</button>
+      ${moveButtons}
+    `;
+  } else if (isRule){
+    fields = `
+      <label class="toast-field wide"><span class="toast-color"><span class="toast-label">色</span><input type="color" value="${colorDefault}" aria-label="色"></span></label>
+      <button type="button" data-act="insertBelow">枠を追加</button>
+      ${moveButtons}
+    `;
+  } else {
+    fields = (isStam ? stamToastRowsHtml(it) : '')
+      + (isOrb ? orbToastRowsHtml(it) : '')
+      + (isIdle ? idleToastRowsHtml(it) : '');
+  }
+
   const extra = fields ? `<div class="toast-fields">${fields}</div>` : '';
   showConfirmToast(
     extra
@@ -924,7 +965,7 @@ function askRemoveItem(id){
       else if (act === 'toggleFoldLock'){
         it.foldLock = !it.foldLock;
         if (it.foldLock) it.collapsed = false;
-        if (btn) btn.textContent = it.foldLock ? '折りたたみ：🔒 固定中' : '折りたたみ：🔓 開閉可能';
+        if (btn) btn.textContent = it.foldLock ? '折りたたみ：🔒' : '折りたたみ：🔓';
         save(); render();
       }
       else if (act === 'toggleOrbMode'){
@@ -984,6 +1025,9 @@ function askRemoveItem(id){
           if (refs[id]?.menuBtn) refs[id].menuBtn.style.setProperty('--header-color', it.color);
         } else if (isRule && refs[id]?.el){
           refs[id].el.style.borderTopColor = it.color;
+        } else if (isGroup && refs[id]?.el){
+          refs[id].el.style.borderColor = it.color;
+          if (refs[id]?.nameEditor) refs[id].nameEditor.setColor(it.color);
         }
         save();
       });
@@ -994,6 +1038,24 @@ function askRemoveItem(id){
   if (isOrb) bindOrbToastRows(it);
   if (isIdle) bindIdleToastRows(it);
 }
+
+let noticeTimer = null;
+function showNotice(msg, timeoutMs = 2800){
+  if (!toastEl) return;
+  closeToast();
+  if (noticeTimer) { clearTimeout(noticeTimer); noticeTimer = null; }
+  toastEl.innerHTML = `<div class="notice-msg">${msg}</div>`;
+  toastEl.classList.add('show');
+  if (timeoutMs > 0){
+    noticeTimer = setTimeout(()=>{
+      if (toastEl && toastEl.innerHTML.includes(msg)){
+        closeToast();
+      }
+    }, timeoutMs);
+  }
+}
+// toast-fields.js: トーストメニュー内の種類別フィールド(スタミナ/オーブ/放置)のHTML生成とバインド
+// この並び順(index.htmlの<script>タグの順番)を変えると、他ファイルの関数/変数を先に参照してエラーになる場合があります。
 
 function stamToastRowsHtml(it){
   const chunkVal = it.useChunk != null ? clampUseChunk(it.useChunk) : '';
@@ -1112,14 +1174,42 @@ function orbToastRowsHtml(it){
   const rh = Math.floor(totalMin / 60);
   const rm = totalMin % 60;
   const fullRemFormatted = String(rh).padStart(2, '0') + ':' + String(rm).padStart(2, '0');
+  const chunkVal = it.useChunk != null ? clampUseChunk(it.useChunk) : '';
 
   return `<label class="toast-field"><span class="toast-color"><span class="toast-label">最大</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${it.max}" maxlength="2" data-role="orbMax" aria-label="最大個数"></span></label>`
     + `<label class="toast-field"><span class="toast-color"><span class="toast-label">回復(${intervalUnit})</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${intervalVal}" maxlength="3" data-role="orbInterval" aria-label="回復時間"></span></label>`
-    + `<label class="toast-field wide"><span class="toast-color"><span class="toast-label" data-role="orbTimeLabel">${timeLabel}</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${fullRemFormatted}" maxlength="5" data-role="orbFullRem" placeholder="17:59" aria-label="${timeLabel}"></span></label>`
+    + `<label class="toast-field"><span class="toast-color"><span class="toast-label" data-role="orbTimeLabel">${timeLabel}</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${fullRemFormatted}" maxlength="5" data-role="orbFullRem" placeholder="00:00" aria-label="${timeLabel}"></span></label>`
+    + `<label class="toast-field"><span class="toast-color"><span class="toast-label">消費数</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${chunkVal}" maxlength="2" data-role="useChunk" aria-label="消費数" placeholder="なし"></span></label>`
     + `<button type="button" data-act="toggleOrbMode">${isUp ? '方式：▲ 経過時間(蓄積)' : '方式：▼ 残り時間(減算)'}</button>`;
 }
 
 function bindOrbToastRows(it){
+  const chunkEl = toastEl.querySelector('input[data-role="useChunk"]');
+  if (chunkEl){
+    chunkEl.addEventListener('focus', ()=>{ chunkEl.value = ''; });
+    const applyChunk = ()=>{
+      const raw = String(chunkEl.value || '').replace(/\D/g, '');
+      const num = Number(raw);
+      if (raw === '' || num === 0){
+        delete it.useChunk;
+        chunkEl.value = '';
+        if (pending40Id === it.id){ pending40Id = null; paintUseChunkPreview(it.id); }
+      } else {
+        it.useChunk = clampUseChunk(num);
+        chunkEl.value = String(it.useChunk);
+        if (pending40Id === it.id) paintUseChunkPreview(it.id);
+      }
+      if (refs[it.id]) refs[it.id].shortAction = hasUseChunk(it) ? (e) => onUseChunkTap(it, e) : null;
+      updateOneTimer(it);
+      save();
+    };
+    chunkEl.addEventListener('change', applyChunk);
+    chunkEl.addEventListener('keydown', e=>{
+      if (e.key === 'Enter'){ e.preventDefault(); chunkEl.blur(); }
+    });
+    chunkEl.addEventListener('pointerdown', e=>e.stopPropagation());
+  }
+
   const maxEl = toastEl.querySelector('input[data-role="orbMax"]');
   if (maxEl){
     maxEl.addEventListener('focus', ()=>{ maxEl.value = ''; });
@@ -1292,7 +1382,9 @@ function bindIdleToastRows(it){
     if (e.key === 'Enter' && rowOf(e.target)){ e.preventDefault(); e.target.blur(); }
   });
 }
-/* ═══════════ 放置トースト：設定時間／残り時間（ここまで）═══════════ */
+/* ═══════════ 放置トースト：設定時間／残り時間（ここまで）═══════════ */// card-builders.js: 各カード(スタミナ/オーブ/放置/仕切り線/見出し)のDOM構築
+// この並び順(index.htmlの<script>タグの順番)を変えると、他ファイルの関数/変数を先に参照してエラーになる場合があります。
+
 
 function makeCardEl(type, id, innerHtml){
   const wrap = document.createElement('div');
@@ -1353,11 +1445,18 @@ function onUseChunkTap(it, e){
   if (e){ e.stopPropagation(); e.preventDefault(); }
   if (!hasUseChunk(it)) return;
   const now = Date.now();
-  const info = stamInfo(it, now);
+  const isOrb = it.type === 'orb';
+  const info = isOrb ? orbInfo(it, now) : stamInfo(it, now);
   if (pending40Id === it.id){
-    preserveCycle(it, now);
-    it.current = remainingAfterUse(info.cur, it);
-    freezeIfFull(it, now);
+    if (isOrb){
+      preserveOrbCycle(it, now);
+      it.current = remainingAfterUse(info.cur, it);
+      freezeOrbIfFull(it, now);
+    } else {
+      preserveCycle(it, now);
+      it.current = remainingAfterUse(info.cur, it);
+      freezeIfFull(it, now);
+    }
     pending40Id = null;
     paintUseChunkPreview(it.id);
     startTicking(true);
@@ -1408,21 +1507,31 @@ function applyOrbInput(it, rawVal, now){
 }
 
 function attachOrbCurrentEditor(curWrap, it){
+  const clearChunkPreview = ()=>{
+    if (hasUseChunk(it) && pending40Id === it.id){
+      pending40Id = null;
+      paintUseChunkPreview(it.id);
+    }
+  };
   const curEditor = createInlineNumber(orbInfo(it, Date.now()).cur, value => {
     const now = Date.now();
     applyOrbInput(it, value, now);
     updateOneTimer(it);
     startTicking(true);
     saveAfterPaint();
-  }, it.id + ':cur', null, 4);
+  }, it.id + ':cur', clearChunkPreview, 4);
   curWrap.appendChild(curEditor.wrap);
   return curEditor;
 }
 
 function buildOrbCard(it){
   const wrap = makeCardEl('orb', it.id, `
-    <div class="clockstack orb-clock" data-role="clock"></div>
-    <div class="orb-next-rem" data-role="nextRem"></div>
+    <div class="orb-toprow">
+      <div class="orb-next-rem" data-role="nextRem">
+        <span class="orb-next-lbl">次</span><span class="orb-next-val" data-role="nextVal"></span>
+      </div>
+      <div class="clockstack orb-clock" data-role="clock"></div>
+    </div>
     ${valrowStamHtml()}
   `);
   const curWrap = wrap.querySelector('[data-role="curWrap"]');
@@ -1432,9 +1541,10 @@ function buildOrbCard(it){
   const r = { el: wrap, curEl: curEditor, maxLabel: maxWrap,
     clockEl: wrap.querySelector('[data-role="clock"]'),
     nextRemEl: wrap.querySelector('[data-role="nextRem"]'),
-    shortAction: null };
+    nextValEl: wrap.querySelector('[data-role="nextVal"]'),
+    shortAction: hasUseChunk(it) ? (e) => onUseChunkTap(it, e) : null };
   refs[it.id] = r;
-  // オーブはカードタップでの減算機能を外した（数値の直接編集のみ）
+  bindTimerShortAction(wrap, (e) => r.shortAction ? r.shortAction(e) : null);
   return wrap;
 }
 
@@ -1461,6 +1571,9 @@ function buildGroupCard(it){
   const wrap = document.createElement('div');
   wrap.className = 'card group';
   wrap.dataset.id = it.id;
+  if (it.color){
+    wrap.style.borderColor = it.color;
+  }
   wrap.innerHTML = `
     <div class="row namerow group-namerow" data-role="namerow"></div>
     <div class="group-body" data-role="body"></div>
@@ -1469,6 +1582,9 @@ function buildGroupCard(it){
   const nameEditor = createInlineText(it.name || '', 'アカウント', (value)=>{
     if (it.name !== value){ it.name = value; save(); }
   });
+  if (it.color){
+    nameEditor.setColor(it.color);
+  }
   nameRowEl.appendChild(nameEditor.wrap);
   refs[it.id] = { el: wrap, nameEl: nameEditor.wrap, nameEditor,
     bodyEl: wrap.querySelector('[data-role="body"]'),
@@ -1537,6 +1653,8 @@ function buildRuleCard(it){
 
 // トーストメニューを開く入口はすべてここに集約（#cards への委譲・pointerdown）。
 // タイマー丸ボタン／見出し丸ボタン／アカウント名ラベル／仕切り線の右端ゾーン。
+// MENU_BTN_SEL はこのファイルでのみ定義。card-logic.js と resume-fit.js から参照される
+// （両方ともindex.html上でこのファイルより後に読み込まれるので今は安全。並び順を変える場合は要注意）。
 const MENU_BTN_SEL = '.timer-menu-btn, .header-menu-button, .group-namerow, .rule-line';
 function bindMenuButtonDelegation(){
   if (!cardsEl) return;
@@ -1643,6 +1761,8 @@ function buildHeaderCard(it){
 
   return wrap;
 }
+// card-logic.js: カード参照・移動・削除・render()本体・updateTimerCard
+// この並び順(index.htmlの<script>タグの順番)を変えると、他ファイルの関数/変数を先に参照してエラーになる場合があります。
 
 function getTimerRef(id){
   const direct = refs[id];
@@ -1703,26 +1823,37 @@ document.addEventListener('pointerdown', (e) => {
       paintUseChunkPreview(id);
     }
   }
-  if (addPanelEl.classList.contains('show') && !addPanelEl.contains(e.target) && e.target !== addBtnEl){
-    closeAddPanel();
-    pendingAddGroupId = null;
-    pendingInsertAfterId = null;
-  }
-  if (setupType === 'rule' && setupPanelEl.classList.contains('show') && !setupPanelEl.contains(e.target)){
-    closeSetup();
-  }
-  // トースト表示中に枠外をタップした場合は、背後要素への貫通（短押し消費・見出し開閉など）を遮断してトーストを閉じるだけにする
-  if (toastEl && toastEl.classList.contains('show')){
-    if (!toastEl.contains(e.target) && !e.target.closest(MENU_BTN_SEL)){
+  // ポップアップモーダル（トースト・追加パネル・設定パネル）の枠外タップ処理を一本化
+  const isSetupOpen = setupPanelEl && setupPanelEl.classList.contains('show');
+  const isAddOpen = addPanelEl && addPanelEl.classList.contains('show');
+  const isToastOpen = toastEl && toastEl.classList.contains('show');
+
+  if (isSetupOpen || isAddOpen || isToastOpen){
+    const inSetup = isSetupOpen && setupPanelEl.contains(e.target);
+    const inAdd = isAddOpen && (addPanelEl.contains(e.target) || e.target === addBtnEl);
+    const inToast = isToastOpen && (toastEl.contains(e.target) || e.target.closest(MENU_BTN_SEL));
+
+    if (!inSetup && !inAdd && !inToast){
       e.preventDefault();
       e.stopPropagation();
-      const activeInput = toastEl.querySelector('input:focus');
-      if (activeInput) activeInput.blur();
-      closeToast();
+      try {
+        const activeInput = document.querySelector('#setupFields input:focus, #toast input:focus');
+        if (activeInput) activeInput.blur();
+      } catch (err) {}
+      if (isSetupOpen) closeSetup();
+      if (isAddOpen){
+        closeAddPanel();
+        pendingAddGroupId = null;
+        pendingInsertAfterId = null;
+      }
+      if (isToastOpen) closeToast();
+      return;
     }
   }
 }, {capture:true, passive:false});
 
+// clampInt の定義はここ1箇所のみ（state.js/engine.js/panels.js/toast-fields.jsからも呼ばれる。読み込み順で
+// 先に来るファイルの中では「即実行されるコード」からは呼ばれていないため、この順のままなら安全）。
 function clampInt(v, min, max, fb){
   const n = parseInt(v,10);
   return Number.isFinite(n) ? Math.max(min, Math.min(max,n)) : fb;
@@ -1855,7 +1986,7 @@ function findItemById(id){
 }
 function paintUseChunkPreview(id){
   const it = findItemById(id);
-  if (it && it.type === 'stam') updateOneTimer(it);
+  if (it && (it.type === 'stam' || it.type === 'orb')) updateOneTimer(it);
 }
 function render(){
   const now = Date.now();
@@ -1954,16 +2085,23 @@ let updateTimerCard = function(it, r, now){
     if (r.el){ fitObserve(r.el); fitApply(r.el); }
   } else if (it.type==='orb'){
     const info = orbInfo(it, now);
+    const waitChunk = hasUseChunk(it) && pending40Id === it.id;
     r.el.classList.toggle('full', info.isFull);
+    r.el.classList.toggle('claim', waitChunk);
     renderClock(r.clockEl, info.remainMs, info.isFull, now, info.fullAt);
-    if (r.curEl && !r.curEl.isEditing()) r.curEl.setText(info.cur);
+    if (r.curEl && !r.curEl.isEditing()) r.curEl.setText(waitChunk ? remainingAfterUse(info.cur, it) : info.cur);
     if (r.maxLabel){
       const v = String(it.max);
       if (r.maxLabel.textContent !== v) r.maxLabel.textContent = v;
     }
     if (r.nextRemEl){
-      const nextTxt = info.isFull ? '' : ('次 ' + fmtCountdown(info.nextInMs));
-      if (r.nextRemEl.textContent !== nextTxt) r.nextRemEl.textContent = nextTxt;
+      if (info.isFull){
+        if (r.nextRemEl.style.display !== 'none') r.nextRemEl.style.display = 'none';
+      } else {
+        if (r.nextRemEl.style.display !== '') r.nextRemEl.style.display = '';
+        const cd = fmtCountdown(info.nextInMs);
+        if (r.nextValEl && r.nextValEl.textContent !== cd) r.nextValEl.textContent = cd;
+      }
     }
     setNearOnCurrent(r.curEl, isNearFull(info.remainMs, info.isFull));
   } else if (it.type==='idle' || it.type==='exped'){
@@ -1985,12 +2123,16 @@ let updateTimerCard = function(it, r, now){
     renderClock(r.clockEl, info.remainMs, info.isFull, now, info.fullAt);
   }
 }
+// panels.js: 追加パネル・設定パネル(色選択含む)の開閉と確定処理
+// この並び順(index.htmlの<script>タグの順番)を変えると、他ファイルの関数/変数を先に参照してエラーになる場合があります。
 
 let pendingAddGroupId = null;
 let pendingInsertAfterId = null;
 let setupType = null;
 let setupIdleMode = 'down';
 let setupOrbMode = 'down';
+
+const addPanelLabelEl = document.getElementById('addPanelLabel');
 
 function closeAddPanel(){
   addPanelEl.classList.remove('show');
@@ -2000,7 +2142,11 @@ function openAddPanel(opts){
   opts = opts || {};
   pendingAddGroupId = opts.groupId || null;
   pendingInsertAfterId = opts.insertAfterId || null;
-  addPanelEl.classList.toggle('group-mode', !!pendingAddGroupId);
+  const isGroup = !!pendingAddGroupId;
+  addPanelEl.classList.toggle('group-mode', isGroup);
+  if (addPanelLabelEl){
+    addPanelLabelEl.textContent = isGroup ? 'タイマーを追加' : '枠を追加';
+  }
   if (!opts.groupId) pendingAddGroupId = null;
   if (!opts.insertAfterId) pendingInsertAfterId = null;
   addPanelEl.classList.add('show');
@@ -2029,29 +2175,66 @@ function openSetup(type){
   setupFieldsEl.innerHTML = '';
   delete setupFieldsEl.dataset.color;
   if (type === 'header'){
-    setupLabelEl.textContent = 'ゲーム名ヘッダーの文字色';
+    setupLabelEl.textContent = '見出しの文字色';
     fillColorPalette('#9b8bff');
   } else if (type === 'stam'){
     setupLabelEl.textContent = 'スタミナ設定';
     setupFieldsEl.innerHTML = `
-      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupInterval" value="5"><span>分で1</span>
-      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupMax" value="100" style="margin-left:6px;"><span>最大</span>
-      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupUseChunk" value="" style="margin-left:6px;" placeholder="—"><span>使い切り</span>`;
+      <label class="toast-field">
+        <span class="toast-color">
+          <span class="toast-label">回復</span>
+          <span class="toast-val-unit">
+            <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupInterval" value="5" maxlength="3" aria-label="回復時間">
+            <span class="toast-unit">分</span>
+          </span>
+        </span>
+      </label>
+      <label class="toast-field">
+        <span class="toast-color">
+          <span class="toast-label">最大</span>
+          <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupMax" value="100" maxlength="3" aria-label="最大スタミナ">
+        </span>
+      </label>
+      <label class="toast-field wide">
+        <span class="toast-color">
+          <span class="toast-label">使い切り</span>
+          <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupUseChunk" value="" maxlength="3" placeholder="なし" aria-label="使い切り数">
+        </span>
+      </label>`;
   } else if (type === 'orb'){
     setupLabelEl.textContent = 'オーブ設定';
     setupOrbMode = 'down';
     setupFieldsEl.innerHTML = `
-      <div style="width:100%;margin-bottom:6px;">
-        <button type="button" class="idle-mode-btn" data-role="orbModeToggle" style="width:100%;text-align:center;">▼ 残り時間入力（カウントダウン）</button>
-      </div>
-      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupOrbHours" value="6"><span>時間で1個</span>
-      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupMax" value="4" style="margin-left:6px;"><span>最大</span>`;
+      <label class="toast-field">
+        <span class="toast-color">
+          <span class="toast-label">最大</span>
+          <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupMax" value="4" maxlength="2" aria-label="最大個数">
+        </span>
+      </label>
+      <label class="toast-field">
+        <span class="toast-color">
+          <span class="toast-label">回復(時間)</span>
+          <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupOrbHours" value="6" maxlength="3" aria-label="回復時間">
+        </span>
+      </label>
+      <label class="toast-field wide">
+        <span class="toast-color">
+          <span class="toast-label">消費数</span>
+          <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupOrbChunk" value="" maxlength="2" placeholder="なし" aria-label="消費数">
+        </span>
+      </label>
+      <div class="toast-field wide">
+        <span class="toast-color">
+          <span class="toast-label">方式</span>
+          <button type="button" class="idle-mode-btn" data-role="orbModeToggle">▼ 残り時間(減算)</button>
+        </span>
+      </div>`;
     const modeBtn = setupFieldsEl.querySelector('[data-role="orbModeToggle"]');
     if (modeBtn){
       bindTapDown(modeBtn, (e)=>{
         e.stopPropagation();
         setupOrbMode = (setupOrbMode === 'up') ? 'down' : 'up';
-        modeBtn.textContent = (setupOrbMode === 'up') ? '▲ 経過時間入力（カウントアップ）' : '▼ 残り時間入力（カウントダウン）';
+        modeBtn.textContent = (setupOrbMode === 'up') ? '▲ 経過時間(蓄積)' : '▼ 残り時間(減算)';
       });
     }
   } else if (type === 'rule'){
@@ -2060,11 +2243,22 @@ function openSetup(type){
   } else if (type === 'exped'){
     setupLabelEl.textContent = '遠征タイマーの設定';
     setupIdleMode = 'down';
-    setupFieldsEl.innerHTML = `<div style="width:100%;margin-bottom:6px;">`
-      + idleModeRowHtml(setupIdleMode)
-      + `</div>`
-      + `<input type="text" inputmode="numeric" pattern="[0-9]*" id="setupH" value="4"><span>h</span>`
-      + `<input type="text" inputmode="numeric" pattern="[0-9]*" id="setupM" value="0"><span>m</span>`;
+    setupFieldsEl.innerHTML = `
+      <div class="toast-field wide">
+        <span class="toast-color">
+          <span class="toast-label">方式</span>
+          <button type="button" class="idle-mode-btn" data-role="idleModeToggle">▼ カウントダウン</button>
+        </span>
+      </div>
+      <div class="toast-field wide">
+        <span class="toast-color">
+          <span class="toast-label">設定</span>
+          <span class="toast-hm">
+            <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupH" value="4" maxlength="3" aria-label="設定(時間)"><span>h</span>
+            <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupM" value="0" maxlength="2" aria-label="設定(分)"><span>m</span>
+          </span>
+        </span>
+      </div>`;
     const modeBtn = setupFieldsEl.querySelector('[data-role="idleModeToggle"]');
     if (modeBtn){
       bindTapDown(modeBtn, (e)=>{
@@ -2076,11 +2270,22 @@ function openSetup(type){
   } else {
     setupLabelEl.textContent = '放置報酬の設定';
     setupIdleMode = 'down';
-    setupFieldsEl.innerHTML = `<div style="width:100%;margin-bottom:6px;">`
-      + idleModeRowHtml(setupIdleMode)
-      + `</div>`
-      + `<input type="text" inputmode="numeric" pattern="[0-9]*" id="setupH" value="12"><span>h</span>`
-      + `<input type="text" inputmode="numeric" pattern="[0-9]*" id="setupM" value="0"><span>m</span>`;
+    setupFieldsEl.innerHTML = `
+      <div class="toast-field wide">
+        <span class="toast-color">
+          <span class="toast-label">方式</span>
+          <button type="button" class="idle-mode-btn" data-role="idleModeToggle">▼ カウントダウン</button>
+        </span>
+      </div>
+      <div class="toast-field wide">
+        <span class="toast-color">
+          <span class="toast-label">設定</span>
+          <span class="toast-hm">
+            <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupH" value="12" maxlength="3" aria-label="設定(時間)"><span>h</span>
+            <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupM" value="0" maxlength="2" aria-label="設定(分)"><span>m</span>
+          </span>
+        </span>
+      </div>`;
     const modeBtn = setupFieldsEl.querySelector('[data-role="idleModeToggle"]');
     if (modeBtn){
       bindTapDown(modeBtn, (e)=>{
@@ -2141,7 +2346,9 @@ function confirmSetup(){
   } else if (setupType === 'orb'){
     const hours = clampInt(setupFieldsEl.querySelector('#setupOrbHours')?.value, 1, 999, 6);
     const max = clampInt(setupFieldsEl.querySelector('#setupMax')?.value, 1, 99, 4);
-    const item = newOrbItem(hours * 60, max);
+    const chunkRaw = String(setupFieldsEl.querySelector('#setupOrbChunk')?.value || '').replace(/\D/g, '');
+    const useChunk = chunkRaw === '' ? null : clampUseChunk(chunkRaw);
+    const item = newOrbItem(hours * 60, max, useChunk);
     item.orbMode = setupOrbMode || 'down';
     if (!pushNewTimer(item)) return;
   } else if (setupType === 'rule'){
@@ -2189,11 +2396,18 @@ if (setupCancelEl){
     closeSetup();
   });
 }
+// resume-fit.js: バックグラウンド復帰処理(二重RAF)・機種差フィット・起動時イベント登録
+// この並び順(index.htmlの<script>タグの順番)を変えると、他ファイルの関数/変数を先に参照してエラーになる場合があります。
 
 let wasBackgrounded = false;
 
 // ── バックグラウンド・非表示・ページ離脱時の即時保存 ──
 function flushPendingSaveOnHide(){
+  try {
+    if (document.activeElement && typeof document.activeElement.blur === 'function'){
+      document.activeElement.blur();
+    }
+  } catch(e){}
   if (pendingSave){
     saveNow();
   }
@@ -2201,7 +2415,12 @@ function flushPendingSaveOnHide(){
 
 // 復帰処理：黒幕や無駄な待機・二重描画を省き、即座に差分更新してtick再開
 function resumeApp(){
-  tickRender(Date.now()); // tickRender内でsyncFullStamItemsも実行される
+  // 万一DOMノードが消失していた場合の自己修復フォールバック
+  if (!cardsEl || !cardsEl.firstElementChild){
+    render();
+  } else {
+    tickRender(Date.now()); // tickRender内でsyncFullStamItemsも実行される
+  }
   startTicking(true);
 }
 
@@ -2241,6 +2460,9 @@ document.addEventListener('resume', handleResume);
 window.addEventListener('pagehide', handlePause);
 window.addEventListener('beforeunload', flushPendingSaveOnHide);
 window.addEventListener('pageshow', (e)=>{ handleResume(); });
+window.addEventListener('focus', ()=>{
+  if (!document.hidden) handleResume();
+});
 
 /* ═══════════════ 機種差フィット（ここから）═══════════════
    スタミナの現在値/最大値が枠に入り切らない端末向けに、必要な分だけ文字を縮める保険。
@@ -2324,10 +2546,16 @@ function fitObserve(card){
 }
 /* ═══════════════ 機種差フィット（ここまで）═══════════════ */
 
-// 合成clickがトースト外に貫通するのを防ぐ（pointerdown側は上で処理済み。ここはclick単体の遮断のみ）
+// 合成clickがモーダル外（トースト・追加パネル・設定パネル）に貫通するのを防ぐ
 document.addEventListener('click', (e)=>{
-  if (toastEl && toastEl.classList.contains('show')){
-    if (!toastEl.contains(e.target) && !e.target.closest(MENU_BTN_SEL)){
+  const isAnyModalOpen = (toastEl && toastEl.classList.contains('show')) ||
+                         (addPanelEl && addPanelEl.classList.contains('show')) ||
+                         (setupPanelEl && setupPanelEl.classList.contains('show'));
+  if (isAnyModalOpen){
+    const inToast = toastEl && toastEl.contains(e.target);
+    const inAdd = addPanelEl && addPanelEl.contains(e.target);
+    const inSetup = setupPanelEl && setupPanelEl.contains(e.target);
+    if (!inToast && !inAdd && !inSetup && !e.target.closest(MENU_BTN_SEL)){
       e.preventDefault();
       e.stopPropagation();
     }
@@ -2343,9 +2571,128 @@ document.addEventListener('dragstart', (e)=> e.preventDefault());
 // テキスト選択は入力欄側で必要な範囲だけ抑止する。
 document.addEventListener('paste', (e)=> e.preventDefault());
 
-bindTapDown(document.getElementById('updateBtn'), ()=>{
-  location.href = 'update.html?r=' + Date.now().toString(36);
-});
+// ── 完全オフライン保護 ＆ 強力スマート更新（In-App Smart Update） ──
+let isUpdating = false;
+let lastUpdateCheckTime = 0;
+
+async function performSmartUpdate(){
+  if (isUpdating) return;
+  const btn = document.getElementById('updateBtn');
+  
+  // 1. オフライン検出（完全オフライン保護）
+  // 端末がオフラインなら、キャッシュを絶対に削除・解除せず安全に保護する
+  if (!navigator.onLine){
+    showNotice('オフラインです（現在のキャッシュを維持します）', 3000);
+    return;
+  }
+
+  isUpdating = true;
+  if (btn) btn.classList.add('spin');
+  showNotice('最新版を確認中…', 0);
+
+  const bust = Date.now().toString(36);
+  const now = Date.now();
+  // 4秒以内の連続タップは強制リフレッシュモード
+  const forceRefresh = (now - lastUpdateCheckTime < 4000);
+  lastUpdateCheckTime = now;
+
+  const files = [
+    './index.html',
+    './styles.css',
+    './state.js',
+    './engine.js',
+    './toast-core.js',
+    './toast-fields.js',
+    './card-builders.js',
+    './card-logic.js',
+    './panels.js',
+    './resume-fit.js',
+    './sw.js',
+    './manifest.json',
+    './icon-192.png',
+    './icon-512.png',
+    './icon-maskable-512.png'
+  ];
+
+  try {
+    // 2. ネットワーク疎通確認 & 最新の sw.js を取得して更新差分をチェック
+    const swRes = await fetch('./sw.js?check=' + bust, {
+      method: 'GET',
+      cache: 'no-store',
+      credentials: 'same-origin'
+    });
+    if (!swRes.ok) throw new Error('Network check failed');
+    const newSwText = await swRes.text();
+
+    // 現在キャッシュされている sw.js と比較
+    let currentSwText = '';
+    if ('caches' in window){
+      try {
+        const cachedSw = await caches.match('./sw.js');
+        if (cachedSw) currentSwText = await cachedSw.text();
+      } catch(e){}
+    }
+
+    const hasUpdate = forceRefresh || !currentSwText || (currentSwText !== newSwText);
+
+    if (!hasUpdate){
+      // サーバー上に差分なし：無駄な再起動を省き、最新であることを通知
+      if (btn) btn.classList.remove('spin');
+      isUpdating = false;
+      showNotice('すでに最新バージョンです（更新なし）', 2500);
+      return;
+    }
+
+    showNotice(forceRefresh ? '強制再取得中…' : '新バージョンを検出！更新中…', 0);
+
+    // 3. 全アセットをネットワークから直接キャッシュを無視して一括取得
+    const fetchedResults = await Promise.all(files.map(async f => {
+      const res = await fetch(f + '?r=' + bust, { cache: 'no-store', credentials: 'same-origin' });
+      if (!res.ok) throw new Error(`${f} (${res.status})`);
+      return { path: f, res };
+    }));
+
+    showNotice('キャッシュを更新中…', 0);
+
+    // 4. 古いSWを一度解除し、新しいCache Storageに直接書き込み
+    if ('serviceWorker' in navigator){
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+
+    if ('caches' in window){
+      const match = newSwText.match(/CACHE_NAME\s*=\s*['"]([^'"]+)['"]/);
+      const cacheName = match ? match[1] : ('v' + bust);
+      
+      const newCache = await caches.open(cacheName);
+      for (const item of fetchedResults){
+        await newCache.put(item.path, item.res.clone());
+        if (item.path === './index.html'){
+          await newCache.put('./', item.res.clone());
+        }
+      }
+
+      // 古いキャッシュをクリア
+      const allKeys = await caches.keys();
+      await Promise.all(allKeys.filter(k => k !== cacheName).map(k => caches.delete(k)));
+    }
+
+    showNotice('更新完了！再起動します…', 1200);
+
+    // 5. 新バージョンで確実に再読み込み＆完全再描画
+    setTimeout(()=>{
+      location.replace('./index.html?r=' + bust);
+    }, 400);
+
+  } catch(err){
+    console.warn('Smart update failed:', err);
+    if (btn) btn.classList.remove('spin');
+    isUpdating = false;
+    showNotice('更新に失敗しました（現在のバージョンを維持します）', 3500);
+  }
+}
+
+bindTapDown(document.getElementById('updateBtn'), performSmartUpdate);
 
 // Service worker: プレビュー・iframe環境ではSWを解除してキャッシュ滞留を防止
 const isIframe = window.self !== window.top;
