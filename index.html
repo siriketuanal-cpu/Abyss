@@ -1567,7 +1567,6 @@ function bindStamToastRows(it){
       save();
     };
     chunkEl.addEventListener('change', applyChunk);
-    chunkEl.addEventListener('blur', applyChunk);
     chunkEl.addEventListener('keydown', e=>{
       if (e.key === 'Enter'){ e.preventDefault(); chunkEl.blur(); }
     });
@@ -1591,7 +1590,6 @@ function bindStamToastRows(it){
       save();
     };
     intervalEl.addEventListener('change', applyInterval);
-    intervalEl.addEventListener('blur', applyInterval);
     intervalEl.addEventListener('keydown', e=>{ if (e.key === 'Enter'){ e.preventDefault(); intervalEl.blur(); } });
     intervalEl.addEventListener('pointerdown', e=>e.stopPropagation());
   }
@@ -1622,7 +1620,6 @@ function bindStamToastRows(it){
       applyMaxVal(newMax);
     };
     maxEl.addEventListener('change', applyMax);
-    maxEl.addEventListener('blur', applyMax);
     maxEl.addEventListener('keydown', e=>{ if (e.key === 'Enter'){ e.preventDefault(); maxEl.blur(); } });
     maxEl.addEventListener('pointerdown', e=>e.stopPropagation());
   }
@@ -1681,7 +1678,6 @@ function bindOrbToastRows(it){
       save();
     };
     maxEl.addEventListener('change', applyMax);
-    maxEl.addEventListener('blur', applyMax);
     maxEl.addEventListener('keydown', e=>{ if (e.key === 'Enter'){ e.preventDefault(); maxEl.blur(); } });
     maxEl.addEventListener('pointerdown', e=>e.stopPropagation());
   }
@@ -1705,7 +1701,6 @@ function bindOrbToastRows(it){
       save();
     };
     intervalEl.addEventListener('change', applyInterval);
-    intervalEl.addEventListener('blur', applyInterval);
     intervalEl.addEventListener('keydown', e=>{ if (e.key === 'Enter'){ e.preventDefault(); intervalEl.blur(); } });
     intervalEl.addEventListener('pointerdown', e=>e.stopPropagation());
   }
@@ -1733,7 +1728,6 @@ function bindOrbToastRows(it){
       orbFullRemEl.value = String(rh).padStart(2, '0') + ':' + String(rm).padStart(2, '0');
     };
     orbFullRemEl.addEventListener('change', applyOrbFullRem);
-    orbFullRemEl.addEventListener('blur', applyOrbFullRem);
     orbFullRemEl.addEventListener('keydown', e=>{ if (e.key === 'Enter'){ e.preventDefault(); orbFullRemEl.blur(); } });
     orbFullRemEl.addEventListener('pointerdown', e=>e.stopPropagation());
   }
@@ -1828,8 +1822,10 @@ function bindIdleToastRows(it){
     const t = e.target, row = rowOf(t);
     if (!row) return;
     if (t.value.trim() === '') t.value = t.defaultValue;
-    if (rowOf(e.relatedTarget) === row) return;
-    if (dirty[row]){ dirty[row] = false; commit(row); sync(); }
+    setTimeout(()=>{
+      if (rowOf(document.activeElement) === row) return;
+      if (dirty[row]){ dirty[row] = false; commit(row); sync(); }
+    }, 0);
   });
   box.addEventListener('keydown', e=>{
     if (e.key === 'Enter' && rowOf(e.target)){ e.preventDefault(); e.target.blur(); }
