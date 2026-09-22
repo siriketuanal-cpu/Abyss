@@ -1,15 +1,14 @@
 {
-  "name": "タイマー",
-  "short_name": "タイマー",
-  "id": "./",
-  "start_url": "./",
+  "name": "にゃんこチェック",
+  "short_name": "にゃんこチェック",
+  "description": "ゲーム日課・週課チェック＋アカウントメモ",
+  "lang": "ja",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "display_override": ["standalone", "minimal-ui"],
-  "lang": "ja",
-  "background_color": "#0b0b14",
-  "theme_color": "#0b0b14",
   "orientation": "portrait",
+  "background_color": "#0d0d12",
+  "theme_color": "#0d0d12",
   "icons": [
     {
       "src": "icon-192.png",
@@ -28,7 +27,21 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    },
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
     }
   ],
-  "prefer_related_applications": false
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  },
+  "prefer_related_applications": false,
+  "id": "./"
 }
