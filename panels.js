@@ -44,29 +44,60 @@ function openSetup(type){
   setupFieldsEl.innerHTML = '';
   delete setupFieldsEl.dataset.color;
   if (type === 'header'){
-    setupLabelEl.textContent = 'ゲーム名ヘッダーの文字色';
+    setupLabelEl.textContent = '見出しの文字色';
     fillColorPalette('#9b8bff');
   } else if (type === 'stam'){
     setupLabelEl.textContent = 'スタミナ設定';
     setupFieldsEl.innerHTML = `
-      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupInterval" value="5"><span>分で1</span>
-      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupMax" value="100" style="margin-left:6px;"><span>最大</span>
-      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupUseChunk" value="" style="margin-left:6px;" placeholder="—"><span>使い切り</span>`;
+      <label class="toast-field">
+        <span class="toast-color">
+          <span class="toast-label">回復</span>
+          <span class="toast-val-unit">
+            <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupInterval" value="5" maxlength="3" aria-label="回復時間">
+            <span class="toast-unit">分</span>
+          </span>
+        </span>
+      </label>
+      <label class="toast-field">
+        <span class="toast-color">
+          <span class="toast-label">最大</span>
+          <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupMax" value="100" maxlength="3" aria-label="最大スタミナ">
+        </span>
+      </label>
+      <label class="toast-field wide">
+        <span class="toast-color">
+          <span class="toast-label">使い切り</span>
+          <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupUseChunk" value="" maxlength="3" placeholder="なし" aria-label="使い切り数">
+        </span>
+      </label>`;
   } else if (type === 'orb'){
     setupLabelEl.textContent = 'オーブ設定';
     setupOrbMode = 'down';
     setupFieldsEl.innerHTML = `
-      <div style="width:100%;margin-bottom:6px;">
-        <button type="button" class="idle-mode-btn" data-role="orbModeToggle" style="width:100%;text-align:center;">▼ 残り時間入力（カウントダウン）</button>
-      </div>
-      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupOrbHours" value="6"><span>時間で1個</span>
-      <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupMax" value="4" style="margin-left:6px;"><span>最大</span>`;
+      <label class="toast-field">
+        <span class="toast-color">
+          <span class="toast-label">最大</span>
+          <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupMax" value="4" maxlength="2" aria-label="最大個数">
+        </span>
+      </label>
+      <label class="toast-field">
+        <span class="toast-color">
+          <span class="toast-label">回復(時間)</span>
+          <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupOrbHours" value="6" maxlength="3" aria-label="回復時間">
+        </span>
+      </label>
+      <div class="toast-field wide">
+        <span class="toast-color">
+          <span class="toast-label">方式</span>
+          <button type="button" class="idle-mode-btn" data-role="orbModeToggle">▼ 残り時間(減算)</button>
+        </span>
+      </div>`;
     const modeBtn = setupFieldsEl.querySelector('[data-role="orbModeToggle"]');
     if (modeBtn){
       bindTapDown(modeBtn, (e)=>{
         e.stopPropagation();
         setupOrbMode = (setupOrbMode === 'up') ? 'down' : 'up';
-        modeBtn.textContent = (setupOrbMode === 'up') ? '▲ 経過時間入力（カウントアップ）' : '▼ 残り時間入力（カウントダウン）';
+        modeBtn.textContent = (setupOrbMode === 'up') ? '▲ 経過時間(蓄積)' : '▼ 残り時間(減算)';
       });
     }
   } else if (type === 'rule'){
@@ -75,11 +106,22 @@ function openSetup(type){
   } else if (type === 'exped'){
     setupLabelEl.textContent = '遠征タイマーの設定';
     setupIdleMode = 'down';
-    setupFieldsEl.innerHTML = `<div style="width:100%;margin-bottom:6px;">`
-      + idleModeRowHtml(setupIdleMode)
-      + `</div>`
-      + `<input type="text" inputmode="numeric" pattern="[0-9]*" id="setupH" value="4"><span>h</span>`
-      + `<input type="text" inputmode="numeric" pattern="[0-9]*" id="setupM" value="0"><span>m</span>`;
+    setupFieldsEl.innerHTML = `
+      <div class="toast-field wide">
+        <span class="toast-color">
+          <span class="toast-label">方式</span>
+          <button type="button" class="idle-mode-btn" data-role="idleModeToggle">▼ カウントダウン</button>
+        </span>
+      </div>
+      <div class="toast-field wide">
+        <span class="toast-color">
+          <span class="toast-label">設定</span>
+          <span class="toast-hm">
+            <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupH" value="4" maxlength="3" aria-label="設定(時間)"><span>h</span>
+            <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupM" value="0" maxlength="2" aria-label="設定(分)"><span>m</span>
+          </span>
+        </span>
+      </div>`;
     const modeBtn = setupFieldsEl.querySelector('[data-role="idleModeToggle"]');
     if (modeBtn){
       bindTapDown(modeBtn, (e)=>{
@@ -91,11 +133,22 @@ function openSetup(type){
   } else {
     setupLabelEl.textContent = '放置報酬の設定';
     setupIdleMode = 'down';
-    setupFieldsEl.innerHTML = `<div style="width:100%;margin-bottom:6px;">`
-      + idleModeRowHtml(setupIdleMode)
-      + `</div>`
-      + `<input type="text" inputmode="numeric" pattern="[0-9]*" id="setupH" value="12"><span>h</span>`
-      + `<input type="text" inputmode="numeric" pattern="[0-9]*" id="setupM" value="0"><span>m</span>`;
+    setupFieldsEl.innerHTML = `
+      <div class="toast-field wide">
+        <span class="toast-color">
+          <span class="toast-label">方式</span>
+          <button type="button" class="idle-mode-btn" data-role="idleModeToggle">▼ カウントダウン</button>
+        </span>
+      </div>
+      <div class="toast-field wide">
+        <span class="toast-color">
+          <span class="toast-label">設定</span>
+          <span class="toast-hm">
+            <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupH" value="12" maxlength="3" aria-label="設定(時間)"><span>h</span>
+            <input type="text" inputmode="numeric" pattern="[0-9]*" id="setupM" value="0" maxlength="2" aria-label="設定(分)"><span>m</span>
+          </span>
+        </span>
+      </div>`;
     const modeBtn = setupFieldsEl.querySelector('[data-role="idleModeToggle"]');
     if (modeBtn){
       bindTapDown(modeBtn, (e)=>{

@@ -340,13 +340,16 @@
   #toast .toast-quick-max-btns button:active{
     background:#3a3e4c; border-color:#ffd166; color:#ffffff;
   }
-  #toast .toast-field{
+  #toast .toast-field,
+  #setupFields .toast-field{
     min-width:0; min-height:30px; padding:2px 6px;
     display:flex; align-items:center; justify-content:space-between; gap:4px;
     border:1px solid var(--line); border-radius:6px; background:var(--card2);
   }
-  #toast .toast-field.wide{grid-column:1 / -1;}
-  #toast .toast-label{
+  #toast .toast-field.wide,
+  #setupFields .toast-field.wide{grid-column:1 / -1;}
+  #toast .toast-label,
+  #setupFields .toast-label{
     min-width:0; color:#8e96a5; font-size:11px; font-weight:600; line-height:1.2;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   }
@@ -366,7 +369,8 @@
     font-size:11.5px; font-weight:600; border-radius:6px;
     border:1px solid var(--line); background:var(--card2); color:var(--text);
   }
-  #toast .idle-mode-btn{
+  #toast .idle-mode-btn,
+  #setupFields .idle-mode-btn{
     padding:3px 8px; font-size:11px; font-weight:700;
     border:1px solid var(--line); background:var(--card); color:#ffd166;
     border-radius:5px; line-height:1.3;
@@ -391,13 +395,15 @@
   #toast button.done{
     background:var(--accent); color:#100c26; border-color:transparent;
   }
-  #toast .toast-color{
+  #toast .toast-color,
+  #setupFields .toast-color{
     display:flex; align-items:center; justify-content:space-between; gap:3px;
     min-width:0; width:100%; height:100%; color:var(--text); font-size:12px;
     white-space:nowrap;
   }
   #toast .toast-color input[type="color"]{width:24px;height:20px;padding:1px;border:1px solid var(--line);border-radius:4px;background:transparent;}
-  #toast .toast-color input[type="text"]{
+  #toast .toast-color input[type="text"],
+  #setupFields .toast-color input[type="text"]{
     width:2.7em; height:22px; padding:1px 3px; border:1px solid var(--line); border-radius:4px;
     background:var(--card); color:#ffffff !important; font-size:12.5px; font-weight:700;
     text-align:center; caret-color:#ffffff; -webkit-text-fill-color:#ffffff;
@@ -405,8 +411,12 @@
   #toast .toast-color input[data-role="orbFullRem"]{
     width:3.8em;
   }
-  #toast .toast-color input[type="text"]::placeholder{color:#606775; font-weight:500;}
-  #toast .toast-hm{display:flex; align-items:center; gap:2px; color:#8e96a5; font-size:11px;}
+  #toast .toast-color input[type="text"]::placeholder,
+  #setupFields .toast-color input[type="text"]::placeholder{color:#606775; font-weight:500;}
+  #toast .toast-hm,
+  #setupFields .toast-hm{display:flex; align-items:center; gap:2px; color:#8e96a5; font-size:11px;}
+  .toast-val-unit{display:inline-flex; align-items:center; gap:2px;}
+  .toast-val-unit .toast-unit{color:#8e96a5; font-size:11px; font-weight:600;}
   #empty{color:var(--sub); font-size:13px; text-align:center; padding:40px 0;}
   #addPanel{
     position:fixed; left:0; right:0; bottom:0; background:var(--card);
@@ -424,23 +434,34 @@
   }
   #setupPanel{
     position:fixed; left:50%; top:50%; bottom:auto; right:auto;
-    transform:translate(-50%, -50%); width:min(92vw, 340px);
-    background:var(--card); border:1px solid var(--line); border-radius:14px;
-    padding:16px; display:none; flex-direction:column; gap:12px; z-index:25;
-    box-shadow:0 0 0 1px rgba(255,255,255,.05), 0 6px 0 rgba(0,0,0,.35);
+    transform:translate(-50%, -50%); width:min(76vw, 250px); max-width:78%;
+    background:#202127; color:var(--text); border:1px solid #4a5160;
+    border-radius:12px; padding:10px 10px 8px; font-size:12px; z-index:30;
+    display:none; flex-direction:column; gap:8px;
+    box-shadow:0 0 0 1px rgba(255,255,255,.05), 0 6px 0 rgba(0,0,0,.4);
   }
   #setupPanel.show{display:flex;}
-  #setupPanel .setupLabel{font-size:13px; color:var(--sub); text-align:center;}
-  #setupFields{display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:6px;}
-  #setupFields input{
-    width:60px; background:var(--card2); border:1px solid var(--line); border-radius:8px;
-    color:var(--text); font-size:16px; text-align:center; padding:8px 4px;
+  #setupPanel .setupLabel{
+    font-size:12px; font-weight:700; color:var(--text); text-align:center;
+    padding-bottom:2px;
   }
-  #setupFields span{color:var(--sub); font-size:13px;}
-  #setupActions{display:flex; gap:8px;}
+  #setupFields{
+    display:grid; grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:5px; width:100%; align-items:start;
+  }
+  #setupFields .header-palette{
+    grid-column:1 / -1; width:100%;
+  }
+  #setupActions{
+    display:grid; grid-template-columns:1fr 1.2fr; gap:6px;
+    margin-top:2px; padding-top:8px; border-top:1px solid var(--line);
+  }
   #setupActions button{
-    flex:1; padding:12px; border-radius:10px; border:1px solid var(--line);
-    background:var(--card2); color:var(--text); font-size:14px; font-weight:700;
+    width:100%; min-height:30px; padding:4px 8px; font-size:12px; font-weight:700; border-radius:6px;
+    border:1px solid var(--line); background:var(--card2); color:var(--text);
+  }
+  #setupCancel{
+    background:transparent !important; color:#ff6b6b !important; border:1px solid rgba(255,107,107,0.35) !important;
   }
   #setupConfirm{
     background:var(--accent) !important; color:#100c26 !important; border-color:transparent !important;

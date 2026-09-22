@@ -65,7 +65,11 @@ document.addEventListener('pointerdown', (e) => {
     pendingAddGroupId = null;
     pendingInsertAfterId = null;
   }
-  if (setupType === 'rule' && setupPanelEl.classList.contains('show') && !setupPanelEl.contains(e.target)){
+  if (setupPanelEl.classList.contains('show') && !setupPanelEl.contains(e.target) && !addPanelEl.contains(e.target)){
+    e.preventDefault();
+    e.stopPropagation();
+    const activeInput = setupFieldsEl.querySelector('input:focus');
+    if (activeInput) activeInput.blur();
     closeSetup();
   }
   // トースト表示中に枠外をタップした場合は、背後要素への貫通（短押し消費・見出し開閉など）を遮断してトーストを閉じるだけにする
