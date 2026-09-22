@@ -68,7 +68,7 @@
   #cards{
     flex:1 1 auto; min-height:0; overflow-x:hidden; overflow-y:auto;
     overscroll-behavior:none; -webkit-overflow-scrolling:touch;
-    padding:6px 6px calc(20px + env(safe-area-inset-bottom));
+    padding:6px 6px calc(36px + env(safe-area-inset-bottom, 0px));
     display:grid; grid-template-columns:repeat(4,1fr); gap:6px;
     align-items:start; align-content:start; /* 余白を行間に配らない＝コンパクト維持 */
   }
@@ -229,31 +229,32 @@
   .group-body:empty{display:none;}
   .group-empty-slot{height:56px; min-height:56px; box-sizing:border-box; border:1px dashed var(--line); border-radius:10px; display:flex; align-items:center; justify-content:center; background:var(--card); touch-action:pan-y; -webkit-tap-highlight-color:transparent;}
   .group-empty-add{border:0; background:transparent; color:var(--muted); font-size:22px; line-height:1; width:100%; height:100%; padding:0; touch-action:pan-y; -webkit-tap-highlight-color:transparent;}
-  .main{font-size:16px; line-height:1.1; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:.01em;}
+  .main{font-size:16px; line-height:1.1; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:.01em; white-space:nowrap;}
   /* 左右を均等フレックスにし「/」を中央固定。桁数が変わってもスラッシュは動かない。 */
   .valrow-stam{
     margin-top:0 !important; align-items:center; min-height:22px; height:22px;
-    position:absolute; left:6px; right:6px; bottom:5px;
+    position:absolute; left:4px; right:4px; bottom:5px;
     display:flex; justify-content:center; gap:0;
+    white-space:nowrap;
   }
   .stamval{
     color:var(--text); font-size:18px; font-weight:700; text-align:right;
     font-variant-numeric:tabular-nums; min-width:0;
     overflow:visible; height:22px; line-height:22px;
-    flex:1 1 0; display:block;
+    flex:1 1 0; display:block; white-space:nowrap;
   }
   /* 最大値は左寄せにして、現在値(右寄せ)と対称。「/」が中央に見える */
   .stammax{
     color:var(--blue); font-size:18px; font-weight:700; text-align:left;
     font-variant-numeric:tabular-nums; height:22px; line-height:22px;
-    flex:1 1 0; min-width:0; display:block;
+    flex:1 1 0; min-width:0; display:block; white-space:nowrap;
   }
   .slash{
     position:relative; flex:0 0 auto; width:auto; height:22px;
-    margin:0 4px; color:#7f8da3;
+    margin:0 2px; color:#7f8da3;
     font-size:15px; font-weight:700; line-height:20px;
     text-align:center; top:-1px;
-    overflow:visible; pointer-events:none;
+    overflow:visible; pointer-events:none; white-space:nowrap;
   }
   .clockstack{
     margin-left:0; margin-right:auto; display:flex; flex-direction:row; align-items:center; justify-content:flex-start;
