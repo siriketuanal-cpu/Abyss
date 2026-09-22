@@ -5,6 +5,7 @@ const ASSETS = [
   './',
   './index.html',
   './styles.css',
+  // 単一化するときはこの8つを app.js 1つに戻す（build.html参照）
   './state.js',
   './engine.js',
   './toast-core.js',

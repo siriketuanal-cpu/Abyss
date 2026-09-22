@@ -80,6 +80,8 @@ document.addEventListener('pointerdown', (e) => {
   }
 }, {capture:true, passive:false});
 
+// clampInt の定義はここ1箇所のみ（state.js/engine.js/panels.js/toast-fields.jsからも呼ばれる。読み込み順で
+// 先に来るファイルの中では「即実行されるコード」からは呼ばれていないため、この順のままなら安全）。
 function clampInt(v, min, max, fb){
   const n = parseInt(v,10);
   return Number.isFinite(n) ? Math.max(min, Math.min(max,n)) : fb;

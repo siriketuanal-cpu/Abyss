@@ -60,7 +60,12 @@
     </div>
   </div>
 </div>
-<!-- 開発中はこの並び順のまま分割。APK化前に単一app.jsへ結合予定（順番はこの通りに保つこと） -->
+<!-- 開発中はこの並び順のまま分割。APK化前に単一app.jsへ結合予定（順番はこの通りに保つこと）
+     並び替え注意: card-builders.js の MENU_BTN_SEL を card-logic.js / resume-fit.js が参照しているので、
+     card-builders.js は必ずその2つより前に読み込むこと。
+     単一化するとき: build.html を開くと、この8ファイルを結合したapp.jsを作れる。
+     結合後、この<script>群を <script src="app.js"></script> 1行に戻し、
+     sw.js・update.html のファイル一覧も app.js 1つに戻すこと。 -->
 <script src="state.js"></script>
 <script src="engine.js"></script>
 <script src="toast-core.js"></script>

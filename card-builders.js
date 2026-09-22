@@ -245,6 +245,8 @@ function buildRuleCard(it){
 
 // トーストメニューを開く入口はすべてここに集約（#cards への委譲・pointerdown）。
 // タイマー丸ボタン／見出し丸ボタン／アカウント名ラベル／仕切り線の右端ゾーン。
+// MENU_BTN_SEL はこのファイルでのみ定義。card-logic.js と resume-fit.js から参照される
+// （両方ともindex.html上でこのファイルより後に読み込まれるので今は安全。並び順を変える場合は要注意）。
 const MENU_BTN_SEL = '.timer-menu-btn, .header-menu-button, .group-namerow, .rule-line';
 function bindMenuButtonDelegation(){
   if (!cardsEl) return;

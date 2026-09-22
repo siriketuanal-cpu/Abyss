@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>結合（分割JS → app.js）</title>
+<style>
+  body{background:#0b0b14; color:#eceef2; font-family:-apple-system,sans-serif;
+       display:flex; flex-direction:column; align-items:center; justify-content:center;
+       height:100vh; margin:0; gap:14px; padding:0 20px; text-align:center;}
+  p{font-size:13px; color:#8a8ea3; line-height:1.7; max-width:420px;}
+  a{color:#9b8bff;}
+  button{font-size:14px; padding:10px 20px; border-radius:8px; border:1px solid #555b68;
+         background:#1c1e2a; color:#eceef2;}
+</style>
+</head>
+<body>
+<p id="msg">
+  分割中の8ファイル（state.js〜resume-fit.js）を、index.htmlと同じ順番で1本に結合して
+  app.js としてダウンロードします。<br>
+  結合するだけで、中身の書き換えは一切行いません。
+</p>
+<button id="go">結合してダウンロード</button>
+<p id="result"></p>
+<script>
+// index.html の <script src> の並びと必ず同じ順番にすること（単一化のときの正の並び順）。
+const FILES = [
+  'state.js',
+  'engine.js',
+  'toast-core.js',
+  'toast-fields.js',
+  'card-builders.js',
+  'card-logic.js',
+  'panels.js',
+  'resume-fit.js'
+];
+
+document.getElementById('go').addEventListener('click', async () => {
+  const resultEl = document.getElementById('result');
+  resultEl.textContent = '取得中…';
+  try {
+    const bust = Date.now().toString(36);
+    const texts = await Promise.all(FILES.map(f =>
+      fetch(f + '?r=' + bust, { cache: 'no-store' }).then(res => {
+        if (!res.ok) throw new Error(f + ' ' + res.status);
+        return res.text();
+      })
+    ));
+    const combined = texts.join('\n');
+    const blob = new Blob([combined], { type: 'text/javascript' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'app.js';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    resultEl.textContent = '完了：app.js をダウンロードしました（' + Math.round(combined.length/1024) + 'KB）。'
+      + ' index.htmlのscriptタグ8行を app.js 1本を読み込む1行に、'
+      + ' sw.js/update.htmlのファイル一覧も app.js 1つに戻してください。';
+  } catch (e) {
+    resultEl.textContent = '失敗しました: ' + e.message;
+  }
+});
+</script>
+</body>
+</html>
