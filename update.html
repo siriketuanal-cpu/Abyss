@@ -17,18 +17,14 @@
 async function run(){
   const msg = document.getElementById('msg');
   const bust = Date.now().toString(36);
+
+  if (!navigator.onLine){
+    msg.innerHTML = 'オフラインのため更新できません。<br><br><a href="./index.html" style="color:#ffd166;text-decoration:none;border:1px solid #ffd166;padding:8px 16px;border-radius:6px;display:inline-block;">アプリに戻る</a>';
+    return;
+  }
+
   try{
-    // 1) SW を外す（古い fetch ハンドラを無効化）
-    if ('serviceWorker' in navigator){
-      const regs = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(regs.map(r => r.unregister()));
-    }
-    // 2) Cache Storage 全削除
-    if ('caches' in window){
-      const keys = await caches.keys();
-      await Promise.all(keys.map(k => caches.delete(k)));
-    }
-    // 3) HTTP キャッシュも避けて本体をネットワークから取り直す
+    // 1) 先にHTTPキャッシュをバイパスして最新アセットの取得を試みる（失敗時はキャッシュを壊さない）
     const files = [
       'index.html',
       'styles.css',
@@ -51,11 +47,22 @@ async function run(){
       fetch(f + '?r=' + bust, { cache: 'no-store', credentials: 'same-origin' })
         .then(res => { if (!res.ok) throw new Error(f + ' ' + res.status); })
     ));
+
+    // 2) ダウンロード成功を確認してから、古いSWとCache Storageを安全にクリア
+    if ('serviceWorker' in navigator){
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+    if ('caches' in window){
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+
     msg.textContent = '更新完了。起動します…';
-    // 4) クエリ付きで index へ（途中キャッシュを避ける）
+    // 3) クエリ付きで index へ（途中キャッシュを避ける）
     location.replace('./index.html?r=' + bust);
   }catch(e){
-    msg.textContent = '更新に失敗しました。通信できる状態で、もう一度 ↻ を押してください。';
+    msg.innerHTML = '更新に失敗しました。<br><br><a href="./index.html" style="color:#ffd166;text-decoration:none;border:1px solid #ffd166;padding:8px 16px;border-radius:6px;display:inline-block;">アプリに戻る</a>';
   }
 }
 run();

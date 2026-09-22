@@ -173,9 +173,92 @@ document.addEventListener('dragstart', (e)=> e.preventDefault());
 // テキスト選択は入力欄側で必要な範囲だけ抑止する。
 document.addEventListener('paste', (e)=> e.preventDefault());
 
-bindTapDown(document.getElementById('updateBtn'), ()=>{
-  location.href = 'update.html?r=' + Date.now().toString(36);
-});
+// ── 完全オフライン保護 ＆ 強力スマート更新（In-App Smart Update） ──
+let isUpdating = false;
+async function performSmartUpdate(){
+  if (isUpdating) return;
+  const btn = document.getElementById('updateBtn');
+  
+  // 1. オフライン検出（完全オフライン保護）
+  // 端末がオフラインなら、キャッシュを絶対に削除・解除せず安全に保護する
+  if (!navigator.onLine){
+    showNotice('オフラインです（現在のキャッシュを維持します）', 3000);
+    return;
+  }
+
+  isUpdating = true;
+  if (btn) btn.classList.add('spin');
+  showNotice('最新版を確認中…', 0);
+
+  const bust = Date.now().toString(36);
+  const files = [
+    './index.html',
+    './styles.css',
+    './state.js',
+    './engine.js',
+    './toast-core.js',
+    './toast-fields.js',
+    './card-builders.js',
+    './card-logic.js',
+    './panels.js',
+    './resume-fit.js',
+    './sw.js',
+    './manifest.json',
+    './icon-192.png',
+    './icon-512.png',
+    './icon-maskable-512.png'
+  ];
+
+  try {
+    // 2. ネットワーク接続の実際の疎通テスト（超軽量 ping）
+    const pingRes = await fetch('./manifest.json?ping=' + bust, {
+      method: 'GET',
+      cache: 'no-store',
+      credentials: 'same-origin'
+    });
+    if (!pingRes.ok) throw new Error('Network ping failed');
+
+    showNotice('最新データを取得中…', 0);
+
+    // 3. 全アセットをネットワークから直接キャッシュを無視して一括取得
+    await Promise.all(files.map(f =>
+      fetch(f + '?r=' + bust, { cache: 'no-store', credentials: 'same-origin' })
+        .then(res => {
+          if (!res.ok) throw new Error(`${f} (${res.status})`);
+          return res;
+        })
+    ));
+
+    showNotice('キャッシュを更新中…', 0);
+
+    // 4. Cache Storage を安全にクリア（全取得成功後なので安全）
+    if ('caches' in window){
+      const keys = await caches.keys();
+      if ('serviceWorker' in navigator){
+        const regs = await navigator.serviceWorker.getRegistrations();
+        for (const reg of regs){
+          try { await reg.update(); } catch(e){}
+        }
+      }
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+
+    showNotice('更新完了！再起動します…', 1500);
+
+    // 5. 新バージョンで安全にリロード（ブラウザキャッシュをバイパス）
+    setTimeout(()=>{
+      location.replace('./index.html?r=' + bust);
+    }, 500);
+
+  } catch(err){
+    console.warn('Smart update failed:', err);
+    if (btn) btn.classList.remove('spin');
+    isUpdating = false;
+    showNotice('更新に失敗しました（現在のバージョンを維持します）', 3500);
+  }
+}
+
+bindTapDown(document.getElementById('updateBtn'), performSmartUpdate);
 
 // Service worker: プレビュー・iframe環境ではSWを解除してキャッシュ滞留を防止
 const isIframe = window.self !== window.top;

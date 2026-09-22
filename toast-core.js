@@ -200,3 +200,19 @@ function askRemoveItem(id){
   if (isOrb) bindOrbToastRows(it);
   if (isIdle) bindIdleToastRows(it);
 }
+
+let noticeTimer = null;
+function showNotice(msg, timeoutMs = 2800){
+  if (!toastEl) return;
+  closeToast();
+  if (noticeTimer) { clearTimeout(noticeTimer); noticeTimer = null; }
+  toastEl.innerHTML = `<div class="notice-msg">${msg}</div>`;
+  toastEl.classList.add('show');
+  if (timeoutMs > 0){
+    noticeTimer = setTimeout(()=>{
+      if (toastEl && toastEl.innerHTML.includes(msg)){
+        closeToast();
+      }
+    }, timeoutMs);
+  }
+}

@@ -117,14 +117,13 @@
   .card.orb .timer-menu-btn{border-color:#a78bfa;}
   .card.idle .timer-menu-btn{border-color:#f0a85a;}
   .card.exped .timer-menu-btn{border-color:#34d399;}
-  /* 選択・削除確認中の対象：元の細線を100%完全消去し、シームレスな単一太枠だけを描画 */
+  /* 選択・削除確認中の対象：元の細線を100%完全消去し、シームレスな単一太枠だけを描画（光彩なし・軽量） */
   .longpress-target{ border-color:var(--danger) !important; }
   .card.longpress-target.longpress-target.longpress-target{
     border-color:transparent !important; /* 下の細線を完全に消して二重線・四隅の干渉をゼロにする */
-    background:rgba(255, 107, 107, 0.08) !important;
     box-shadow:none !important;
   }
-  /* 親の角丸と数学的に100%同心円を描くベクター単一太枠オーバーレイ */
+  /* 親の角丸と数学的に100%同心円を描くベクター単一太枠オーバーレイ（発光・ぼかし・背景色は完全排除） */
   .card.longpress-target::after{
     content:'';
     position:absolute;
@@ -132,7 +131,7 @@
     box-sizing:border-box;
     border:2px solid var(--danger) !important;
     border-radius:10px;
-    box-shadow:0 0 10px rgba(255, 107, 107, 0.45) !important;
+    box-shadow:none !important;
     pointer-events:none;
     z-index:10;
   }
@@ -151,10 +150,9 @@
   /* タイマーカードは種類に関係なく同じ外寸に揃える。中身だけ配置を変える。 */
   .card.stam, .card.orb, .card.idle, .card.exped{height:56px; min-height:56px;} 
   /* claim（スタミナ使い切り / 放置=受取 / 遠征=再出発）：
-     元の細線を完全消去し、単一の美しい強調太枠を描画（レイアウト崩れ完全ゼロ） */
+     元の細線を完全消去し、単一のシャープな強調太枠を描画（発光なし・軽量・レイアウト崩れ完全ゼロ） */
   .card.claim{
     border-color:transparent !important; /* 下の細線を完全に消去 */
-    background:rgba(255, 209, 102, 0.06) !important;
     box-shadow:none !important;
   }
   .card.claim::after{
@@ -164,20 +162,19 @@
     box-sizing:border-box;
     border:2px solid #ffd166;
     border-radius:10px;
-    box-shadow:0 0 10px rgba(255, 209, 102, 0.4);
+    box-shadow:none !important;
     pointer-events:none;
     z-index:9;
   }
   .card.idle.claim,
   .card.exped.claim{
     border-color:transparent !important; /* 下の細線を完全に消去 */
-    background:rgba(92, 214, 138, 0.06) !important;
     box-shadow:none !important;
   }
   .card.idle.claim::after,
   .card.exped.claim::after{
     border-color:var(--ok);
-    box-shadow:0 0 10px rgba(92, 214, 138, 0.4);
+    box-shadow:none !important;
   }
   .card.full{
     border-color:var(--orange) !important;
@@ -539,3 +536,20 @@
     background:var(--card2); color:var(--text); font-size:14px; font-weight:700;
   }
   #nameEditOk{background:var(--accent) !important; color:#100c26 !important; border-color:transparent !important;}
+
+  /* 更新ボタンの回転アニメーション */
+  @keyframes spinUpdate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  .iconbtn.spin svg {
+    animation: spinUpdate 0.8s linear infinite;
+  }
+  .notice-msg {
+    padding: 10px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: center;
+    color: var(--text);
+    line-height: 1.4;
+  }
