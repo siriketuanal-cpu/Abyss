@@ -153,8 +153,7 @@
   .card.stam, .card.orb, .card.idle, .card.exped{height:56px; min-height:56px;} 
   /* claim（スタミナ使い切り / 放置=受取 / 遠征=再出発）は太枠線で強調。
      ぼかし無しのシャープな inset 影＝枠の内側だけに描く（外へはみ出さない→隣カード/枠と重ならない。レイアウトも動かない） */
-  .card.claim,
-  .card.stam.claim{
+  .card.claim{
     border-color:#ffd166 !important;
     box-shadow:inset 0 0 0 1.5px #ffd166 !important;
   }
@@ -163,11 +162,7 @@
     border-color:var(--ok) !important;
     box-shadow:inset 0 0 0 1.5px var(--ok) !important;
   }
-  .card.full,
-  .card.stam.full,
-  .card.orb.full,
-  .card.idle.full,
-  .card.exped.full{
+  .card.full{
     border-color:var(--orange) !important;
   }
   .card.stam .clockstack, .card.stam .stammax, .card.stam .slash,
@@ -190,17 +185,16 @@
   .card.group.three{grid-column:span 3;}
   .card.group.four{grid-column:span 4;}
   .card.group.layout-2x2{grid-column:span 2;}
-  /* 名前タグ：1文字目の開始位置を枠の中央あたり(--name-start)に固定し、右へ伸ばす。
-     背景色で枠線を途切れさせる見た目（ネームタグ風）は従来どおり。1タイマー枠は幅が狭いので開始位置を左寄せ気味に。 */
+  /* 名前タグの基準点(--name-start)。文字数に関わらず、この点を中心に自動で中央寄せされる（transform、計測処理なし）。
+     背景色で枠線を途切れさせる見た目（ネームタグ風）は従来どおり。枚数に関わらずカードの真ん中(50%)固定。 */
   .card.group{ --name-start:50%; }
-  .card.group.single{ --name-start:30%; }
   .group-namerow{
-    position:absolute; top:-9px; left:calc(var(--name-start) - 6px);
+    position:absolute; top:-9px; left:var(--name-start); transform:translateX(-50%);
     margin:0; padding:0 6px; gap:0; z-index:3;
     min-height:0; height:18px; line-height:18px;
     display:inline-flex; align-items:center;
     background:var(--bg); border-radius:4px;
-    max-width:calc(100% - var(--name-start) - 2px);
+    max-width:calc(100% - 16px);
   }
   .group-namerow::before{
     /* 透明ヒットエリア。下側は丸ボタンの判定(上端 約+9px)と重ならないところまで */
@@ -434,6 +428,7 @@
     position:fixed; left:0; right:0; bottom:0; background:var(--card);
     border-top:1px solid var(--line); padding:14px 16px calc(16px + env(safe-area-inset-bottom));
     display:none; gap:10px; z-index:10;
+    box-shadow:0 0 0 1px rgba(255,255,255,.05), 0 -6px 0 rgba(0,0,0,.4);
   }
   #addPanel.show{display:flex; flex-wrap:wrap;}
   #addPanel .timerType{display:none;}
@@ -2231,6 +2226,7 @@ function cancelClaim(target){
   saveAfterPaint();
 }
 
+// 「枠外タップで閉じる」系はここに集約（document-levelのpointerdownは1本だけにする）。
 document.addEventListener('pointerdown', (e) => {
   try {
     if (document.activeElement !== e.target && window.getSelection){
@@ -2258,7 +2254,17 @@ document.addEventListener('pointerdown', (e) => {
   if (setupType === 'rule' && setupPanelEl.classList.contains('show') && !setupPanelEl.contains(e.target)){
     closeSetup();
   }
-}, true);
+  // トースト表示中に枠外をタップした場合は、背後要素への貫通（短押し消費・見出し開閉など）を遮断してトーストを閉じるだけにする
+  if (toastEl && toastEl.classList.contains('show')){
+    if (!toastEl.contains(e.target) && !e.target.closest(MENU_BTN_SEL)){
+      e.preventDefault();
+      e.stopPropagation();
+      const activeInput = toastEl.querySelector('input:focus');
+      if (activeInput) activeInput.blur();
+      closeToast();
+    }
+  }
+}, {capture:true, passive:false});
 
 function clampInt(v, min, max, fb){
   const n = parseInt(v,10);
@@ -2488,6 +2494,7 @@ let updateTimerCard = function(it, r, now){
       if (r.maxLabel.textContent !== v) r.maxLabel.textContent = v;
     }
     setNearOnCurrent(r.curEl, isNearFull(info.remainMs, info.isFull));
+    if (r.el){ fitObserve(r.el); fitApply(r.el); }
   } else if (it.type==='orb'){
     const info = orbInfo(it, now);
     r.el.classList.toggle('full', info.isFull);
@@ -2778,94 +2785,89 @@ window.addEventListener('pagehide', handlePause);
 window.addEventListener('beforeunload', flushPendingSaveOnHide);
 window.addEventListener('pageshow', (e)=>{ handleResume(); });
 
-/* ═══════════════ 機種差フィット（ここから）═══════════════ */
-(function(){
+/* ═══════════════ 機種差フィット（ここから）═══════════════
+   スタミナの現在値/最大値が枠に入り切らない端末向けに、必要な分だけ文字を縮める保険。
+   digitEmの実測（DOM生成を伴う）は端末ごとに一度で済むよう localStorage にキャッシュし、
+   フォント設定（サイズ/フォント/太さ）が前回と同じなら、次回起動以降は測定自体を丸ごとスキップする。
+   updateTimerCardへの割り込み（上書き）はやめ、stam分岐の最後から直接呼ぶだけにしている。 */
+const FIT_MIN_FONT = 11, FIT_SAFETY = 0.98, FIT_TOLERANCE = 0.5;
+const FIT_CACHE_KEY = 'abyssFitDigitEmV1';
+let fitDigitEm = 0, fitBaseFont = 18;
+let fitRO = null;
+const fitSeen = new WeakSet();
+
+function fitCalibrate(slot){
+  const cs = getComputedStyle(slot);
+  fitBaseFont = parseFloat(cs.fontSize) || 18;
+  const sig = fitBaseFont + '|' + cs.fontFamily + '|' + cs.fontWeight;
+  try {
+    const cached = JSON.parse(localStorage.getItem(FIT_CACHE_KEY) || 'null');
+    if (cached && cached.sig === sig && cached.digitEm){
+      fitDigitEm = cached.digitEm;
+      return;
+    }
+  } catch(err){}
+  const probe = document.createElement('span');
+  probe.textContent = '0123456789';
+  probe.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden;white-space:nowrap;line-height:1;font-size:100px;font-variant-numeric:tabular-nums;';
+  probe.style.fontFamily = cs.fontFamily;
+  probe.style.fontWeight = cs.fontWeight;
+  document.body.appendChild(probe);
+  const node = probe.firstChild, rg = document.createRange();
+  let w = 0;
+  for (let i = 0; i < 10; i++){
+    rg.setStart(node, i); rg.setEnd(node, i + 1);
+    w = Math.max(w, rg.getBoundingClientRect().width);
+  }
+  probe.remove();
+  fitDigitEm = w / 100;
+  if (fitDigitEm){
+    try { localStorage.setItem(FIT_CACHE_KEY, JSON.stringify({ sig, digitEm: fitDigitEm })); } catch(err){}
+  }
+}
+
+function fitApply(card){
+  const slotW = card._slotW;
+  if (!slotW) return;
+  const cur = card._curEl || (card._curEl = card.querySelector('.stamval'));
+  const max = card._maxEl || (card._maxEl = card.querySelector('.stammax'));
+  const curText = card._curTextEl || (card._curTextEl = (cur && cur.querySelector('.inline-number-text')));
+  if (!cur || !max || !curText) return;
+  if (!fitDigitEm){ fitCalibrate(cur); if (!fitDigitEm) return; }
+
+  const lc = curText.textContent.length, lm = max.textContent.length;
+  const key = slotW + '|' + lc + '|' + lm;
+  if (card._fitKey === key) return;
+  card._fitKey = key;
+
+  const need = Math.max(lc, lm) * fitDigitEm * fitBaseFont;
+  let px = '';
+  if (need > slotW + FIT_TOLERANCE){
+    px = Math.max(FIT_MIN_FONT, Math.floor(fitBaseFont * (slotW / need) * FIT_SAFETY * 10) / 10) + 'px';
+  }
+  if (cur.style.fontSize !== px){ cur.style.fontSize = px; max.style.fontSize = px; }
+}
+
+function fitObserve(card){
   if (typeof ResizeObserver === 'undefined') return;
-
-  const MIN_FONT  = 11;
-  const SAFETY    = 0.98;
-  const TOLERANCE = 0.5;
-
-  let digitEm  = 0;
-  let baseFont = 18;
-
-  function calibrate(slot){
-    const cs = getComputedStyle(slot);
-    baseFont = parseFloat(cs.fontSize) || 18;
-    const probe = document.createElement('span');
-    probe.textContent = '0123456789';
-    probe.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden;white-space:nowrap;line-height:1;font-size:100px;font-variant-numeric:tabular-nums;';
-    probe.style.fontFamily = cs.fontFamily;
-    probe.style.fontWeight = cs.fontWeight;
-    document.body.appendChild(probe);
-    const node = probe.firstChild, rg = document.createRange();
-    let w = 0;
-    for (let i = 0; i < 10; i++){
-      rg.setStart(node, i); rg.setEnd(node, i + 1);
-      w = Math.max(w, rg.getBoundingClientRect().width);
-    }
-    probe.remove();
-    digitEm = w / 100;
+  if (!fitRO){
+    fitRO = new ResizeObserver(entries => {
+      for (const e of entries){
+        const c = e.target.closest && e.target.closest('.card');
+        if (!c) continue;
+        c._slotW = e.contentRect.width;
+        fitApply(c);
+      }
+    });
   }
-
-  function apply(card){
-    const slotW = card._slotW;
-    if (!slotW) return;
-    const cur = card._curEl || (card._curEl = card.querySelector('.stamval'));
-    const max = card._maxEl || (card._maxEl = card.querySelector('.stammax'));
-    const curText = card._curTextEl || (card._curTextEl = (cur && cur.querySelector('.inline-number-text')));
-    if (!cur || !max || !curText) return;
-    if (!digitEm){ calibrate(cur); if (!digitEm) return; }
-
-    const lc = curText.textContent.length, lm = max.textContent.length;
-    const key = slotW + '|' + lc + '|' + lm;
-    if (card._fitKey === key) return;
-    card._fitKey = key;
-
-    const need = Math.max(lc, lm) * digitEm * baseFont;
-    let px = '';
-    if (need > slotW + TOLERANCE){
-      px = Math.max(MIN_FONT, Math.floor(baseFont * (slotW / need) * SAFETY * 10) / 10) + 'px';
-    }
-    if (cur.style.fontSize !== px){ cur.style.fontSize = px; max.style.fontSize = px; }
+  if (!fitSeen.has(card)){
+    const slot = card.querySelector('.stamval');
+    if (slot){ fitSeen.add(card); fitRO.observe(slot); }
   }
-
-  const ro = new ResizeObserver(entries => {
-    for (const e of entries){
-      const card = e.target.closest && e.target.closest('.card');
-      if (!card) continue;
-      card._slotW = e.contentRect.width;
-      apply(card);
-    }
-  });
-
-  const seen = new WeakSet();
-  const orig = updateTimerCard;
-  updateTimerCard = function(it, r, now){
-    orig(it, r, now);
-    if (!it || !r || it.type !== 'stam' || !r.el) return;
-    const card = r.el;
-    if (!seen.has(card)){
-      const slot = card.querySelector('.stamval');
-      if (slot){ seen.add(card); ro.observe(slot); }
-    }
-    apply(card);
-  };
-})();
+}
 /* ═══════════════ 機種差フィット（ここまで）═══════════════ */
 
-// トースト表示中に枠外をタップした場合は、背後要素への貫通（短押し消費・見出し開閉など）を遮断してトーストを閉じるだけにする
-document.addEventListener('pointerdown', (e)=>{
-  if (toastEl && toastEl.classList.contains('show')){
-    if (!toastEl.contains(e.target) && !e.target.closest(MENU_BTN_SEL)){
-      e.preventDefault();
-      e.stopPropagation();
-      const activeInput = toastEl.querySelector('input:focus');
-      if (activeInput) activeInput.blur();
-      closeToast();
-    }
-  }
-}, {capture:true, passive:false});
+// 合成clickがトースト外に貫通するのを防ぐ（pointerdown側は上で処理済み。ここはclick単体の遮断のみ）
 document.addEventListener('click', (e)=>{
   if (toastEl && toastEl.classList.contains('show')){
     if (!toastEl.contains(e.target) && !e.target.closest(MENU_BTN_SEL)){
