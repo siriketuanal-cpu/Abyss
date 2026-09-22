@@ -1,0 +1,175 @@
+// resume-fit.js: バックグラウンド復帰処理(二重RAF)・機種差フィット・起動時イベント登録
+// この並び順(index.htmlの<script>タグの順番)を変えると、他ファイルの関数/変数を先に参照してエラーになる場合があります。
+
+let wasBackgrounded = false;
+
+// ── バックグラウンド・非表示・ページ離脱時の即時保存 ──
+function flushPendingSaveOnHide(){
+  if (pendingSave){
+    saveNow();
+  }
+}
+
+// 復帰処理：黒幕や無駄な待機・二重描画を省き、即座に差分更新してtick再開
+function resumeApp(){
+  tickRender(Date.now()); // tickRender内でsyncFullStamItemsも実行される
+  startTicking(true);
+}
+
+let resumeRaf = 0;
+function handlePause(){
+  flushPendingSaveOnHide();
+  wasBackgrounded = true;
+  if (resumeRaf){ cancelAnimationFrame(resumeRaf); resumeRaf = 0; }
+  if (menuOpenRaf){ cancelAnimationFrame(menuOpenRaf); menuOpenRaf = 0; }
+  tickGen++;
+  if (tickId){ clearTimeout(tickId); tickId = null; }
+}
+
+// ダブルRAF：1フレーム目でGPU描画領域の復元・ビューポート確定を待ち、2フレーム目で時刻同期。
+// visibilitychange / resume / pageshow / focus が連発しても1回に集約する。
+function handleResume(){
+  wasBackgrounded = false;
+  if (resumeRaf) return;
+  resumeRaf = requestAnimationFrame(()=>{
+    resumeRaf = requestAnimationFrame(()=>{
+      resumeRaf = 0;
+      if (document.hidden) return;
+      resumeApp();
+    });
+  });
+}
+
+document.addEventListener('visibilitychange', ()=>{
+  if (document.hidden) handlePause();
+  else handleResume();
+});
+
+// Android Chrome / Chromium の Page Lifecycle API（凍結・復帰）
+document.addEventListener('freeze', handlePause);
+document.addEventListener('resume', handleResume);
+
+window.addEventListener('pagehide', handlePause);
+window.addEventListener('beforeunload', flushPendingSaveOnHide);
+window.addEventListener('pageshow', (e)=>{ handleResume(); });
+
+/* ═══════════════ 機種差フィット（ここから）═══════════════
+   スタミナの現在値/最大値が枠に入り切らない端末向けに、必要な分だけ文字を縮める保険。
+   digitEmの実測（DOM生成を伴う）は端末ごとに一度で済むよう localStorage にキャッシュし、
+   フォント設定（サイズ/フォント/太さ）が前回と同じなら、次回起動以降は測定自体を丸ごとスキップする。
+   updateTimerCardへの割り込み（上書き）はやめ、stam分岐の最後から直接呼ぶだけにしている。 */
+const FIT_MIN_FONT = 11, FIT_SAFETY = 0.98, FIT_TOLERANCE = 0.5;
+const FIT_CACHE_KEY = 'abyssFitDigitEmV1';
+let fitDigitEm = 0, fitBaseFont = 18;
+let fitRO = null;
+const fitSeen = new WeakSet();
+
+function fitCalibrate(slot){
+  const cs = getComputedStyle(slot);
+  fitBaseFont = parseFloat(cs.fontSize) || 18;
+  const sig = fitBaseFont + '|' + cs.fontFamily + '|' + cs.fontWeight;
+  try {
+    const cached = JSON.parse(localStorage.getItem(FIT_CACHE_KEY) || 'null');
+    if (cached && cached.sig === sig && cached.digitEm){
+      fitDigitEm = cached.digitEm;
+      return;
+    }
+  } catch(err){}
+  const probe = document.createElement('span');
+  probe.textContent = '0123456789';
+  probe.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden;white-space:nowrap;line-height:1;font-size:100px;font-variant-numeric:tabular-nums;';
+  probe.style.fontFamily = cs.fontFamily;
+  probe.style.fontWeight = cs.fontWeight;
+  document.body.appendChild(probe);
+  const node = probe.firstChild, rg = document.createRange();
+  let w = 0;
+  for (let i = 0; i < 10; i++){
+    rg.setStart(node, i); rg.setEnd(node, i + 1);
+    w = Math.max(w, rg.getBoundingClientRect().width);
+  }
+  probe.remove();
+  fitDigitEm = w / 100;
+  if (fitDigitEm){
+    try { localStorage.setItem(FIT_CACHE_KEY, JSON.stringify({ sig, digitEm: fitDigitEm })); } catch(err){}
+  }
+}
+
+function fitApply(card){
+  const slotW = card._slotW;
+  if (!slotW) return;
+  const cur = card._curEl || (card._curEl = card.querySelector('.stamval'));
+  const max = card._maxEl || (card._maxEl = card.querySelector('.stammax'));
+  const curText = card._curTextEl || (card._curTextEl = (cur && cur.querySelector('.inline-number-text')));
+  if (!cur || !max || !curText) return;
+  if (!fitDigitEm){ fitCalibrate(cur); if (!fitDigitEm) return; }
+
+  const lc = curText.textContent.length, lm = max.textContent.length;
+  const key = slotW + '|' + lc + '|' + lm;
+  if (card._fitKey === key) return;
+  card._fitKey = key;
+
+  const need = Math.max(lc, lm) * fitDigitEm * fitBaseFont;
+  let px = '';
+  if (need > slotW + FIT_TOLERANCE){
+    px = Math.max(FIT_MIN_FONT, Math.floor(fitBaseFont * (slotW / need) * FIT_SAFETY * 10) / 10) + 'px';
+  }
+  if (cur.style.fontSize !== px){ cur.style.fontSize = px; max.style.fontSize = px; }
+}
+
+function fitObserve(card){
+  if (typeof ResizeObserver === 'undefined') return;
+  if (!fitRO){
+    fitRO = new ResizeObserver(entries => {
+      for (const e of entries){
+        const c = e.target.closest && e.target.closest('.card');
+        if (!c) continue;
+        c._slotW = e.contentRect.width;
+        fitApply(c);
+      }
+    });
+  }
+  if (!fitSeen.has(card)){
+    const slot = card.querySelector('.stamval');
+    if (slot){ fitSeen.add(card); fitRO.observe(slot); }
+  }
+}
+/* ═══════════════ 機種差フィット（ここまで）═══════════════ */
+
+// 合成clickがトースト外に貫通するのを防ぐ（pointerdown側は上で処理済み。ここはclick単体の遮断のみ）
+document.addEventListener('click', (e)=>{
+  if (toastEl && toastEl.classList.contains('show')){
+    if (!toastEl.contains(e.target) && !e.target.closest(MENU_BTN_SEL)){
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }
+}, {capture:true, passive:false});
+
+render();
+startTicking(true);
+
+// 長押しメニュー(コピー等)やドラッグ選択を出さない。
+document.addEventListener('contextmenu', (e)=> e.preventDefault());
+document.addEventListener('dragstart', (e)=> e.preventDefault());
+// テキスト選択は入力欄側で必要な範囲だけ抑止する。
+document.addEventListener('paste', (e)=> e.preventDefault());
+
+bindTapDown(document.getElementById('updateBtn'), ()=>{
+  location.href = 'update.html?r=' + Date.now().toString(36);
+});
+
+// Service worker: プレビュー・iframe環境ではSWを解除してキャッシュ滞留を防止
+const isIframe = window.self !== window.top;
+if ('serviceWorker' in navigator){
+  if (isIframe) {
+    navigator.serviceWorker.getRegistrations().then(regs => {
+      regs.forEach(r => r.unregister());
+    }).catch(()=>{});
+  } else {
+    window.addEventListener('load', ()=>{
+      navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(err => {
+        console.warn('ServiceWorker registration bypassed:', err?.message || err);
+      });
+    });
+  }
+}
