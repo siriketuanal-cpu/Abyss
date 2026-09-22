@@ -1,6 +1,0 @@
-{
-  "name": "Abyss",
-  "description": "ゲームのスタミナや放置報酬を管理するタイマートラッカー",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
