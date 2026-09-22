@@ -60,26 +60,31 @@ document.addEventListener('pointerdown', (e) => {
       paintUseChunkPreview(id);
     }
   }
-  if (addPanelEl.classList.contains('show') && !addPanelEl.contains(e.target) && e.target !== addBtnEl){
-    closeAddPanel();
-    pendingAddGroupId = null;
-    pendingInsertAfterId = null;
-  }
-  if (setupPanelEl.classList.contains('show') && !setupPanelEl.contains(e.target) && !addPanelEl.contains(e.target)){
-    e.preventDefault();
-    e.stopPropagation();
-    const activeInput = setupFieldsEl.querySelector('input:focus');
-    if (activeInput) activeInput.blur();
-    closeSetup();
-  }
-  // トースト表示中に枠外をタップした場合は、背後要素への貫通（短押し消費・見出し開閉など）を遮断してトーストを閉じるだけにする
-  if (toastEl && toastEl.classList.contains('show')){
-    if (!toastEl.contains(e.target) && !e.target.closest(MENU_BTN_SEL)){
+  // ポップアップモーダル（トースト・追加パネル・設定パネル）の枠外タップ処理を一本化
+  const isSetupOpen = setupPanelEl && setupPanelEl.classList.contains('show');
+  const isAddOpen = addPanelEl && addPanelEl.classList.contains('show');
+  const isToastOpen = toastEl && toastEl.classList.contains('show');
+
+  if (isSetupOpen || isAddOpen || isToastOpen){
+    const inSetup = isSetupOpen && setupPanelEl.contains(e.target);
+    const inAdd = isAddOpen && (addPanelEl.contains(e.target) || e.target === addBtnEl);
+    const inToast = isToastOpen && (toastEl.contains(e.target) || e.target.closest(MENU_BTN_SEL));
+
+    if (!inSetup && !inAdd && !inToast){
       e.preventDefault();
       e.stopPropagation();
-      const activeInput = toastEl.querySelector('input:focus');
-      if (activeInput) activeInput.blur();
-      closeToast();
+      try {
+        const activeInput = document.querySelector('#setupFields input:focus, #toast input:focus');
+        if (activeInput) activeInput.blur();
+      } catch (err) {}
+      if (isSetupOpen) closeSetup();
+      if (isAddOpen){
+        closeAddPanel();
+        pendingAddGroupId = null;
+        pendingInsertAfterId = null;
+      }
+      if (isToastOpen) closeToast();
+      return;
     }
   }
 }, {capture:true, passive:false});

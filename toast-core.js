@@ -90,7 +90,7 @@ function askRemoveItem(id){
   const canAdd = isGroup && it.children.length < 4;
   const canInsertOrMove = isHeader || isGroup || isRule;
   const canEditName = isHeader || isGroup;
-  const colorDefault = isHeader ? (it.color || '#9b8bff') : (isRule ? (it.color || '#52617a') : null);
+  const colorDefault = isHeader ? (it.color || '#9b8bff') : (isRule ? (it.color || '#52617a') : (isGroup ? (it.color || '#555b68') : null));
 
   const moveButtons = canInsertOrMove
     ? `<div class="toast-fields-btns"><button type="button" data-act="moveUp">↑ 上へ移動</button><button type="button" data-act="moveDown">↓ 下へ移動</button></div>`
@@ -187,6 +187,9 @@ function askRemoveItem(id){
           if (refs[id]?.menuBtn) refs[id].menuBtn.style.setProperty('--header-color', it.color);
         } else if (isRule && refs[id]?.el){
           refs[id].el.style.borderTopColor = it.color;
+        } else if (isGroup && refs[id]?.el){
+          refs[id].el.style.borderColor = it.color;
+          if (refs[id]?.nameEditor) refs[id].nameEditor.setColor(it.color);
         }
         save();
       });

@@ -169,6 +169,9 @@ function buildGroupCard(it){
   const wrap = document.createElement('div');
   wrap.className = 'card group';
   wrap.dataset.id = it.id;
+  if (it.color){
+    wrap.style.borderColor = it.color;
+  }
   wrap.innerHTML = `
     <div class="row namerow group-namerow" data-role="namerow"></div>
     <div class="group-body" data-role="body"></div>
@@ -177,6 +180,9 @@ function buildGroupCard(it){
   const nameEditor = createInlineText(it.name || '', 'アカウント', (value)=>{
     if (it.name !== value){ it.name = value; save(); }
   });
+  if (it.color){
+    nameEditor.setColor(it.color);
+  }
   nameRowEl.appendChild(nameEditor.wrap);
   refs[it.id] = { el: wrap, nameEl: nameEditor.wrap, nameEditor,
     bodyEl: wrap.querySelector('[data-role="body"]'),

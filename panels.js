@@ -7,6 +7,8 @@ let setupType = null;
 let setupIdleMode = 'down';
 let setupOrbMode = 'down';
 
+const addPanelLabelEl = document.getElementById('addPanelLabel');
+
 function closeAddPanel(){
   addPanelEl.classList.remove('show');
   addPanelEl.classList.remove('group-mode');
@@ -15,7 +17,11 @@ function openAddPanel(opts){
   opts = opts || {};
   pendingAddGroupId = opts.groupId || null;
   pendingInsertAfterId = opts.insertAfterId || null;
-  addPanelEl.classList.toggle('group-mode', !!pendingAddGroupId);
+  const isGroup = !!pendingAddGroupId;
+  addPanelEl.classList.toggle('group-mode', isGroup);
+  if (addPanelLabelEl){
+    addPanelLabelEl.textContent = isGroup ? 'タイマーを追加' : '枠を追加';
+  }
   if (!opts.groupId) pendingAddGroupId = null;
   if (!opts.insertAfterId) pendingInsertAfterId = null;
   addPanelEl.classList.add('show');

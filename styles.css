@@ -117,12 +117,27 @@
   .card.orb .timer-menu-btn{border-color:#a78bfa;}
   .card.idle .timer-menu-btn{border-color:#f0a85a;}
   .card.exped .timer-menu-btn{border-color:#34d399;}
-  /* 選択・削除確認中の対象：ぼかし無しのシャープな太線（カードは枠の内側に描画） */
+  /* 選択・削除確認中の対象：元の細線を100%完全消去し、シームレスな単一太枠だけを描画 */
   .longpress-target{ border-color:var(--danger) !important; }
-  /* 同じ !important の claim / full 枠色に負けないよう、クラスを重ねて詳細度を上げている */
   .card.longpress-target.longpress-target.longpress-target{
-    border-color:var(--danger) !important;
-    box-shadow:inset 0 0 0 1.5px var(--danger) !important;
+    border-color:transparent !important; /* 下の細線を完全に消して二重線・四隅の干渉をゼロにする */
+    background:rgba(255, 107, 107, 0.08) !important;
+    box-shadow:none !important;
+  }
+  /* 親の角丸と数学的に100%同心円を描くベクター単一太枠オーバーレイ */
+  .card.longpress-target::after{
+    content:'';
+    position:absolute;
+    inset:-1px;
+    box-sizing:border-box;
+    border:2px solid var(--danger) !important;
+    border-radius:10px;
+    box-shadow:0 0 10px rgba(255, 107, 107, 0.45) !important;
+    pointer-events:none;
+    z-index:10;
+  }
+  .card.group.longpress-target::after{
+    border-radius:8px;
   }
   .divider.longpress-target{
     box-shadow:0 0 0 1.5px var(--danger) !important;
@@ -135,16 +150,34 @@
   .namerow{margin-bottom:4px;}
   /* タイマーカードは種類に関係なく同じ外寸に揃える。中身だけ配置を変える。 */
   .card.stam, .card.orb, .card.idle, .card.exped{height:56px; min-height:56px;} 
-  /* claim（スタミナ使い切り / 放置=受取 / 遠征=再出発）は太枠線で強調。
-     ぼかし無しのシャープな inset 影＝枠の内側だけに描く（外へはみ出さない→隣カード/枠と重ならない。レイアウトも動かない） */
+  /* claim（スタミナ使い切り / 放置=受取 / 遠征=再出発）：
+     元の細線を完全消去し、単一の美しい強調太枠を描画（レイアウト崩れ完全ゼロ） */
   .card.claim{
-    border-color:#ffd166 !important;
-    box-shadow:inset 0 0 0 1.5px #ffd166 !important;
+    border-color:transparent !important; /* 下の細線を完全に消去 */
+    background:rgba(255, 209, 102, 0.06) !important;
+    box-shadow:none !important;
+  }
+  .card.claim::after{
+    content:'';
+    position:absolute;
+    inset:-1px;
+    box-sizing:border-box;
+    border:2px solid #ffd166;
+    border-radius:10px;
+    box-shadow:0 0 10px rgba(255, 209, 102, 0.4);
+    pointer-events:none;
+    z-index:9;
   }
   .card.idle.claim,
   .card.exped.claim{
-    border-color:var(--ok) !important;
-    box-shadow:inset 0 0 0 1.5px var(--ok) !important;
+    border-color:transparent !important; /* 下の細線を完全に消去 */
+    background:rgba(92, 214, 138, 0.06) !important;
+    box-shadow:none !important;
+  }
+  .card.idle.claim::after,
+  .card.exped.claim::after{
+    border-color:var(--ok);
+    box-shadow:0 0 10px rgba(92, 214, 138, 0.4);
   }
   .card.full{
     border-color:var(--orange) !important;
@@ -312,15 +345,20 @@
     content:''; position:absolute; right:0; width:40px; top:-10px; bottom:-10px;
     pointer-events:auto;
   }
-  #toast{
-    /* 画面中央。必要な設定だけを横並びにして、コンパクト＆高コントラストに。 */
-    position:fixed; left:50%; top:50%; bottom:auto;
+  /* ポップアップモーダル共通枠（トースト・追加パネル・設定パネルの一本化） */
+  #toast,
+  #addPanel,
+  #setupPanel{
+    position:fixed; left:50%; top:50%; bottom:auto; right:auto;
     transform:translate(-50%, -50%); width:min(76vw, 250px); max-width:78%;
     background:#202127; color:var(--text); border:1px solid #4a5160;
     border-radius:12px; padding:10px 10px 8px; font-size:12px; z-index:30;
     display:none; box-shadow:0 0 0 1px rgba(255,255,255,.05), 0 6px 0 rgba(0,0,0,.4);
   }
   #toast.show{display:block;}
+  #addPanel.show,
+  #setupPanel.show{display:flex; flex-direction:column; gap:8px;}
+
   #toast .toast-fields{
     display:grid; grid-template-columns:repeat(2, minmax(0, 1fr));
     gap:5px; width:100%; align-items:start;
@@ -418,33 +456,40 @@
   .toast-val-unit{display:inline-flex; align-items:center; gap:2px;}
   .toast-val-unit .toast-unit{color:#8e96a5; font-size:11px; font-weight:600;}
   #empty{color:var(--sub); font-size:13px; text-align:center; padding:40px 0;}
-  #addPanel{
-    position:fixed; left:0; right:0; bottom:0; background:var(--card);
-    border-top:1px solid var(--line); padding:14px 16px calc(16px + env(safe-area-inset-bottom));
-    display:none; gap:10px; z-index:10;
-    box-shadow:0 0 0 1px rgba(255,255,255,.05), 0 -6px 0 rgba(0,0,0,.4);
-  }
-  #addPanel.show{display:flex; flex-wrap:wrap;}
-  #addPanel .timerType{display:none;}
-  #addPanel.group-mode .timerType{display:block;}
-  #addPanel.group-mode .onlyTop{display:none;}
-  #addPanel button{
-    flex:1 1 calc(50% - 5px); min-width:calc(40% - 5px); padding:12px; border-radius:12px; border:1px solid var(--line);
-    background:var(--card2); color:var(--text); font-size:14px; font-weight:600;
-  }
-  #setupPanel{
-    position:fixed; left:50%; top:50%; bottom:auto; right:auto;
-    transform:translate(-50%, -50%); width:min(76vw, 250px); max-width:78%;
-    background:#202127; color:var(--text); border:1px solid #4a5160;
-    border-radius:12px; padding:10px 10px 8px; font-size:12px; z-index:30;
-    display:none; flex-direction:column; gap:8px;
-    box-shadow:0 0 0 1px rgba(255,255,255,.05), 0 6px 0 rgba(0,0,0,.4);
-  }
-  #setupPanel.show{display:flex;}
+  .addPanelLabel,
   #setupPanel .setupLabel{
     font-size:12px; font-weight:700; color:var(--text); text-align:center;
     padding-bottom:2px;
   }
+  .addPanelGrid{
+    display:grid; grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:5px; width:100%; align-items:start;
+  }
+  /* アカウント枠は1行フル幅、見出し・仕切り線は2列 */
+  #addPanel:not(.group-mode) .onlyTop[data-type="group"]{
+    grid-column:1 / -1;
+  }
+  #addPanel .timerType{display:none;}
+  #addPanel.group-mode .timerType{display:flex;}
+  #addPanel.group-mode .onlyTop{display:none;}
+  #addPanel button{
+    width:100%; height:32px; min-height:32px; padding:0 6px; border-radius:6px; border:1px solid var(--line);
+    background:var(--card2); color:var(--text); font-size:12px; font-weight:700;
+    display:flex; align-items:center; justify-content:center; gap:5px;
+    touch-action:manipulation; appearance:none; -webkit-appearance:none; outline:none;
+    transition:background-color 0.1s, border-color 0.1s;
+  }
+  #addPanel button:active{
+    background:#2e323e;
+  }
+  /* タイマーの種類に合わせた枠色・アクセント */
+  #addPanel .timerType[data-type="stam"]{border-color:#5aa9ff;}
+  #addPanel .timerType[data-type="orb"]{border-color:#a78bfa;}
+  #addPanel .timerType[data-type="idle"]{border-color:#f0a85a;}
+  #addPanel .timerType[data-type="exped"]{border-color:#34d399;}
+  #addPanel .onlyTop[data-type="group"]{border-color:#555b68;}
+  #addPanel .onlyTop[data-type="header"]{border-color:#9b8bff;}
+  #addPanel .onlyTop[data-type="rule"]{border-color:#52617a;}
   #setupFields{
     display:grid; grid-template-columns:repeat(2, minmax(0, 1fr));
     gap:5px; width:100%; align-items:start;

@@ -5,6 +5,11 @@ let wasBackgrounded = false;
 
 // ── バックグラウンド・非表示・ページ離脱時の即時保存 ──
 function flushPendingSaveOnHide(){
+  try {
+    if (document.activeElement && typeof document.activeElement.blur === 'function'){
+      document.activeElement.blur();
+    }
+  } catch(e){}
   if (pendingSave){
     saveNow();
   }
@@ -12,7 +17,12 @@ function flushPendingSaveOnHide(){
 
 // 復帰処理：黒幕や無駄な待機・二重描画を省き、即座に差分更新してtick再開
 function resumeApp(){
-  tickRender(Date.now()); // tickRender内でsyncFullStamItemsも実行される
+  // 万一DOMノードが消失していた場合の自己修復フォールバック
+  if (!cardsEl || !cardsEl.firstElementChild){
+    render();
+  } else {
+    tickRender(Date.now()); // tickRender内でsyncFullStamItemsも実行される
+  }
   startTicking(true);
 }
 
@@ -52,6 +62,9 @@ document.addEventListener('resume', handleResume);
 window.addEventListener('pagehide', handlePause);
 window.addEventListener('beforeunload', flushPendingSaveOnHide);
 window.addEventListener('pageshow', (e)=>{ handleResume(); });
+window.addEventListener('focus', ()=>{
+  if (!document.hidden) handleResume();
+});
 
 /* ═══════════════ 機種差フィット（ここから）═══════════════
    スタミナの現在値/最大値が枠に入り切らない端末向けに、必要な分だけ文字を縮める保険。
@@ -135,10 +148,16 @@ function fitObserve(card){
 }
 /* ═══════════════ 機種差フィット（ここまで）═══════════════ */
 
-// 合成clickがトースト外に貫通するのを防ぐ（pointerdown側は上で処理済み。ここはclick単体の遮断のみ）
+// 合成clickがモーダル外（トースト・追加パネル・設定パネル）に貫通するのを防ぐ
 document.addEventListener('click', (e)=>{
-  if (toastEl && toastEl.classList.contains('show')){
-    if (!toastEl.contains(e.target) && !e.target.closest(MENU_BTN_SEL)){
+  const isAnyModalOpen = (toastEl && toastEl.classList.contains('show')) ||
+                         (addPanelEl && addPanelEl.classList.contains('show')) ||
+                         (setupPanelEl && setupPanelEl.classList.contains('show'));
+  if (isAnyModalOpen){
+    const inToast = toastEl && toastEl.contains(e.target);
+    const inAdd = addPanelEl && addPanelEl.contains(e.target);
+    const inSetup = setupPanelEl && setupPanelEl.contains(e.target);
+    if (!inToast && !inAdd && !inSetup && !e.target.closest(MENU_BTN_SEL)){
       e.preventDefault();
       e.stopPropagation();
     }
