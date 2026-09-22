@@ -62,9 +62,9 @@ function syncGameHeader(g) {
   const el = gameUI?.meta || document.querySelector('[data-gmeta="' + g.id + '"]');
   if (!el) return;
   const bits = [];
-  if (gameDailyAllOk(g)) bits.push('<span class="badge complete" title="全アカウント デイリー完了">DONE</span>');
-  if (gameWeeklyAllOk(g)) bits.push('<span class="badge week" title="全アカウント 週課完了">DONE</span>');
-  if (gameMonthlyAllOk(g)) bits.push('<span class="badge month" title="全アカウント 月課完了">DONE</span>');
+  if (gameDailyAllOk(g)) bits.push('<span class="badge complete" title="全アカウント デイリー完了">COMPLETE</span>');
+  if (gameWeeklyAllOk(g)) bits.push('<span class="badge week" title="全アカウント 週課完了">COMPLETE</span>');
+  if (gameMonthlyAllOk(g)) bits.push('<span class="badge month" title="全アカウント 月課完了">COMPLETE</span>');
   el.innerHTML = bits.join('');
 }
 
@@ -263,8 +263,8 @@ function render(forceStructure = false) {
                   <span class="aname-text">${escape(a.name)}</span>
                   <span class="abadges">
                     <span class="badge" data-bdaily="${g.id}|${a.id}" hidden>デイリー完了</span>
-                    <span class="badge week" data-bweek="${g.id}|${a.id}" hidden title="週課完了">DONE</span>
-                    <span class="badge month" data-bmonth="${g.id}|${a.id}" hidden title="月課完了">DONE</span>
+                    <span class="badge week" data-bweek="${g.id}|${a.id}" hidden title="週課完了">COMPLETE</span>
+                    <span class="badge month" data-bmonth="${g.id}|${a.id}" hidden title="月課完了">COMPLETE</span>
                   </span>
                 </div>
                 <div class="anote" data-anote="${g.id}|${a.id}"></div>
