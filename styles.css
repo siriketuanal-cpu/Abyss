@@ -717,14 +717,6 @@
   }
   #nameEditOk{background:var(--accent) !important; color:#100c26 !important; border-color:transparent !important;}
 
-  /* 更新ボタンの回転アニメーション */
-  @keyframes spinUpdate {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-  }
-  .iconbtn.spin svg {
-    animation: spinUpdate 0.8s linear infinite;
-  }
   .notice-msg {
     padding: 10px 14px;
     font-size: 13px;

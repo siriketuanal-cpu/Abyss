@@ -178,7 +178,6 @@ let isUpdating = false;
 
 async function performSmartUpdate(){
   if (isUpdating) return;
-  const btn = document.getElementById('updateBtn');
   
   // 1. オフライン検出（完全オフライン保護）
   // 端末がオフラインなら、キャッシュを絶対に削除・解除せず安全に保護する
@@ -188,7 +187,6 @@ async function performSmartUpdate(){
   }
 
   isUpdating = true;
-  if (btn) btn.classList.add('spin');
   showNotice('最新版を読み込み中…', 0);
 
   const bust = Date.now().toString(36);
@@ -257,7 +255,6 @@ async function performSmartUpdate(){
 
   } catch(err){
     console.warn('Smart update failed:', err);
-    if (btn) btn.classList.remove('spin');
     isUpdating = false;
     showNotice('更新に失敗しました（現在のバージョンを維持します）', 3500);
   }
