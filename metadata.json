@@ -1,6 +1,8 @@
 {
   "name": "Abyss Timer",
   "description": "Customizable timer app for stamina, orbs, idle rewards, and expeditions.",
-  "requestPermissions": [],
-  "capabilities": []
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
