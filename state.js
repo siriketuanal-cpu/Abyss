@@ -117,7 +117,7 @@ if (nameEditOverlayEl){
   });
 }
 
-// ── カラーパレット（1段目・2段目・3段目カスタム6枠） ──
+// ── カラーパレット ＆ RGB調色ミキサー ──
 const CUSTOM_COLORS_STORAGE_KEY = 'freetimer:custom_colors:v1';
 const DEFAULT_CUSTOM_COLORS = ['#38bdf8', '#f472b6', '#4ade80', '#fbbf24', '#a78bfa', '#fb923c'];
 
@@ -144,17 +144,47 @@ const PRESET_COLOR_ROW_2 = [
 ];
 
 const colorPickerOverlayEl = document.getElementById('colorPickerOverlay');
+const colorPaletteViewEl = document.getElementById('colorPaletteView');
+const colorRgbViewEl = document.getElementById('colorRgbView');
 const colorPickerLabelEl = document.getElementById('colorPickerLabel');
 const colorPresetRow1El = document.getElementById('colorPresetRow1');
 const colorPresetRow2El = document.getElementById('colorPresetRow2');
 const colorCustomSlotsEl = document.getElementById('colorCustomSlots');
 const customColorAddBtnEl = document.getElementById('customColorAddBtn');
-const nativeColorInputEl = document.getElementById('nativeColorInput');
 const colorPickerCloseEl = document.getElementById('colorPickerClose');
 
+const colorRgbBackBtnEl = document.getElementById('colorRgbBackBtn');
+const colorRgbPreviewEl = document.getElementById('colorRgbPreview');
+const colorRgbHexEl = document.getElementById('colorRgbHex');
+const colorSliderREl = document.getElementById('colorSliderR');
+const colorSliderGEl = document.getElementById('colorSliderG');
+const colorSliderBEl = document.getElementById('colorSliderB');
+const colorValREl = document.getElementById('colorValR');
+const colorValGEl = document.getElementById('colorValG');
+const colorValBEl = document.getElementById('colorValB');
+const colorRgbTargetSlotsEl = document.getElementById('colorRgbTargetSlots');
+const colorRgbApplyOnlyBtnEl = document.getElementById('colorRgbApplyOnlyBtn');
+
 let colorPickerOnSelect = null;
-let activeCustomSlotIndex = 0;
+let colorPickerCurrentColor = '#555b68';
 let colorPickerOpenTime = 0;
+
+function hexToRgb(hex){
+  hex = String(hex || '#555b68').replace('#', '');
+  if (hex.length === 3) hex = hex.split('').map(c=>c+c).join('');
+  const num = parseInt(hex, 16);
+  if (isNaN(num)) return { r: 85, g: 91, b: 104 };
+  return {
+    r: (num >> 16) & 255,
+    g: (num >> 8) & 255,
+    b: num & 255
+  };
+}
+
+function rgbToHex(r, g, b){
+  const toHex = (n) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0');
+  return ('#' + toHex(r) + toHex(g) + toHex(b)).toLowerCase();
+}
 
 function loadCustomColors(){
   try {
@@ -182,6 +212,9 @@ function closeColorPickerPopup(){
   colorPickerOverlayEl.classList.remove('show');
   colorPickerOverlayEl.setAttribute('aria-hidden', 'true');
   colorPickerOnSelect = null;
+  // 次回開く時のためにパレットビューに戻しておく
+  if (colorPaletteViewEl) colorPaletteViewEl.style.display = 'block';
+  if (colorRgbViewEl) colorRgbViewEl.style.display = 'none';
   closeToast();
 }
 
@@ -201,7 +234,7 @@ function renderColorPickerSwatches(currentColor){
     btn.addEventListener('click', (e)=>{
       e.preventDefault();
       e.stopPropagation();
-      if (Date.now() - colorPickerOpenTime < 180) return; // 開いた瞬間のゴーストクリックのみ破棄
+      if (Date.now() - colorPickerOpenTime < 180) return;
       if (colorPickerOnSelect) colorPickerOnSelect(hex);
       closeColorPickerPopup();
     });
@@ -220,7 +253,7 @@ function renderColorPickerSwatches(currentColor){
     btn.addEventListener('click', (e)=>{
       e.preventDefault();
       e.stopPropagation();
-      if (Date.now() - colorPickerOpenTime < 180) return; // 開いた瞬間のゴーストクリックのみ破棄
+      if (Date.now() - colorPickerOpenTime < 180) return;
       if (colorPickerOnSelect) colorPickerOnSelect(hex);
       closeColorPickerPopup();
     });
@@ -241,12 +274,65 @@ function renderColorPickerSwatches(currentColor){
       e.preventDefault();
       e.stopPropagation();
       if (Date.now() - colorPickerOpenTime < 180) return;
-      activeCustomSlotIndex = idx;
       if (colorPickerOnSelect) colorPickerOnSelect(hex);
       closeColorPickerPopup();
     });
     colorCustomSlotsEl.appendChild(btn);
   });
+}
+
+function updateRgbMixerDisplay(){
+  if (!colorSliderREl || !colorSliderGEl || !colorSliderBEl) return;
+  const r = parseInt(colorSliderREl.value, 10) || 0;
+  const g = parseInt(colorSliderGEl.value, 10) || 0;
+  const b = parseInt(colorSliderBEl.value, 10) || 0;
+  if (colorValREl) colorValREl.textContent = r;
+  if (colorValGEl) colorValGEl.textContent = g;
+  if (colorValBEl) colorValBEl.textContent = b;
+  const hex = rgbToHex(r, g, b);
+  if (colorRgbPreviewEl) colorRgbPreviewEl.style.backgroundColor = hex;
+  if (colorRgbHexEl) colorRgbHexEl.textContent = hex.toUpperCase();
+}
+
+function renderRgbTargetSlots(){
+  if (!colorRgbTargetSlotsEl) return;
+  const customColors = loadCustomColors();
+  colorRgbTargetSlotsEl.innerHTML = '';
+  customColors.forEach((hex, idx) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'color-swatch-btn';
+    btn.style.backgroundColor = hex;
+    btn.title = `スロット ${idx + 1} に保存して適用`;
+    btn.addEventListener('click', (e)=>{
+      e.preventDefault();
+      e.stopPropagation();
+      const r = parseInt(colorSliderREl.value, 10) || 0;
+      const g = parseInt(colorSliderGEl.value, 10) || 0;
+      const b = parseInt(colorSliderBEl.value, 10) || 0;
+      const newHex = rgbToHex(r, g, b);
+      const list = loadCustomColors();
+      list[idx] = newHex;
+      saveCustomColors(list);
+      if (colorPickerOnSelect) colorPickerOnSelect(newHex);
+      closeColorPickerPopup();
+    });
+    colorRgbTargetSlotsEl.appendChild(btn);
+  });
+}
+
+function openRgbMixerView(){
+  if (!colorPaletteViewEl || !colorRgbViewEl) return;
+  colorPaletteViewEl.style.display = 'none';
+  colorRgbViewEl.style.display = 'flex';
+  colorRgbViewEl.style.flexDirection = 'column';
+  colorRgbViewEl.style.gap = '10px';
+  const rgb = hexToRgb(colorPickerCurrentColor);
+  if (colorSliderREl) colorSliderREl.value = rgb.r;
+  if (colorSliderGEl) colorSliderGEl.value = rgb.g;
+  if (colorSliderBEl) colorSliderBEl.value = rgb.b;
+  updateRgbMixerDisplay();
+  renderRgbTargetSlots();
 }
 
 function openColorPickerPopup(opts){
@@ -256,20 +342,46 @@ function openColorPickerPopup(opts){
   colorPickerOpenTime = Date.now();
   if (colorPickerLabelEl) colorPickerLabelEl.textContent = opts.label || '色を選択';
   colorPickerOnSelect = typeof opts.onSelect === 'function' ? opts.onSelect : null;
-  const current = opts.currentColor || '#555b68';
-  if (nativeColorInputEl) nativeColorInputEl.value = current.startsWith('#') ? current : '#555b68';
-  renderColorPickerSwatches(current);
+  colorPickerCurrentColor = opts.currentColor || '#555b68';
+  if (colorPaletteViewEl) colorPaletteViewEl.style.display = 'block';
+  if (colorRgbViewEl) colorRgbViewEl.style.display = 'none';
+  renderColorPickerSwatches(colorPickerCurrentColor);
   colorPickerOverlayEl.classList.add('show');
   colorPickerOverlayEl.setAttribute('aria-hidden', 'false');
 }
 
-if (customColorAddBtnEl && nativeColorInputEl){
+if (customColorAddBtnEl){
   customColorAddBtnEl.addEventListener('click', (e)=>{
     e.preventDefault();
     e.stopPropagation();
-    try {
-      nativeColorInputEl.click();
-    } catch(err){}
+    openRgbMixerView();
+  });
+}
+
+if (colorRgbBackBtnEl){
+  colorRgbBackBtnEl.addEventListener('click', (e)=>{
+    e.preventDefault();
+    e.stopPropagation();
+    if (colorRgbViewEl) colorRgbViewEl.style.display = 'none';
+    if (colorPaletteViewEl) colorPaletteViewEl.style.display = 'block';
+    renderColorPickerSwatches(colorPickerCurrentColor);
+  });
+}
+
+if (colorSliderREl) colorSliderREl.addEventListener('input', updateRgbMixerDisplay);
+if (colorSliderGEl) colorSliderGEl.addEventListener('input', updateRgbMixerDisplay);
+if (colorSliderBEl) colorSliderBEl.addEventListener('input', updateRgbMixerDisplay);
+
+if (colorRgbApplyOnlyBtnEl){
+  colorRgbApplyOnlyBtnEl.addEventListener('click', (e)=>{
+    e.preventDefault();
+    e.stopPropagation();
+    const r = parseInt(colorSliderREl.value, 10) || 0;
+    const g = parseInt(colorSliderGEl.value, 10) || 0;
+    const b = parseInt(colorSliderBEl.value, 10) || 0;
+    const newHex = rgbToHex(r, g, b);
+    if (colorPickerOnSelect) colorPickerOnSelect(newHex);
+    closeColorPickerPopup();
   });
 }
 
@@ -291,28 +403,6 @@ if (colorPickerOverlayEl){
   };
   colorPickerOverlayEl.addEventListener('pointerdown', onOverlayBgTap);
   colorPickerOverlayEl.addEventListener('click', onOverlayBgTap);
-}
-
-if (nativeColorInputEl){
-  nativeColorInputEl.addEventListener('input', (e)=>{
-    const newColor = e.target.value;
-    if (!newColor) return;
-    const customColors = loadCustomColors();
-    customColors[activeCustomSlotIndex] = newColor;
-    saveCustomColors(customColors);
-    renderColorPickerSwatches(newColor);
-    if (colorPickerOnSelect) colorPickerOnSelect(newColor);
-  });
-  nativeColorInputEl.addEventListener('change', (e)=>{
-    const newColor = e.target.value;
-    if (!newColor) return;
-    const customColors = loadCustomColors();
-    customColors[activeCustomSlotIndex] = newColor;
-    saveCustomColors(customColors);
-    renderColorPickerSwatches(newColor);
-    if (colorPickerOnSelect) colorPickerOnSelect(newColor);
-    closeColorPickerPopup();
-  });
 }
 
 function normalizeIdleClaim(it){

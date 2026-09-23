@@ -65,24 +65,62 @@
 </div>
 <div id="colorPickerOverlay" aria-hidden="true">
   <div id="colorPickerPanel" role="dialog" aria-modal="true">
-    <div id="colorPickerLabel">色を選択</div>
-    <div class="color-palette-container">
-      <div class="color-palette-row" id="colorPresetRow1"></div>
-      <div class="color-palette-row" id="colorPresetRow2"></div>
-      <div class="color-custom-section">
-        <div class="color-custom-header">
-          <span>カスタム保存枠 (6枠)</span>
-          <span class="color-custom-hint">＋で色作成</span>
-        </div>
-        <div class="color-custom-row">
-          <div class="color-custom-slots" id="colorCustomSlots"></div>
-          <button type="button" class="color-custom-add-btn" id="customColorAddBtn" title="新しい色を作成して保存">＋</button>
-          <input type="color" id="nativeColorInput" aria-label="自由な色を選択" style="position:fixed; opacity:0; pointer-events:none; width:0; height:0; left:-9999px;"/>
+    <!-- パレット一覧ビュー -->
+    <div id="colorPaletteView">
+      <div id="colorPickerLabel">色を選択</div>
+      <div class="color-palette-container">
+        <div class="color-palette-row" id="colorPresetRow1"></div>
+        <div class="color-palette-row" id="colorPresetRow2"></div>
+        <div class="color-custom-section">
+          <div class="color-custom-header">
+            <span>カスタム保存枠 (6枠)</span>
+            <span class="color-custom-hint">＋でRGB作成</span>
+          </div>
+          <div class="color-custom-row">
+            <div class="color-custom-slots" id="colorCustomSlots"></div>
+            <button type="button" class="color-custom-add-btn" id="customColorAddBtn" title="RGBで色を作成">＋</button>
+          </div>
         </div>
       </div>
+      <div class="color-picker-actions">
+        <button type="button" id="colorPickerClose">閉じる</button>
+      </div>
     </div>
-    <div id="colorPickerActions">
-      <button type="button" id="colorPickerClose">閉じる</button>
+
+    <!-- RGB調色ビュー -->
+    <div id="colorRgbView" style="display:none;">
+      <div class="color-rgb-header">
+        <button type="button" class="color-rgb-back-btn" id="colorRgbBackBtn" aria-label="パレットに戻る">‹ 戻る</button>
+        <div class="color-rgb-title">RGBで色を作成</div>
+        <div style="width:40px;"></div>
+      </div>
+      <div class="color-rgb-preview-box">
+        <div class="color-rgb-preview-swatch" id="colorRgbPreview">
+          <span id="colorRgbHex">#555B68</span>
+        </div>
+      </div>
+      <div class="color-rgb-sliders">
+        <div class="color-slider-row">
+          <span class="color-slider-label r">R</span>
+          <input type="range" id="colorSliderR" min="0" max="255" value="85" class="color-slider slider-r">
+          <span class="color-slider-val" id="colorValR">85</span>
+        </div>
+        <div class="color-slider-row">
+          <span class="color-slider-label g">G</span>
+          <input type="range" id="colorSliderG" min="0" max="255" value="91" class="color-slider slider-g">
+          <span class="color-slider-val" id="colorValG">91</span>
+        </div>
+        <div class="color-slider-row">
+          <span class="color-slider-label b">B</span>
+          <input type="range" id="colorSliderB" min="0" max="255" value="104" class="color-slider slider-b">
+          <span class="color-slider-val" id="colorValB">104</span>
+        </div>
+      </div>
+      <div class="color-rgb-slot-select-title">保存先スロットを選択（タップで確定）</div>
+      <div class="color-rgb-target-slots" id="colorRgbTargetSlots"></div>
+      <div class="color-picker-actions">
+        <button type="button" id="colorRgbApplyOnlyBtn">保存せず色だけ適用</button>
+      </div>
     </div>
   </div>
 </div>
