@@ -615,23 +615,56 @@
   #addPanel.group-mode .timerType{display:flex;}
   #addPanel.group-mode .onlyTop{display:none;}
   #addPanel button{
-    width:100%; height:32px; min-height:32px; padding:0 6px; border-radius:6px; border:1px solid var(--line);
-    background:var(--card2); color:var(--text); font-size:12px; font-weight:700;
+    width:100%; height:32px; min-height:32px; padding:0 6px; border-radius:6px;
+    font-size:12px; font-weight:700;
     display:flex; align-items:center; justify-content:center; gap:5px;
     touch-action:manipulation; appearance:none; -webkit-appearance:none; outline:none;
     transition:background-color 0.1s, border-color 0.1s;
   }
-  #addPanel button:active{
-    background:#2e323e;
+  /* タイプ別・機能別の美しい統一カラーアクセント */
+  #addPanel .onlyTop[data-type="group"]{
+    color:#5eead4; border:1px solid rgba(94, 234, 212, 0.4); background:rgba(94, 234, 212, 0.1);
   }
-  /* タイマーの種類に合わせた枠色・アクセント */
-  #addPanel .timerType[data-type="stam"]{border-color:#5aa9ff;}
-  #addPanel .timerType[data-type="orb"]{border-color:#a78bfa;}
-  #addPanel .timerType[data-type="idle"]{border-color:#f0a85a;}
-  #addPanel .timerType[data-type="exped"]{border-color:#34d399;}
-  #addPanel .onlyTop[data-type="group"]{border-color:#555b68;}
-  #addPanel .onlyTop[data-type="header"]{border-color:#9b8bff;}
-  #addPanel .onlyTop[data-type="rule"]{border-color:#52617a;}
+  #addPanel .onlyTop[data-type="group"]:active{
+    background:rgba(94, 234, 212, 0.22);
+  }
+  #addPanel .onlyTop[data-type="header"]{
+    color:#c4b5fd; border:1px solid rgba(196, 181, 253, 0.4); background:rgba(196, 181, 253, 0.1);
+  }
+  #addPanel .onlyTop[data-type="header"]:active{
+    background:rgba(196, 181, 253, 0.22);
+  }
+  #addPanel .onlyTop[data-type="rule"]{
+    color:#94a3b8; border:1px solid rgba(148, 163, 184, 0.4); background:rgba(148, 163, 184, 0.1);
+  }
+  #addPanel .onlyTop[data-type="rule"]:active{
+    background:rgba(148, 163, 184, 0.22);
+  }
+
+  #addPanel .timerType[data-type="stam"]{
+    color:#60a5fa; border:1px solid rgba(96, 165, 250, 0.4); background:rgba(96, 165, 250, 0.1);
+  }
+  #addPanel .timerType[data-type="stam"]:active{
+    background:rgba(96, 165, 250, 0.22);
+  }
+  #addPanel .timerType[data-type="orb"]{
+    color:#c084fc; border:1px solid rgba(192, 132, 252, 0.4); background:rgba(192, 132, 252, 0.1);
+  }
+  #addPanel .timerType[data-type="orb"]:active{
+    background:rgba(192, 132, 252, 0.22);
+  }
+  #addPanel .timerType[data-type="idle"]{
+    color:#fb923c; border:1px solid rgba(251, 146, 60, 0.4); background:rgba(251, 146, 60, 0.1);
+  }
+  #addPanel .timerType[data-type="idle"]:active{
+    background:rgba(251, 146, 60, 0.22);
+  }
+  #addPanel .timerType[data-type="exped"]{
+    color:#34d399; border:1px solid rgba(52, 211, 153, 0.4); background:rgba(52, 211, 153, 0.1);
+  }
+  #addPanel .timerType[data-type="exped"]:active{
+    background:rgba(52, 211, 153, 0.22);
+  }
   #setupFields{
     display:grid; grid-template-columns:repeat(2, minmax(0, 1fr));
     gap:5px; width:100%; align-items:start;
@@ -641,14 +674,17 @@
   }
   #setupActions{
     display:grid; grid-template-columns:1fr 1.2fr; gap:6px;
-    margin-top:2px; padding-top:8px; border-top:1px solid var(--line);
+    margin-top:2px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.15);
   }
   #setupActions button{
     width:100%; min-height:30px; padding:4px 8px; font-size:12px; font-weight:700; border-radius:6px;
-    border:1px solid var(--line); background:var(--card2); color:var(--text);
+    border:1px solid rgba(255,255,255,0.2); background:#252937; color:#ffffff;
   }
   #setupCancel{
-    background:transparent !important; color:#ff6b6b !important; border:1px solid rgba(255,107,107,0.35) !important;
+    background:rgba(255,107,107,0.08) !important; color:#ff6b6b !important; border:1px solid rgba(255,107,107,0.4) !important;
+  }
+  #setupCancel:active{
+    background:rgba(255,107,107,0.2) !important;
   }
   #setupConfirm{
     background:var(--accent) !important; color:#100c26 !important; border-color:transparent !important;

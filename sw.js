@@ -1,6 +1,6 @@
 // 【重要】TWA起動時のブラウザアイコン表示抑制・高速起動・オフライン動作のため、完全キャッシュ優先（Cache-First）を維持すること。
 // キャッシュ名固定。中身の差し替えは update.html（SW解除＋Cache削除＋no-store取得）でのみ行う。
-const CACHE_NAME = 'v72';
+const CACHE_NAME = 'v73';
 const ASSETS = [
   './',
   './index.html',
