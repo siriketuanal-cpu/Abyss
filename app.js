@@ -950,7 +950,7 @@ function askRemoveItem(id){
   if (isGroup){
     fields = `
       <button type="button" data-act="editName">アカウント名を変更</button>
-      <label class="toast-field"><span class="toast-color"><span class="toast-label">枠色</span><input type="color" value="${colorDefault}" aria-label="枠色"></span></label>
+      <label class="toast-color-btn"><span class="toast-color-label">色</span><input type="color" value="${colorDefault}" aria-label="色"></label>
       <button type="button" class="toast-half-btn" data-act="toggleGroupLayout">${it.layout === '2x2' ? '配置：⊞ 2×2' : '配置：☰ 1行'}</button>
       <div class="toast-fields-btns">
         ${canAdd ? '<button type="button" data-act="add">タイマー追加</button>' : ''}
@@ -964,19 +964,19 @@ function askRemoveItem(id){
   } else if (isHeader){
     fields = `
       <button type="button" data-act="editName">見出し名を変更</button>
-      <label class="toast-field"><span class="toast-color"><span class="toast-label">色</span><input type="color" value="${colorDefault}" aria-label="色"></span></label>
+      <label class="toast-color-btn"><span class="toast-color-label">色</span><input type="color" value="${colorDefault}" aria-label="色"></label>
       <button type="button" class="toast-half-btn" data-act="toggleFoldLock">${it.foldLock ? '折りたたみ：🔒' : '折りたたみ：🔓'}</button>
-      <button type="button" data-act="insertBelow">枠を追加</button>
       <div class="toast-fields-btns">
-        <button type="button" data-act="startMove" style="grid-column:1/-1;">移動</button>
+        <button type="button" data-act="insertBelow">枠を追加</button>
+        <button type="button" data-act="startMove">移動</button>
       </div>
     `;
   } else if (isRule){
     fields = `
-      <label class="toast-field wide"><span class="toast-color"><span class="toast-label">色</span><input type="color" value="${colorDefault}" aria-label="色"></span></label>
-      <button type="button" data-act="insertBelow">枠を追加</button>
+      <label class="toast-color-btn wide"><span class="toast-color-label">色</span><input type="color" value="${colorDefault}" aria-label="色"></label>
       <div class="toast-fields-btns">
-        <button type="button" data-act="startMove" style="grid-column:1/-1;">移動</button>
+        <button type="button" data-act="insertBelow">枠を追加</button>
+        <button type="button" data-act="startMove">移動</button>
       </div>
     `;
   } else {

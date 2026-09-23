@@ -416,33 +416,33 @@
     min-height:30px; align-items:center;
   }
   #toast .toast-quick-max-btns button{
-    width:100%; min-height:22px; height:22px; padding:0;
-    font-size:10.5px; font-weight:700; border-radius:4px;
-    border:1px solid var(--line); background:var(--card); color:#ffd166;
-    line-height:22px; text-align:center;
+    width:100%; min-height:24px; height:24px; padding:0;
+    font-size:11px; font-weight:700; border-radius:5px;
+    border:1px solid rgba(255, 209, 102, 0.35); background:rgba(255, 209, 102, 0.12); color:#ffd166;
+    line-height:24px; text-align:center;
     appearance:none; -webkit-appearance:none; outline:none;
     display:flex; align-items:center; justify-content:center;
   }
   #toast .toast-quick-max-btns button:active{
-    background:#3a3e4c; border-color:#ffd166; color:#ffffff;
+    background:rgba(255, 209, 102, 0.25); border-color:#ffd166; color:#ffffff;
   }
   #toast .toast-field,
   #setupFields .toast-field{
     min-width:0; min-height:30px; padding:2px 6px;
     display:flex; align-items:center; justify-content:space-between; gap:4px;
-    border:1px solid var(--line); border-radius:6px; background:var(--card2);
+    border:1px solid rgba(255,255,255,0.18); border-radius:6px; background:#232733;
   }
   #toast .toast-field.wide,
   #setupFields .toast-field.wide{grid-column:1 / -1;}
   #toast .toast-label,
   #setupFields .toast-label{
-    min-width:0; color:#b0b7c3; font-size:11.5px; font-weight:600; line-height:1.2;
+    min-width:0; color:#e2e8f0; font-size:11.5px; font-weight:600; line-height:1.2;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   }
   #toast .toast-fields > button{
     grid-column:1 / -1; width:100%; min-height:30px; padding:5px 8px;
     font-size:11.5px; font-weight:600; border-radius:6px;
-    border:1px solid var(--line); background:var(--card2); color:var(--text);
+    border:1px solid rgba(255,255,255,0.2); background:#252937; color:#ffffff;
   }
   #toast .toast-fields > button.toast-half-btn{
     grid-column:auto; width:100%; min-height:30px; height:30px;
@@ -450,7 +450,39 @@
     white-space:nowrap; text-align:center;
   }
   #toast .toast-fields > button:active{
-    background:#323642;
+    background:#343b4e;
+  }
+  #toast .toast-color-btn{
+    grid-column:auto; width:100%; min-height:30px; height:30px;
+    padding:2px 6px; font-size:11.5px; font-weight:600;
+    display:flex; align-items:center; justify-content:center; gap:7px;
+    border:1px solid rgba(255,255,255,0.2); border-radius:6px; background:#252937;
+    color:#ffffff; cursor:pointer; box-sizing:border-box; user-select:none;
+  }
+  #toast .toast-color-btn.wide{
+    grid-column:1 / -1;
+  }
+  #toast .toast-color-btn:active{
+    background:#343b4e;
+  }
+  #toast .toast-color-btn .toast-color-label{
+    color:#ffffff; font-size:11.5px; font-weight:600; line-height:1;
+  }
+  #toast .toast-color-btn input[type="color"]{
+    -webkit-appearance:none; appearance:none;
+    width:18px; height:18px; padding:0;
+    border:1.5px solid rgba(255,255,255,0.45); border-radius:50%;
+    background:transparent; cursor:pointer; outline:none;
+    box-sizing:border-box; flex-shrink:0; pointer-events:none;
+  }
+  #toast .toast-color-btn input[type="color"]::-webkit-color-swatch-wrapper{
+    padding:0; border-radius:50%;
+  }
+  #toast .toast-color-btn input[type="color"]::-webkit-color-swatch{
+    border:none; border-radius:50%;
+  }
+  #toast .toast-color-btn input[type="color"]::-moz-color-swatch{
+    border:none; border-radius:50%;
   }
   #toast .toast-fields-btns{
     grid-column:1 / -1; display:grid; grid-template-columns:1fr 1fr; gap:5px; width:100%;
@@ -458,27 +490,65 @@
   #toast .toast-fields-btns button{
     width:100%; min-height:30px; padding:4px 6px;
     font-size:11.5px; font-weight:600; border-radius:6px;
-    border:1px solid var(--line); background:var(--card2); color:var(--text);
+    border:1px solid rgba(255,255,255,0.2); background:#252937; color:#ffffff;
+  }
+  /* 統一カラーアクセント */
+  #toast button[data-act="add"],
+  #toast button[data-act="insertBelow"]{
+    color:#5eead4; border-color:rgba(94, 234, 212, 0.35); background:rgba(94, 234, 212, 0.1);
+  }
+  #toast button[data-act="add"]:active,
+  #toast button[data-act="insertBelow"]:active{
+    background:rgba(94, 234, 212, 0.22);
+  }
+  #toast button[data-act="startMove"]{
+    color:#fde047; border-color:rgba(253, 224, 71, 0.35); background:rgba(253, 224, 71, 0.1);
+  }
+  #toast button[data-act="startMove"]:active{
+    background:rgba(253, 224, 71, 0.22);
+  }
+  #toast button[data-act="cloneGroup"]{
+    color:#c4b5fd; border-color:rgba(196, 181, 253, 0.35); background:rgba(196, 181, 253, 0.1);
+  }
+  #toast button[data-act="cloneGroup"]:active{
+    background:rgba(196, 181, 253, 0.22);
+  }
+  #toast button[data-act="toggleGroupLayout"],
+  #toast button[data-act="toggleFoldLock"],
+  #toast button[data-act="toggleOrbMode"]{
+    color:#7dd3fc; border-color:rgba(125, 211, 252, 0.35); background:rgba(125, 211, 252, 0.1);
+  }
+  #toast button[data-act="toggleGroupLayout"]:active,
+  #toast button[data-act="toggleFoldLock"]:active,
+  #toast button[data-act="toggleOrbMode"]:active{
+    background:rgba(125, 211, 252, 0.22);
   }
   #toast .idle-mode-btn,
   #setupFields .idle-mode-btn{
     padding:3px 8px; font-size:11px; font-weight:700;
-    border:1px solid var(--line); background:var(--card); color:#ffd166;
+    border:1px solid rgba(125, 211, 252, 0.35); background:rgba(125, 211, 252, 0.12); color:#7dd3fc;
     border-radius:5px; line-height:1.3;
   }
+  #toast .idle-mode-btn:active,
+  #setupFields .idle-mode-btn:active{
+    background:rgba(125, 211, 252, 0.25);
+  }
   #toast button{
-    border:1px solid var(--line); background:var(--card2); color:var(--text);
+    border:1px solid rgba(255,255,255,0.2); background:#252937; color:#ffffff;
     border-radius:6px; padding:5px 8px; font-size:12px; font-weight:600;
   }
   #toast .toast-actions{
     display:grid; grid-template-columns:1fr 1.2fr; gap:6px;
-    margin-top:10px; padding-top:8px; border-top:1px solid var(--line);
+    margin-top:10px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.15);
   }
   #toast .toast-actions button{
     width:100%; min-height:30px; padding:4px 8px; font-size:12px; font-weight:700; border-radius:6px;
   }
   #toast button.del{
-    background:transparent; color:#ff6b6b; border:1px solid rgba(255,107,107,0.35);
+    background:rgba(255,107,107,0.08); color:#ff6b6b; border:1px solid rgba(255,107,107,0.4);
+  }
+  #toast button.del:active{
+    background:rgba(255,107,107,0.2);
   }
   #toast button.del.armed{
     background:var(--danger); color:#ffffff; border-color:transparent;
