@@ -173,9 +173,8 @@ document.addEventListener('dragstart', (e)=> e.preventDefault());
 // テキスト選択は入力欄側で必要な範囲だけ抑止する。
 document.addEventListener('paste', (e)=> e.preventDefault());
 
-// ── 完全オフライン保護 ＆ 強力スマート更新（In-App Smart Update） ──
+// ── 完全オフライン保護 ＆ 高速スマート更新（In-App Smart Update） ──
 let isUpdating = false;
-let lastUpdateCheckTime = 0;
 
 async function performSmartUpdate(){
   if (isUpdating) return;
@@ -190,13 +189,9 @@ async function performSmartUpdate(){
 
   isUpdating = true;
   if (btn) btn.classList.add('spin');
-  showNotice('最新版を確認中…', 0);
+  showNotice('最新版を読み込み中…', 0);
 
   const bust = Date.now().toString(36);
-  const now = Date.now();
-  // 4秒以内の連続タップは強制リフレッシュモード
-  const forceRefresh = (now - lastUpdateCheckTime < 4000);
-  lastUpdateCheckTime = now;
 
   const files = [
     './index.html',
@@ -217,44 +212,21 @@ async function performSmartUpdate(){
   ];
 
   try {
-    // 2. ネットワーク疎通確認 & 最新の sw.js を取得して更新差分をチェック
-    const swRes = await fetch('./sw.js?check=' + bust, {
-      method: 'GET',
-      cache: 'no-store',
-      credentials: 'same-origin'
-    });
-    if (!swRes.ok) throw new Error('Network check failed');
-    const newSwText = await swRes.text();
-
-    // 現在キャッシュされている sw.js と比較
-    let currentSwText = '';
-    if ('caches' in window){
-      try {
-        const cachedSw = await caches.match('./sw.js');
-        if (cachedSw) currentSwText = await cachedSw.text();
-      } catch(e){}
-    }
-
-    const hasUpdate = forceRefresh || !currentSwText || (currentSwText !== newSwText);
-
-    if (!hasUpdate){
-      // サーバー上に差分なし：無駄な再起動を省き、最新であることを通知
-      if (btn) btn.classList.remove('spin');
-      isUpdating = false;
-      showNotice('すでに最新バージョンです（更新なし）', 2500);
-      return;
-    }
-
-    showNotice(forceRefresh ? '強制再取得中…' : '新バージョンを検出！更新中…', 0);
-
-    // 3. 全アセットをネットワークから直接キャッシュを無視して一括取得
+    // 2. 全アセットをネットワークからキャッシュ無視で一括取得
     const fetchedResults = await Promise.all(files.map(async f => {
       const res = await fetch(f + '?r=' + bust, { cache: 'no-store', credentials: 'same-origin' });
       if (!res.ok) throw new Error(`${f} (${res.status})`);
       return { path: f, res };
     }));
 
-    showNotice('キャッシュを更新中…', 0);
+    // 3. 最新 sw.js の中身から CACHE_NAME を特定
+    const swItem = fetchedResults.find(x => x.path === './sw.js');
+    let cacheName = 'v' + bust;
+    if (swItem){
+      const swText = await swItem.res.clone().text();
+      const match = swText.match(/CACHE_NAME\s*=\s*['"]([^'"]+)['"]/);
+      if (match) cacheName = match[1];
+    }
 
     // 4. 古いSWを一度解除し、新しいCache Storageに直接書き込み
     if ('serviceWorker' in navigator){
@@ -263,9 +235,6 @@ async function performSmartUpdate(){
     }
 
     if ('caches' in window){
-      const match = newSwText.match(/CACHE_NAME\s*=\s*['"]([^'"]+)['"]/);
-      const cacheName = match ? match[1] : ('v' + bust);
-      
       const newCache = await caches.open(cacheName);
       for (const item of fetchedResults){
         await newCache.put(item.path, item.res.clone());

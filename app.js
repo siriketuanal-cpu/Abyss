@@ -26,6 +26,7 @@ let tickId = null;
 let tickGen = 0;
 let pending40Id = null;
 let claimId = null;
+let movingItemId = null;
 // インライン数字編集中の対象。null | `${itemId}:cur` | `${itemId}:max`
 let editingId = null;
 
@@ -833,8 +834,8 @@ function showConfirmToast(html, onAct){
       setTimeout(()=>{ if (cardsEl) cardsEl.style.pointerEvents = ''; }, 180);
     }
 
-    // 移動系：即時移動しつつトーストを閉じる
-    if (act === 'moveUp' || act === 'moveDown'){
+    // 移動・複製・入れ替え：トーストを閉じて即時実行
+    if (act === 'startMove' || act === 'cloneItem' || act === 'swap' || act === 'moveUp' || act === 'moveDown'){
       closeToast();
       if (typeof onAct === 'function') onAct(act, btn);
       return;
@@ -872,6 +873,7 @@ function showConfirmToast(html, onAct){
   toastEl.addEventListener('pointerdown', onClick);
 }
 function cancelAllPendingStates(){
+  if (typeof cancelMove === 'function') cancelMove();
   if (pending40Id){
     const prev = pending40Id;
     pending40Id = null;
@@ -888,6 +890,98 @@ function cancelAllPendingStates(){
   if (document.activeElement && typeof document.activeElement.blur === 'function'){
     try { document.activeElement.blur(); } catch(e){}
   }
+}
+
+function getItemDisplayName(it){
+  if (!it) return '要素';
+  if (it.type === 'group') return it.name || 'アカウント枠';
+  if (it.type === 'header') return it.name || '見出し';
+  if (it.type === 'rule') return '仕切り線';
+  if (it.name) return it.name;
+  if (it.type === 'stam') return 'スタミナ';
+  if (it.type === 'orb') return 'オーブ';
+  if (it.type === 'idle') return '放置';
+  if (it.type === 'exped') return '遠征';
+  return 'タイマー';
+}
+
+function cloneItem(id){
+  const it = findItemById(id);
+  if (!it) return;
+
+  // グループ内のタイマーが対象の場合
+  if (it.type === 'stam' || it.type === 'orb' || it.type === 'idle' || it.type === 'exped'){
+    const parent = state.items.find(p => p.type === 'group' && p.children && p.children.some(c => c.id === id));
+    if (parent){
+      if (parent.children.length >= 4){
+        showNotice('枠がいっぱいです（最大4つ）', 2000);
+        return;
+      }
+      const cIdx = parent.children.findIndex(c => c.id === id);
+      const copy = JSON.parse(JSON.stringify(it));
+      copy.id = uid();
+      const now = Date.now();
+      copy.start = now;
+      copy.updatedAt = now;
+      if (copy.state === 'claim') copy.state = 'running';
+      parent.children.splice(cIdx + 1, 0, copy);
+      save(); render(); startTicking(true);
+      showNotice('タイマーを複製しました', 1500);
+      return;
+    }
+  }
+
+  // トップレベル（アカウント枠 / 見出し / 仕切り線 / 単独タイマー）の場合
+  const topId = getTopLevelItemId(id) || id;
+  const topIdx = state.items.findIndex(i => i.id === topId);
+  if (topIdx === -1) return;
+  const orig = state.items[topIdx];
+  const copy = JSON.parse(JSON.stringify(orig));
+  copy.id = uid();
+  const now = Date.now();
+
+  if (copy.type === 'group'){
+    if (copy.name) copy.name = copy.name + ' (コピー)';
+    if (Array.isArray(copy.children)){
+      copy.children.forEach(c => {
+        c.id = uid();
+        c.start = now;
+        c.updatedAt = now;
+        if (c.state === 'claim') c.state = 'running';
+      });
+    }
+  } else if (copy.type === 'header'){
+    if (copy.name) copy.name = copy.name + ' (コピー)';
+  } else if (copy.type === 'stam' || copy.type === 'orb' || copy.type === 'idle' || copy.type === 'exped'){
+    copy.start = now;
+    copy.updatedAt = now;
+    if (copy.state === 'claim') copy.state = 'running';
+  }
+
+  state.items.splice(topIdx + 1, 0, copy);
+  save(); render(); startTicking(true);
+  showNotice('複製しました', 1500);
+}
+
+function askSwapItems(idA, idB, nameA, nameB){
+  closeToast();
+  const html = `
+    <div class="toast-fields">
+      <div style="text-align:center; padding:8px 4px 4px; font-size:13.5px; font-weight:700; color:#fff; line-height:1.45;">
+        「${escapeHtml(nameA)}」と<br>「${escapeHtml(nameB)}」を入れ替えますか？
+      </div>
+    </div>
+    <div class="toast-actions">
+      <button type="button" class="del" data-act="cancel">やめる</button>
+      <button type="button" class="done" data-act="swap">入れ替える</button>
+    </div>
+  `;
+  showConfirmToast(html, (act)=>{
+    if (act === 'swap'){
+      swapTopItems(idA, idB);
+      showNotice('配置を入れ替えました', 1500);
+    }
+  });
 }
 
 function askRemoveItem(id){
@@ -908,9 +1002,9 @@ function askRemoveItem(id){
   const canEditName = isHeader || isGroup;
   const colorDefault = isHeader ? (it.color || '#9b8bff') : (isRule ? (it.color || '#52617a') : (isGroup ? (it.color || '#555b68') : null));
 
-  const moveButtons = canInsertOrMove
-    ? `<div class="toast-fields-btns"><button type="button" data-act="moveUp">↑ 上へ移動</button><button type="button" data-act="moveDown">↓ 下へ移動</button></div>`
-    : '';
+  const actionButtons = canInsertOrMove
+    ? `<div class="toast-fields-btns"><button type="button" data-act="startMove">移動</button><button type="button" data-act="cloneItem">複製</button></div>`
+    : `<div class="toast-fields-btns"><button type="button" data-act="cloneItem" style="grid-column:1/-1;">タイマーを複製</button></div>`;
 
   let fields = '';
   if (isGroup){
@@ -922,7 +1016,7 @@ function askRemoveItem(id){
         ${canAdd ? '<button type="button" data-act="add">タイマー追加</button>' : ''}
         <button type="button" data-act="insertBelow"${!canAdd ? ' style="grid-column:1/-1;"' : ''}>枠を追加</button>
       </div>
-      ${moveButtons}
+      ${actionButtons}
     `;
   } else if (isHeader){
     fields = `
@@ -930,18 +1024,19 @@ function askRemoveItem(id){
       <label class="toast-field"><span class="toast-color"><span class="toast-label">色</span><input type="color" value="${colorDefault}" aria-label="色"></span></label>
       <button type="button" class="toast-half-btn" data-act="toggleFoldLock">${it.foldLock ? '折りたたみ：🔒' : '折りたたみ：🔓'}</button>
       <button type="button" data-act="insertBelow">枠を追加</button>
-      ${moveButtons}
+      ${actionButtons}
     `;
   } else if (isRule){
     fields = `
       <label class="toast-field wide"><span class="toast-color"><span class="toast-label">色</span><input type="color" value="${colorDefault}" aria-label="色"></span></label>
       <button type="button" data-act="insertBelow">枠を追加</button>
-      ${moveButtons}
+      ${actionButtons}
     `;
   } else {
     fields = (isStam ? stamToastRowsHtml(it) : '')
       + (isOrb ? orbToastRowsHtml(it) : '')
-      + (isIdle ? idleToastRowsHtml(it) : '');
+      + (isIdle ? idleToastRowsHtml(it) : '')
+      + actionButtons;
   }
 
   const extra = fields ? `<div class="toast-fields">${fields}</div>` : '';
@@ -955,8 +1050,8 @@ function askRemoveItem(id){
       if (act === 'yes') removeItem(id);
       else if (act === 'add') openAddPanel({ groupId: id });
       else if (act === 'insertBelow') openAddPanel({ insertAfterId: id });
-      else if (act === 'moveUp') moveTopItem(id, -1);
-      else if (act === 'moveDown') moveTopItem(id, 1);
+      else if (act === 'startMove') startMoveItem(id);
+      else if (act === 'cloneItem') cloneItem(id);
       else if (act === 'toggleGroupLayout'){
         it.layout = (it.layout === '2x2') ? '1row' : '2x2';
         if (btn) btn.textContent = (it.layout === '2x2') ? '配置：⊞ 2×2' : '配置：☰ 1行';
@@ -1811,16 +1906,81 @@ document.addEventListener('pointerdown', (e) => {
       if (sel && sel.rangeCount) sel.removeAllRanges();
     }
   } catch(err){}
-  if (claimId != null){
-    const r = getTimerRef(claimId);
-    if (!r || !r.el.contains(e.target)) cancelClaim(claimId);
+  // 移動選択中（入れ替え待機中）の場合：
+  if (movingItemId != null){
+    e.preventDefault();
+    e.stopPropagation();
+
+    // 突き抜け防止（pointerup / click をイート）
+    const pid = e.pointerId;
+    const eater = (ev) => {
+      if (ev.pointerId === pid || ev.type === 'click'){
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (ev.type === 'pointerup' || ev.type === 'pointercancel' || ev.type === 'click'){
+          window.removeEventListener('pointerup', eater, true);
+          window.removeEventListener('pointercancel', eater, true);
+          window.removeEventListener('click', eater, true);
+        }
+      }
+    };
+    window.addEventListener('pointerup', eater, {capture:true, passive:false});
+    window.addEventListener('pointercancel', eater, {capture:true, passive:false});
+    window.addEventListener('click', eater, {capture:true, passive:false});
+
+    // タップされた要素から一番近いトップレベルアイテムのIDを検索
+    const host = (e.target && e.target.closest) ? e.target.closest('[data-id]') : null;
+    const targetTopId = host ? (getTopLevelItemId(host.dataset.id) || host.dataset.id) : null;
+
+    if (!targetTopId || targetTopId === movingItemId){
+      // 自身または余白タップ：キャンセル
+      cancelMove();
+      showNotice('移動をキャンセルしました', 1200);
+      return;
+    }
+
+    // 別のトップレベル要素がタップされた：入れ替え確認へ
+    const srcId = movingItemId;
+    const dstId = targetTopId;
+    const srcItem = findItemById(srcId);
+    const dstItem = findItemById(dstId);
+
+    cancelMove();
+
+    if (srcItem && dstItem){
+      const srcName = getItemDisplayName(srcItem);
+      const dstName = getItemDisplayName(dstItem);
+      askSwapItems(srcId, dstId, srcName, dstName);
+    }
+    return;
   }
-  if (pending40Id != null){
-    const r = getTimerRef(pending40Id);
+
+  // 待機中（受取・再出発・使い切り計算中）のタイマーがある場合：
+  // そのカード外のタップは「待機状態を解除するキャンセルタップ」として消費し、他のタイマー等の誤作動を防ぐ
+  const activePendingId = claimId || pending40Id;
+  if (activePendingId != null){
+    const r = getTimerRef(activePendingId);
     if (!r || !r.el.contains(e.target)){
-      const id = pending40Id;
-      pending40Id = null;
-      paintUseChunkPreview(id);
+      cancelAllPendingStates();
+      e.preventDefault();
+      e.stopPropagation();
+
+      const pid = e.pointerId;
+      const cancelEater = (ev) => {
+        if (ev.pointerId === pid || ev.type === 'click'){
+          ev.preventDefault();
+          ev.stopPropagation();
+          if (ev.type === 'pointerup' || ev.type === 'pointercancel' || ev.type === 'click'){
+            window.removeEventListener('pointerup', cancelEater, true);
+            window.removeEventListener('pointercancel', cancelEater, true);
+            window.removeEventListener('click', cancelEater, true);
+          }
+        }
+      };
+      window.addEventListener('pointerup', cancelEater, {capture:true, passive:false});
+      window.addEventListener('pointercancel', cancelEater, {capture:true, passive:false});
+      window.addEventListener('click', cancelEater, {capture:true, passive:false});
+      return;
     }
   }
   // ポップアップモーダル（トースト・追加パネル・設定パネル）の枠外タップ処理を一本化
@@ -1915,29 +2075,41 @@ function getRowAssignments(){
   return rows;
 }
 
-function moveTopItem(id, dir){
+function startMoveItem(id){
+  cancelAllPendingStates();
   const topId = getTopLevelItemId(id) || id;
-  const idx = state.items.findIndex(i => i.id === topId);
-  if (idx === -1) return;
-  const it = state.items[idx];
-  const isFullRow = (it.type === 'header' || it.type === 'rule');
+  const it = findItemById(topId);
+  if (!it) return;
 
-  if (isFullRow){
-    const rows = getRowAssignments();
-    const rIdx = rows.findIndex(r => r.includes(idx));
-    if (rIdx === -1) return;
-    const targetRowIdx = rIdx + dir;
-    if (targetRowIdx < 0 || targetRowIdx >= rows.length) return;
-    const targetRow = rows[targetRowIdx];
-    const targetIdx = (dir > 0) ? targetRow[targetRow.length - 1] : targetRow[0];
-    const [item] = state.items.splice(idx, 1);
-    state.items.splice(targetIdx, 0, item);
-  } else {
-    const targetIdx = idx + dir;
-    if (targetIdx < 0 || targetIdx >= state.items.length) return;
-    const [item] = state.items.splice(idx, 1);
-    state.items.splice(targetIdx, 0, item);
+  movingItemId = topId;
+  const ref = refs[topId];
+  if (ref && ref.el){
+    ref.el.classList.add('moving-source');
   }
+  showNotice('入れ替え先をタップ（余白タップでキャンセル）', 0);
+}
+
+function cancelMove(){
+  if (movingItemId != null){
+    const ref = refs[movingItemId];
+    if (ref && ref.el){
+      ref.el.classList.remove('moving-source');
+    }
+    if (cardsEl){
+      cardsEl.querySelectorAll('.moving-source').forEach(el => el.classList.remove('moving-source'));
+    }
+    movingItemId = null;
+  }
+  hideNotice();
+}
+
+function swapTopItems(idA, idB){
+  const idxA = state.items.findIndex(i => i.id === idA);
+  const idxB = state.items.findIndex(i => i.id === idB);
+  if (idxA === -1 || idxB === -1 || idxA === idxB) return;
+  const temp = state.items[idxA];
+  state.items[idxA] = state.items[idxB];
+  state.items[idxB] = temp;
   save();
   render();
   startTicking(true);
@@ -2571,9 +2743,8 @@ document.addEventListener('dragstart', (e)=> e.preventDefault());
 // テキスト選択は入力欄側で必要な範囲だけ抑止する。
 document.addEventListener('paste', (e)=> e.preventDefault());
 
-// ── 完全オフライン保護 ＆ 強力スマート更新（In-App Smart Update） ──
+// ── 完全オフライン保護 ＆ 高速スマート更新（In-App Smart Update） ──
 let isUpdating = false;
-let lastUpdateCheckTime = 0;
 
 async function performSmartUpdate(){
   if (isUpdating) return;
@@ -2588,13 +2759,9 @@ async function performSmartUpdate(){
 
   isUpdating = true;
   if (btn) btn.classList.add('spin');
-  showNotice('最新版を確認中…', 0);
+  showNotice('最新版を読み込み中…', 0);
 
   const bust = Date.now().toString(36);
-  const now = Date.now();
-  // 4秒以内の連続タップは強制リフレッシュモード
-  const forceRefresh = (now - lastUpdateCheckTime < 4000);
-  lastUpdateCheckTime = now;
 
   const files = [
     './index.html',
@@ -2615,44 +2782,21 @@ async function performSmartUpdate(){
   ];
 
   try {
-    // 2. ネットワーク疎通確認 & 最新の sw.js を取得して更新差分をチェック
-    const swRes = await fetch('./sw.js?check=' + bust, {
-      method: 'GET',
-      cache: 'no-store',
-      credentials: 'same-origin'
-    });
-    if (!swRes.ok) throw new Error('Network check failed');
-    const newSwText = await swRes.text();
-
-    // 現在キャッシュされている sw.js と比較
-    let currentSwText = '';
-    if ('caches' in window){
-      try {
-        const cachedSw = await caches.match('./sw.js');
-        if (cachedSw) currentSwText = await cachedSw.text();
-      } catch(e){}
-    }
-
-    const hasUpdate = forceRefresh || !currentSwText || (currentSwText !== newSwText);
-
-    if (!hasUpdate){
-      // サーバー上に差分なし：無駄な再起動を省き、最新であることを通知
-      if (btn) btn.classList.remove('spin');
-      isUpdating = false;
-      showNotice('すでに最新バージョンです（更新なし）', 2500);
-      return;
-    }
-
-    showNotice(forceRefresh ? '強制再取得中…' : '新バージョンを検出！更新中…', 0);
-
-    // 3. 全アセットをネットワークから直接キャッシュを無視して一括取得
+    // 2. 全アセットをネットワークからキャッシュ無視で一括取得
     const fetchedResults = await Promise.all(files.map(async f => {
       const res = await fetch(f + '?r=' + bust, { cache: 'no-store', credentials: 'same-origin' });
       if (!res.ok) throw new Error(`${f} (${res.status})`);
       return { path: f, res };
     }));
 
-    showNotice('キャッシュを更新中…', 0);
+    // 3. 最新 sw.js の中身から CACHE_NAME を特定
+    const swItem = fetchedResults.find(x => x.path === './sw.js');
+    let cacheName = 'v' + bust;
+    if (swItem){
+      const swText = await swItem.res.clone().text();
+      const match = swText.match(/CACHE_NAME\s*=\s*['"]([^'"]+)['"]/);
+      if (match) cacheName = match[1];
+    }
 
     // 4. 古いSWを一度解除し、新しいCache Storageに直接書き込み
     if ('serviceWorker' in navigator){
@@ -2661,9 +2805,6 @@ async function performSmartUpdate(){
     }
 
     if ('caches' in window){
-      const match = newSwText.match(/CACHE_NAME\s*=\s*['"]([^'"]+)['"]/);
-      const cacheName = match ? match[1] : ('v' + bust);
-      
       const newCache = await caches.open(cacheName);
       for (const item of fetchedResults){
         await newCache.put(item.path, item.res.clone());

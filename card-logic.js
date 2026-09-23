@@ -48,16 +48,81 @@ document.addEventListener('pointerdown', (e) => {
       if (sel && sel.rangeCount) sel.removeAllRanges();
     }
   } catch(err){}
-  if (claimId != null){
-    const r = getTimerRef(claimId);
-    if (!r || !r.el.contains(e.target)) cancelClaim(claimId);
+  // 移動選択中（入れ替え待機中）の場合：
+  if (movingItemId != null){
+    e.preventDefault();
+    e.stopPropagation();
+
+    // 突き抜け防止（pointerup / click をイート）
+    const pid = e.pointerId;
+    const eater = (ev) => {
+      if (ev.pointerId === pid || ev.type === 'click'){
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (ev.type === 'pointerup' || ev.type === 'pointercancel' || ev.type === 'click'){
+          window.removeEventListener('pointerup', eater, true);
+          window.removeEventListener('pointercancel', eater, true);
+          window.removeEventListener('click', eater, true);
+        }
+      }
+    };
+    window.addEventListener('pointerup', eater, {capture:true, passive:false});
+    window.addEventListener('pointercancel', eater, {capture:true, passive:false});
+    window.addEventListener('click', eater, {capture:true, passive:false});
+
+    // タップされた要素から一番近いトップレベルアイテムのIDを検索
+    const host = (e.target && e.target.closest) ? e.target.closest('[data-id]') : null;
+    const targetTopId = host ? (getTopLevelItemId(host.dataset.id) || host.dataset.id) : null;
+
+    if (!targetTopId || targetTopId === movingItemId){
+      // 自身または余白タップ：キャンセル
+      cancelMove();
+      showNotice('移動をキャンセルしました', 1200);
+      return;
+    }
+
+    // 別のトップレベル要素がタップされた：入れ替え確認へ
+    const srcId = movingItemId;
+    const dstId = targetTopId;
+    const srcItem = findItemById(srcId);
+    const dstItem = findItemById(dstId);
+
+    cancelMove();
+
+    if (srcItem && dstItem){
+      const srcName = getItemDisplayName(srcItem);
+      const dstName = getItemDisplayName(dstItem);
+      askSwapItems(srcId, dstId, srcName, dstName);
+    }
+    return;
   }
-  if (pending40Id != null){
-    const r = getTimerRef(pending40Id);
+
+  // 待機中（受取・再出発・使い切り計算中）のタイマーがある場合：
+  // そのカード外のタップは「待機状態を解除するキャンセルタップ」として消費し、他のタイマー等の誤作動を防ぐ
+  const activePendingId = claimId || pending40Id;
+  if (activePendingId != null){
+    const r = getTimerRef(activePendingId);
     if (!r || !r.el.contains(e.target)){
-      const id = pending40Id;
-      pending40Id = null;
-      paintUseChunkPreview(id);
+      cancelAllPendingStates();
+      e.preventDefault();
+      e.stopPropagation();
+
+      const pid = e.pointerId;
+      const cancelEater = (ev) => {
+        if (ev.pointerId === pid || ev.type === 'click'){
+          ev.preventDefault();
+          ev.stopPropagation();
+          if (ev.type === 'pointerup' || ev.type === 'pointercancel' || ev.type === 'click'){
+            window.removeEventListener('pointerup', cancelEater, true);
+            window.removeEventListener('pointercancel', cancelEater, true);
+            window.removeEventListener('click', cancelEater, true);
+          }
+        }
+      };
+      window.addEventListener('pointerup', cancelEater, {capture:true, passive:false});
+      window.addEventListener('pointercancel', cancelEater, {capture:true, passive:false});
+      window.addEventListener('click', cancelEater, {capture:true, passive:false});
+      return;
     }
   }
   // ポップアップモーダル（トースト・追加パネル・設定パネル）の枠外タップ処理を一本化
@@ -152,29 +217,41 @@ function getRowAssignments(){
   return rows;
 }
 
-function moveTopItem(id, dir){
+function startMoveItem(id){
+  cancelAllPendingStates();
   const topId = getTopLevelItemId(id) || id;
-  const idx = state.items.findIndex(i => i.id === topId);
-  if (idx === -1) return;
-  const it = state.items[idx];
-  const isFullRow = (it.type === 'header' || it.type === 'rule');
+  const it = findItemById(topId);
+  if (!it) return;
 
-  if (isFullRow){
-    const rows = getRowAssignments();
-    const rIdx = rows.findIndex(r => r.includes(idx));
-    if (rIdx === -1) return;
-    const targetRowIdx = rIdx + dir;
-    if (targetRowIdx < 0 || targetRowIdx >= rows.length) return;
-    const targetRow = rows[targetRowIdx];
-    const targetIdx = (dir > 0) ? targetRow[targetRow.length - 1] : targetRow[0];
-    const [item] = state.items.splice(idx, 1);
-    state.items.splice(targetIdx, 0, item);
-  } else {
-    const targetIdx = idx + dir;
-    if (targetIdx < 0 || targetIdx >= state.items.length) return;
-    const [item] = state.items.splice(idx, 1);
-    state.items.splice(targetIdx, 0, item);
+  movingItemId = topId;
+  const ref = refs[topId];
+  if (ref && ref.el){
+    ref.el.classList.add('moving-source');
   }
+  showNotice('入れ替え先をタップ（余白タップでキャンセル）', 0);
+}
+
+function cancelMove(){
+  if (movingItemId != null){
+    const ref = refs[movingItemId];
+    if (ref && ref.el){
+      ref.el.classList.remove('moving-source');
+    }
+    if (cardsEl){
+      cardsEl.querySelectorAll('.moving-source').forEach(el => el.classList.remove('moving-source'));
+    }
+    movingItemId = null;
+  }
+  hideNotice();
+}
+
+function swapTopItems(idA, idB){
+  const idxA = state.items.findIndex(i => i.id === idA);
+  const idxB = state.items.findIndex(i => i.id === idB);
+  if (idxA === -1 || idxB === -1 || idxA === idxB) return;
+  const temp = state.items[idxA];
+  state.items[idxA] = state.items[idxB];
+  state.items[idxB] = temp;
   save();
   render();
   startTicking(true);

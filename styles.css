@@ -143,10 +143,23 @@
     border-radius:8px;
   }
   .divider.longpress-target{
-    box-shadow:0 0 0 1.5px var(--danger) !important;
-    border-radius:6px;
+    border-bottom: 2px solid var(--header-color, var(--accent)) !important;
+    box-shadow: none !important;
+  }
+  .divider.longpress-target .header-menu-button{
+    background: var(--header-color, var(--accent)) !important;
+    opacity: 1 !important;
   }
   .rule-line.longpress-target{ border-top-color:var(--danger) !important; }
+
+  /* 選択移動中のスマート破線アウトライン（レイアウト変化ゼロ・超軽量） */
+  .moving-source{
+    outline: 2px dashed #4da3ff !important;
+    outline-offset: 2px;
+    position: relative;
+    z-index: 5;
+    opacity: 0.88;
+  }
 
   .row{display:flex; align-items:center; gap:3px; min-width:0;}
   .row + .row{margin-top:3px;}
@@ -308,6 +321,26 @@
   /* 放置タイマー：2時間未満は明るめオレンジ、カウントストップ時は赤文字 */
   .valrow-idle .main.warn{color:#ffab5c !important;}
   .valrow-idle .main.stop{color:var(--danger) !important;}
+  /* 放置・遠征のタップ時（受取 / 再出発）：緑枠に合わせて文字もすっきりとした日本語UIフォントに調整 */
+  .card.idle.claim .valrow-idle .main,
+  .card.exped.claim .valrow-idle .main{
+    font-size:13.5px;
+    font-weight:700;
+    font-family:system-ui, -apple-system, sans-serif;
+    letter-spacing:0.04em;
+    color:var(--ok) !important;
+  }
+  .card.exped.full .valrow-idle .main{
+    font-size:13.5px;
+    font-weight:700;
+    font-family:system-ui, -apple-system, sans-serif;
+    letter-spacing:0.04em;
+  }
+  .card.idle.full .valrow-idle .main{
+    font-size:15.5px;
+    font-weight:700;
+    letter-spacing:0.04em;
+  }
   /* 数字の操作は透明な ::before ヒットボックスを使わず、実際の数字要素で受ける。 */
   [data-role="curWrap"], [data-role="maxWrap"]{ position:relative; }
   .divider{

@@ -26,6 +26,7 @@ let tickId = null;
 let tickGen = 0;
 let pending40Id = null;
 let claimId = null;
+let movingItemId = null;
 // インライン数字編集中の対象。null | `${itemId}:cur` | `${itemId}:max`
 let editingId = null;
 
