@@ -355,6 +355,9 @@ function bindTimerShortAction(el, shortAction){
 
   el.addEventListener('pointerdown', e=>{
     if (!isPrimary(e) || active || editingId != null || isEditTarget(e.target)) return;
+    // 待機中（受取待機・使い切り計算中）の別タイマーがある場合、このタイマーの操作をブロック（誤タップ防止）
+    const otherActiveId = claimId || pending40Id;
+    if (otherActiveId != null && el.dataset.id !== otherActiveId) return;
     active = true; moved = false; pid = e.pointerId;
     sx = e.clientX; sy = e.clientY;
   }, {capture:true, passive:true});

@@ -53,35 +53,15 @@ document.addEventListener('pointerdown', (e) => {
     e.preventDefault();
     e.stopPropagation();
 
-    // 突き抜け防止（pointerup / click をイート）
-    const pid = e.pointerId;
-    const eater = (ev) => {
-      if (ev.pointerId === pid || ev.type === 'click'){
-        ev.preventDefault();
-        ev.stopPropagation();
-        if (ev.type === 'pointerup' || ev.type === 'pointercancel' || ev.type === 'click'){
-          window.removeEventListener('pointerup', eater, true);
-          window.removeEventListener('pointercancel', eater, true);
-          window.removeEventListener('click', eater, true);
-        }
-      }
-    };
-    window.addEventListener('pointerup', eater, {capture:true, passive:false});
-    window.addEventListener('pointercancel', eater, {capture:true, passive:false});
-    window.addEventListener('click', eater, {capture:true, passive:false});
-
-    // タップされた要素から一番近いトップレベルアイテムのIDを検索
     const host = (e.target && e.target.closest) ? e.target.closest('[data-id]') : null;
     const targetTopId = host ? (getTopLevelItemId(host.dataset.id) || host.dataset.id) : null;
 
     if (!targetTopId || targetTopId === movingItemId){
-      // 自身または余白タップ：キャンセル
       cancelMove();
       showNotice('移動をキャンセルしました', 1200);
       return;
     }
 
-    // 別のトップレベル要素がタップされた：入れ替え確認へ
     const srcId = movingItemId;
     const dstId = targetTopId;
     const srcItem = findItemById(srcId);
@@ -97,32 +77,17 @@ document.addEventListener('pointerdown', (e) => {
     return;
   }
 
-  // 待機中（受取・再出発・使い切り計算中）のタイマーがある場合：
-  // そのカード外のタップは「待機状態を解除するキャンセルタップ」として消費し、他のタイマー等の誤作動を防ぐ
-  const activePendingId = claimId || pending40Id;
-  if (activePendingId != null){
-    const r = getTimerRef(activePendingId);
+  // 待機中（受取・再出発・使い切り計算中）のタイマーがある場合：枠外タップで安全に通常表示へ復帰
+  if (claimId != null){
+    const r = getTimerRef(claimId);
+    if (!r || !r.el.contains(e.target)) cancelClaim(claimId);
+  }
+  if (pending40Id != null){
+    const r = getTimerRef(pending40Id);
     if (!r || !r.el.contains(e.target)){
-      cancelAllPendingStates();
-      e.preventDefault();
-      e.stopPropagation();
-
-      const pid = e.pointerId;
-      const cancelEater = (ev) => {
-        if (ev.pointerId === pid || ev.type === 'click'){
-          ev.preventDefault();
-          ev.stopPropagation();
-          if (ev.type === 'pointerup' || ev.type === 'pointercancel' || ev.type === 'click'){
-            window.removeEventListener('pointerup', cancelEater, true);
-            window.removeEventListener('pointercancel', cancelEater, true);
-            window.removeEventListener('click', cancelEater, true);
-          }
-        }
-      };
-      window.addEventListener('pointerup', cancelEater, {capture:true, passive:false});
-      window.addEventListener('pointercancel', cancelEater, {capture:true, passive:false});
-      window.addEventListener('click', cancelEater, {capture:true, passive:false});
-      return;
+      const id = pending40Id;
+      pending40Id = null;
+      paintUseChunkPreview(id);
     }
   }
   // ポップアップモーダル（トースト・追加パネル・設定パネル）の枠外タップ処理を一本化

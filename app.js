@@ -762,6 +762,9 @@ function bindTimerShortAction(el, shortAction){
 
   el.addEventListener('pointerdown', e=>{
     if (!isPrimary(e) || active || editingId != null || isEditTarget(e.target)) return;
+    // 待機中（受取待機・使い切り計算中）の別タイマーがある場合、このタイマーの操作をブロック（誤タップ防止）
+    const otherActiveId = claimId || pending40Id;
+    if (otherActiveId != null && el.dataset.id !== otherActiveId) return;
     active = true; moved = false; pid = e.pointerId;
     sx = e.clientX; sy = e.clientY;
   }, {capture:true, passive:true});
@@ -835,7 +838,7 @@ function showConfirmToast(html, onAct){
     }
 
     // 移動・複製・入れ替え：トーストを閉じて即時実行
-    if (act === 'startMove' || act === 'cloneItem' || act === 'swap' || act === 'moveUp' || act === 'moveDown'){
+    if (act === 'startMove' || act === 'cloneGroup' || act === 'swap'){
       closeToast();
       if (typeof onAct === 'function') onAct(act, btn);
       return;
@@ -905,62 +908,30 @@ function getItemDisplayName(it){
   return 'タイマー';
 }
 
-function cloneItem(id){
-  const it = findItemById(id);
-  if (!it) return;
-
-  // グループ内のタイマーが対象の場合
-  if (it.type === 'stam' || it.type === 'orb' || it.type === 'idle' || it.type === 'exped'){
-    const parent = state.items.find(p => p.type === 'group' && p.children && p.children.some(c => c.id === id));
-    if (parent){
-      if (parent.children.length >= 4){
-        showNotice('枠がいっぱいです（最大4つ）', 2000);
-        return;
-      }
-      const cIdx = parent.children.findIndex(c => c.id === id);
-      const copy = JSON.parse(JSON.stringify(it));
-      copy.id = uid();
-      const now = Date.now();
-      copy.start = now;
-      copy.updatedAt = now;
-      if (copy.state === 'claim') copy.state = 'running';
-      parent.children.splice(cIdx + 1, 0, copy);
-      save(); render(); startTicking(true);
-      showNotice('タイマーを複製しました', 1500);
-      return;
-    }
-  }
-
-  // トップレベル（アカウント枠 / 見出し / 仕切り線 / 単独タイマー）の場合
+function cloneGroup(id){
   const topId = getTopLevelItemId(id) || id;
   const topIdx = state.items.findIndex(i => i.id === topId);
   if (topIdx === -1) return;
   const orig = state.items[topIdx];
+  if (!orig || orig.type !== 'group') return;
+
   const copy = JSON.parse(JSON.stringify(orig));
   copy.id = uid();
   const now = Date.now();
+  if (copy.name) copy.name = copy.name + ' (コピー)';
 
-  if (copy.type === 'group'){
-    if (copy.name) copy.name = copy.name + ' (コピー)';
-    if (Array.isArray(copy.children)){
-      copy.children.forEach(c => {
-        c.id = uid();
-        c.start = now;
-        c.updatedAt = now;
-        if (c.state === 'claim') c.state = 'running';
-      });
-    }
-  } else if (copy.type === 'header'){
-    if (copy.name) copy.name = copy.name + ' (コピー)';
-  } else if (copy.type === 'stam' || copy.type === 'orb' || copy.type === 'idle' || copy.type === 'exped'){
-    copy.start = now;
-    copy.updatedAt = now;
-    if (copy.state === 'claim') copy.state = 'running';
+  if (Array.isArray(copy.children)){
+    copy.children.forEach(c => {
+      c.id = uid();
+      c.start = now;
+      c.updatedAt = now;
+      if (c.state === 'claim') c.state = 'running';
+    });
   }
 
   state.items.splice(topIdx + 1, 0, copy);
   save(); render(); startTicking(true);
-  showNotice('複製しました', 1500);
+  showNotice('枠を複製しました', 1500);
 }
 
 function askSwapItems(idA, idB, nameA, nameB){
@@ -998,13 +969,7 @@ function askRemoveItem(id){
   const isOrb = it && it.type === 'orb';
   const isIdle = it && (it.type === 'idle' || it.type === 'exped');
   const canAdd = isGroup && it.children.length < 4;
-  const canInsertOrMove = isHeader || isGroup || isRule;
-  const canEditName = isHeader || isGroup;
   const colorDefault = isHeader ? (it.color || '#9b8bff') : (isRule ? (it.color || '#52617a') : (isGroup ? (it.color || '#555b68') : null));
-
-  const actionButtons = canInsertOrMove
-    ? `<div class="toast-fields-btns"><button type="button" data-act="startMove">移動</button><button type="button" data-act="cloneItem">複製</button></div>`
-    : `<div class="toast-fields-btns"><button type="button" data-act="cloneItem" style="grid-column:1/-1;">タイマーを複製</button></div>`;
 
   let fields = '';
   if (isGroup){
@@ -1016,7 +981,10 @@ function askRemoveItem(id){
         ${canAdd ? '<button type="button" data-act="add">タイマー追加</button>' : ''}
         <button type="button" data-act="insertBelow"${!canAdd ? ' style="grid-column:1/-1;"' : ''}>枠を追加</button>
       </div>
-      ${actionButtons}
+      <div class="toast-fields-btns">
+        <button type="button" data-act="startMove">移動</button>
+        <button type="button" data-act="cloneGroup">枠を複製</button>
+      </div>
     `;
   } else if (isHeader){
     fields = `
@@ -1024,19 +992,22 @@ function askRemoveItem(id){
       <label class="toast-field"><span class="toast-color"><span class="toast-label">色</span><input type="color" value="${colorDefault}" aria-label="色"></span></label>
       <button type="button" class="toast-half-btn" data-act="toggleFoldLock">${it.foldLock ? '折りたたみ：🔒' : '折りたたみ：🔓'}</button>
       <button type="button" data-act="insertBelow">枠を追加</button>
-      ${actionButtons}
+      <div class="toast-fields-btns">
+        <button type="button" data-act="startMove" style="grid-column:1/-1;">移動</button>
+      </div>
     `;
   } else if (isRule){
     fields = `
       <label class="toast-field wide"><span class="toast-color"><span class="toast-label">色</span><input type="color" value="${colorDefault}" aria-label="色"></span></label>
       <button type="button" data-act="insertBelow">枠を追加</button>
-      ${actionButtons}
+      <div class="toast-fields-btns">
+        <button type="button" data-act="startMove" style="grid-column:1/-1;">移動</button>
+      </div>
     `;
   } else {
     fields = (isStam ? stamToastRowsHtml(it) : '')
       + (isOrb ? orbToastRowsHtml(it) : '')
-      + (isIdle ? idleToastRowsHtml(it) : '')
-      + actionButtons;
+      + (isIdle ? idleToastRowsHtml(it) : '');
   }
 
   const extra = fields ? `<div class="toast-fields">${fields}</div>` : '';
@@ -1051,7 +1022,7 @@ function askRemoveItem(id){
       else if (act === 'add') openAddPanel({ groupId: id });
       else if (act === 'insertBelow') openAddPanel({ insertAfterId: id });
       else if (act === 'startMove') startMoveItem(id);
-      else if (act === 'cloneItem') cloneItem(id);
+      else if (act === 'cloneGroup') cloneGroup(id);
       else if (act === 'toggleGroupLayout'){
         it.layout = (it.layout === '2x2') ? '1row' : '2x2';
         if (btn) btn.textContent = (it.layout === '2x2') ? '配置：⊞ 2×2' : '配置：☰ 1行';
@@ -1911,35 +1882,15 @@ document.addEventListener('pointerdown', (e) => {
     e.preventDefault();
     e.stopPropagation();
 
-    // 突き抜け防止（pointerup / click をイート）
-    const pid = e.pointerId;
-    const eater = (ev) => {
-      if (ev.pointerId === pid || ev.type === 'click'){
-        ev.preventDefault();
-        ev.stopPropagation();
-        if (ev.type === 'pointerup' || ev.type === 'pointercancel' || ev.type === 'click'){
-          window.removeEventListener('pointerup', eater, true);
-          window.removeEventListener('pointercancel', eater, true);
-          window.removeEventListener('click', eater, true);
-        }
-      }
-    };
-    window.addEventListener('pointerup', eater, {capture:true, passive:false});
-    window.addEventListener('pointercancel', eater, {capture:true, passive:false});
-    window.addEventListener('click', eater, {capture:true, passive:false});
-
-    // タップされた要素から一番近いトップレベルアイテムのIDを検索
     const host = (e.target && e.target.closest) ? e.target.closest('[data-id]') : null;
     const targetTopId = host ? (getTopLevelItemId(host.dataset.id) || host.dataset.id) : null;
 
     if (!targetTopId || targetTopId === movingItemId){
-      // 自身または余白タップ：キャンセル
       cancelMove();
       showNotice('移動をキャンセルしました', 1200);
       return;
     }
 
-    // 別のトップレベル要素がタップされた：入れ替え確認へ
     const srcId = movingItemId;
     const dstId = targetTopId;
     const srcItem = findItemById(srcId);
@@ -1955,32 +1906,17 @@ document.addEventListener('pointerdown', (e) => {
     return;
   }
 
-  // 待機中（受取・再出発・使い切り計算中）のタイマーがある場合：
-  // そのカード外のタップは「待機状態を解除するキャンセルタップ」として消費し、他のタイマー等の誤作動を防ぐ
-  const activePendingId = claimId || pending40Id;
-  if (activePendingId != null){
-    const r = getTimerRef(activePendingId);
+  // 待機中（受取・再出発・使い切り計算中）のタイマーがある場合：枠外タップで安全に通常表示へ復帰
+  if (claimId != null){
+    const r = getTimerRef(claimId);
+    if (!r || !r.el.contains(e.target)) cancelClaim(claimId);
+  }
+  if (pending40Id != null){
+    const r = getTimerRef(pending40Id);
     if (!r || !r.el.contains(e.target)){
-      cancelAllPendingStates();
-      e.preventDefault();
-      e.stopPropagation();
-
-      const pid = e.pointerId;
-      const cancelEater = (ev) => {
-        if (ev.pointerId === pid || ev.type === 'click'){
-          ev.preventDefault();
-          ev.stopPropagation();
-          if (ev.type === 'pointerup' || ev.type === 'pointercancel' || ev.type === 'click'){
-            window.removeEventListener('pointerup', cancelEater, true);
-            window.removeEventListener('pointercancel', cancelEater, true);
-            window.removeEventListener('click', cancelEater, true);
-          }
-        }
-      };
-      window.addEventListener('pointerup', cancelEater, {capture:true, passive:false});
-      window.addEventListener('pointercancel', cancelEater, {capture:true, passive:false});
-      window.addEventListener('click', cancelEater, {capture:true, passive:false});
-      return;
+      const id = pending40Id;
+      pending40Id = null;
+      paintUseChunkPreview(id);
     }
   }
   // ポップアップモーダル（トースト・追加パネル・設定パネル）の枠外タップ処理を一本化
