@@ -439,6 +439,10 @@
     min-width:0; color:#e2e8f0; font-size:11.5px; font-weight:600; line-height:1.2;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   }
+  #toast button, #toast label, #nameEditPanel button, #colorPickerPanel button{
+    -webkit-tap-highlight-color: transparent !important;
+    outline: none !important;
+  }
   #toast .toast-fields > button{
     grid-column:1 / -1; width:100%; min-height:30px; padding:5px 8px;
     font-size:11.5px; font-weight:600; border-radius:6px;
@@ -734,15 +738,11 @@
     aspect-ratio:1/1; width:100%; min-height:28px; border-radius:50%;
     border:1.5px solid rgba(255,255,255,0.3); padding:0; cursor:pointer;
     appearance:none; -webkit-appearance:none; outline:none;
-    box-sizing:border-box; transition:transform 0.1s, border-color 0.1s;
-  }
-  .color-swatch-btn:active{
-    transform:scale(0.9);
+    box-sizing:border-box;
   }
   .color-swatch-btn.active{
-    border:2.5px solid #ffffff;
-    box-shadow:0 0 0 2px var(--accent), 0 0 8px rgba(255,209,102,0.6);
-    transform:scale(1.08);
+    border:2px solid #ffffff;
+    box-shadow:0 0 0 2px var(--accent);
   }
   .color-custom-section{
     margin-top:4px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.12);

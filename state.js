@@ -61,7 +61,6 @@ function openNameEditPopup(opts){
   opts = opts || {};
   if (!nameEditOverlayEl || !nameEditInputEl) return;
   if (nameEditFocusTimer){ clearTimeout(nameEditFocusTimer); nameEditFocusTimer = null; }
-  // トースト由来の pointer が残っていると focus 直後に blur されることがある
   closeToast();
   nameEditLabelEl.textContent = opts.label || '名前を編集';
   nameEditInputEl.value = opts.value != null ? String(opts.value) : '';
@@ -69,14 +68,13 @@ function openNameEditPopup(opts){
   nameEditOnOk = typeof opts.onOk === 'function' ? opts.onOk : null;
   nameEditOverlayEl.classList.add('show');
   nameEditOverlayEl.setAttribute('aria-hidden', 'false');
-  // トースト閉鎖・前の pointer が落ち着いてから focus（初回キーボード落ち対策）
   nameEditFocusTimer = setTimeout(()=>{
     nameEditFocusTimer = null;
     if (!nameEditOverlayEl.classList.contains('show')) return;
     try {
       nameEditInputEl.focus({preventScroll:true});
     } catch (e) {}
-  }, 120);
+  }, 100);
 }
 function confirmNameEdit(){
   const v = nameEditInputEl ? nameEditInputEl.value : '';
@@ -85,7 +83,6 @@ function confirmNameEdit(){
   if (cb) cb(v);
 }
 if (nameEditOkEl){
-  // pointerdown だと focus を奪ってキーボードが先に閉じることがある → click で確定
   nameEditOkEl.addEventListener('click', e=>{
     e.preventDefault();
     e.stopPropagation();
@@ -151,12 +148,13 @@ const colorPickerLabelEl = document.getElementById('colorPickerLabel');
 const colorPresetRow1El = document.getElementById('colorPresetRow1');
 const colorPresetRow2El = document.getElementById('colorPresetRow2');
 const colorCustomSlotsEl = document.getElementById('colorCustomSlots');
+const customColorAddBtnEl = document.getElementById('customColorAddBtn');
 const nativeColorInputEl = document.getElementById('nativeColorInput');
 const colorPickerCloseEl = document.getElementById('colorPickerClose');
 
 let colorPickerOnSelect = null;
 let activeCustomSlotIndex = 0;
-let colorPickerGuardUntil = 0;
+let colorPickerOpenTime = 0;
 
 function loadCustomColors(){
   try {
@@ -184,6 +182,7 @@ function closeColorPickerPopup(){
   colorPickerOverlayEl.classList.remove('show');
   colorPickerOverlayEl.setAttribute('aria-hidden', 'true');
   colorPickerOnSelect = null;
+  closeToast();
 }
 
 function renderColorPickerSwatches(currentColor){
@@ -202,7 +201,7 @@ function renderColorPickerSwatches(currentColor){
     btn.addEventListener('click', (e)=>{
       e.preventDefault();
       e.stopPropagation();
-      if (Date.now() < colorPickerGuardUntil) return; // 貫通タップガード
+      if (Date.now() - colorPickerOpenTime < 180) return; // 開いた瞬間のゴーストクリックのみ破棄
       if (colorPickerOnSelect) colorPickerOnSelect(hex);
       closeColorPickerPopup();
     });
@@ -221,7 +220,7 @@ function renderColorPickerSwatches(currentColor){
     btn.addEventListener('click', (e)=>{
       e.preventDefault();
       e.stopPropagation();
-      if (Date.now() < colorPickerGuardUntil) return; // 貫通タップガード
+      if (Date.now() - colorPickerOpenTime < 180) return; // 開いた瞬間のゴーストクリックのみ破棄
       if (colorPickerOnSelect) colorPickerOnSelect(hex);
       closeColorPickerPopup();
     });
@@ -241,7 +240,7 @@ function renderColorPickerSwatches(currentColor){
     btn.addEventListener('click', (e)=>{
       e.preventDefault();
       e.stopPropagation();
-      if (Date.now() < colorPickerGuardUntil) return; // 貫通タップガード
+      if (Date.now() - colorPickerOpenTime < 180) return;
       activeCustomSlotIndex = idx;
       if (colorPickerOnSelect) colorPickerOnSelect(hex);
       closeColorPickerPopup();
@@ -253,8 +252,8 @@ function renderColorPickerSwatches(currentColor){
 function openColorPickerPopup(opts){
   opts = opts || {};
   if (!colorPickerOverlayEl) return;
-  // 貫通タップ・ゴーストクリックガード（開いた直後300msはタップを受け付けない）
-  colorPickerGuardUntil = Date.now() + 300;
+  closeToast();
+  colorPickerOpenTime = Date.now();
   if (colorPickerLabelEl) colorPickerLabelEl.textContent = opts.label || '色を選択';
   colorPickerOnSelect = typeof opts.onSelect === 'function' ? opts.onSelect : null;
   const current = opts.currentColor || '#555b68';
@@ -264,24 +263,34 @@ function openColorPickerPopup(opts){
   colorPickerOverlayEl.setAttribute('aria-hidden', 'false');
 }
 
+if (customColorAddBtnEl && nativeColorInputEl){
+  customColorAddBtnEl.addEventListener('click', (e)=>{
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      nativeColorInputEl.click();
+    } catch(err){}
+  });
+}
+
 if (colorPickerCloseEl){
   colorPickerCloseEl.addEventListener('click', (e)=>{
     e.preventDefault();
     e.stopPropagation();
-    if (Date.now() < colorPickerGuardUntil) return;
     closeColorPickerPopup();
   });
 }
 
 if (colorPickerOverlayEl){
-  colorPickerOverlayEl.addEventListener('pointerdown', (e)=>{
+  const onOverlayBgTap = (e)=>{
     if (e.target === colorPickerOverlayEl){
       e.preventDefault();
       e.stopPropagation();
-      if (Date.now() < colorPickerGuardUntil) return;
       closeColorPickerPopup();
     }
-  });
+  };
+  colorPickerOverlayEl.addEventListener('pointerdown', onOverlayBgTap);
+  colorPickerOverlayEl.addEventListener('click', onOverlayBgTap);
 }
 
 if (nativeColorInputEl){

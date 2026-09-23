@@ -76,10 +76,8 @@
         </div>
         <div class="color-custom-row">
           <div class="color-custom-slots" id="colorCustomSlots"></div>
-          <label class="color-custom-add-btn" title="新しい色を作成して保存">
-            <span>＋</span>
-            <input type="color" id="nativeColorInput" aria-label="自由な色を選択"/>
-          </label>
+          <button type="button" class="color-custom-add-btn" id="customColorAddBtn" title="新しい色を作成して保存">＋</button>
+          <input type="color" id="nativeColorInput" aria-label="自由な色を選択" style="position:fixed; opacity:0; pointer-events:none; width:0; height:0; left:-9999px;"/>
         </div>
       </div>
     </div>

@@ -61,7 +61,6 @@ function openNameEditPopup(opts){
   opts = opts || {};
   if (!nameEditOverlayEl || !nameEditInputEl) return;
   if (nameEditFocusTimer){ clearTimeout(nameEditFocusTimer); nameEditFocusTimer = null; }
-  // トースト由来の pointer が残っていると focus 直後に blur されることがある
   closeToast();
   nameEditLabelEl.textContent = opts.label || '名前を編集';
   nameEditInputEl.value = opts.value != null ? String(opts.value) : '';
@@ -69,14 +68,13 @@ function openNameEditPopup(opts){
   nameEditOnOk = typeof opts.onOk === 'function' ? opts.onOk : null;
   nameEditOverlayEl.classList.add('show');
   nameEditOverlayEl.setAttribute('aria-hidden', 'false');
-  // トースト閉鎖・前の pointer が落ち着いてから focus（初回キーボード落ち対策）
   nameEditFocusTimer = setTimeout(()=>{
     nameEditFocusTimer = null;
     if (!nameEditOverlayEl.classList.contains('show')) return;
     try {
       nameEditInputEl.focus({preventScroll:true});
     } catch (e) {}
-  }, 120);
+  }, 100);
 }
 function confirmNameEdit(){
   const v = nameEditInputEl ? nameEditInputEl.value : '';
@@ -85,7 +83,6 @@ function confirmNameEdit(){
   if (cb) cb(v);
 }
 if (nameEditOkEl){
-  // pointerdown だと focus を奪ってキーボードが先に閉じることがある → click で確定
   nameEditOkEl.addEventListener('click', e=>{
     e.preventDefault();
     e.stopPropagation();
@@ -151,12 +148,13 @@ const colorPickerLabelEl = document.getElementById('colorPickerLabel');
 const colorPresetRow1El = document.getElementById('colorPresetRow1');
 const colorPresetRow2El = document.getElementById('colorPresetRow2');
 const colorCustomSlotsEl = document.getElementById('colorCustomSlots');
+const customColorAddBtnEl = document.getElementById('customColorAddBtn');
 const nativeColorInputEl = document.getElementById('nativeColorInput');
 const colorPickerCloseEl = document.getElementById('colorPickerClose');
 
 let colorPickerOnSelect = null;
 let activeCustomSlotIndex = 0;
-let colorPickerGuardUntil = 0;
+let colorPickerOpenTime = 0;
 
 function loadCustomColors(){
   try {
@@ -184,6 +182,7 @@ function closeColorPickerPopup(){
   colorPickerOverlayEl.classList.remove('show');
   colorPickerOverlayEl.setAttribute('aria-hidden', 'true');
   colorPickerOnSelect = null;
+  closeToast();
 }
 
 function renderColorPickerSwatches(currentColor){
@@ -202,7 +201,7 @@ function renderColorPickerSwatches(currentColor){
     btn.addEventListener('click', (e)=>{
       e.preventDefault();
       e.stopPropagation();
-      if (Date.now() < colorPickerGuardUntil) return; // 貫通タップガード
+      if (Date.now() - colorPickerOpenTime < 180) return; // 開いた瞬間のゴーストクリックのみ破棄
       if (colorPickerOnSelect) colorPickerOnSelect(hex);
       closeColorPickerPopup();
     });
@@ -221,7 +220,7 @@ function renderColorPickerSwatches(currentColor){
     btn.addEventListener('click', (e)=>{
       e.preventDefault();
       e.stopPropagation();
-      if (Date.now() < colorPickerGuardUntil) return; // 貫通タップガード
+      if (Date.now() - colorPickerOpenTime < 180) return; // 開いた瞬間のゴーストクリックのみ破棄
       if (colorPickerOnSelect) colorPickerOnSelect(hex);
       closeColorPickerPopup();
     });
@@ -241,7 +240,7 @@ function renderColorPickerSwatches(currentColor){
     btn.addEventListener('click', (e)=>{
       e.preventDefault();
       e.stopPropagation();
-      if (Date.now() < colorPickerGuardUntil) return; // 貫通タップガード
+      if (Date.now() - colorPickerOpenTime < 180) return;
       activeCustomSlotIndex = idx;
       if (colorPickerOnSelect) colorPickerOnSelect(hex);
       closeColorPickerPopup();
@@ -253,8 +252,8 @@ function renderColorPickerSwatches(currentColor){
 function openColorPickerPopup(opts){
   opts = opts || {};
   if (!colorPickerOverlayEl) return;
-  // 貫通タップ・ゴーストクリックガード（開いた直後300msはタップを受け付けない）
-  colorPickerGuardUntil = Date.now() + 300;
+  closeToast();
+  colorPickerOpenTime = Date.now();
   if (colorPickerLabelEl) colorPickerLabelEl.textContent = opts.label || '色を選択';
   colorPickerOnSelect = typeof opts.onSelect === 'function' ? opts.onSelect : null;
   const current = opts.currentColor || '#555b68';
@@ -264,24 +263,34 @@ function openColorPickerPopup(opts){
   colorPickerOverlayEl.setAttribute('aria-hidden', 'false');
 }
 
+if (customColorAddBtnEl && nativeColorInputEl){
+  customColorAddBtnEl.addEventListener('click', (e)=>{
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      nativeColorInputEl.click();
+    } catch(err){}
+  });
+}
+
 if (colorPickerCloseEl){
   colorPickerCloseEl.addEventListener('click', (e)=>{
     e.preventDefault();
     e.stopPropagation();
-    if (Date.now() < colorPickerGuardUntil) return;
     closeColorPickerPopup();
   });
 }
 
 if (colorPickerOverlayEl){
-  colorPickerOverlayEl.addEventListener('pointerdown', (e)=>{
+  const onOverlayBgTap = (e)=>{
     if (e.target === colorPickerOverlayEl){
       e.preventDefault();
       e.stopPropagation();
-      if (Date.now() < colorPickerGuardUntil) return;
       closeColorPickerPopup();
     }
-  });
+  };
+  colorPickerOverlayEl.addEventListener('pointerdown', onOverlayBgTap);
+  colorPickerOverlayEl.addEventListener('click', onOverlayBgTap);
 }
 
 if (nativeColorInputEl){
@@ -999,6 +1008,13 @@ function closeToast(){
 }// toast-core.js: トーストメニューの開閉・削除確認(askRemoveItem)本体
 // この並び順(index.htmlの<script>タグの順番)を変えると、他ファイルの関数/変数を先に参照してエラーになる場合があります。
 
+function protectBackgroundTap(durationMs = 220){
+  if (cardsEl){
+    cardsEl.style.pointerEvents = 'none';
+    setTimeout(()=>{ if (cardsEl) cardsEl.style.pointerEvents = ''; }, durationMs);
+  }
+}
+
 function showConfirmToast(html, onAct){
   if (!toastEl) return;
   closeToast();
@@ -1009,18 +1025,13 @@ function showConfirmToast(html, onAct){
     if (!btn) return;
     e.preventDefault();
     e.stopPropagation();
+    protectBackgroundTap();
     const act = btn.dataset.act;
 
     // トグル系：トーストを閉じずに即時切り替え＆表示更新
     if (act && act.startsWith('toggle')){
       if (typeof onAct === 'function') onAct(act, btn);
       return;
-    }
-
-    // トーストを閉じた瞬間に背後要素がタップ反応・ハイライトを受けるのを防止
-    if (cardsEl){
-      cardsEl.style.pointerEvents = 'none';
-      setTimeout(()=>{ if (cardsEl) cardsEl.style.pointerEvents = ''; }, 180);
     }
 
     // 移動・複製・入れ替え：トーストを閉じて即時実行
@@ -1052,6 +1063,12 @@ function showConfirmToast(html, onAct){
       }
       closeToast();
       if (typeof onAct === 'function') onAct('yes', btn);
+      return;
+    }
+
+    // ポップアップを開く系（editName / openColorPicker 等）はトーストを保持またはポップアップ側で処理
+    if (act === 'editName' || act === 'openColorPicker'){
+      if (typeof onAct === 'function') onAct(act, btn);
       return;
     }
 

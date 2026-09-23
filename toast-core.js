@@ -1,6 +1,13 @@
 // toast-core.js: トーストメニューの開閉・削除確認(askRemoveItem)本体
 // この並び順(index.htmlの<script>タグの順番)を変えると、他ファイルの関数/変数を先に参照してエラーになる場合があります。
 
+function protectBackgroundTap(durationMs = 220){
+  if (cardsEl){
+    cardsEl.style.pointerEvents = 'none';
+    setTimeout(()=>{ if (cardsEl) cardsEl.style.pointerEvents = ''; }, durationMs);
+  }
+}
+
 function showConfirmToast(html, onAct){
   if (!toastEl) return;
   closeToast();
@@ -11,18 +18,13 @@ function showConfirmToast(html, onAct){
     if (!btn) return;
     e.preventDefault();
     e.stopPropagation();
+    protectBackgroundTap();
     const act = btn.dataset.act;
 
     // トグル系：トーストを閉じずに即時切り替え＆表示更新
     if (act && act.startsWith('toggle')){
       if (typeof onAct === 'function') onAct(act, btn);
       return;
-    }
-
-    // トーストを閉じた瞬間に背後要素がタップ反応・ハイライトを受けるのを防止
-    if (cardsEl){
-      cardsEl.style.pointerEvents = 'none';
-      setTimeout(()=>{ if (cardsEl) cardsEl.style.pointerEvents = ''; }, 180);
     }
 
     // 移動・複製・入れ替え：トーストを閉じて即時実行
@@ -54,6 +56,12 @@ function showConfirmToast(html, onAct){
       }
       closeToast();
       if (typeof onAct === 'function') onAct('yes', btn);
+      return;
+    }
+
+    // ポップアップを開く系（editName / openColorPicker 等）はトーストを保持またはポップアップ側で処理
+    if (act === 'editName' || act === 'openColorPicker'){
+      if (typeof onAct === 'function') onAct(act, btn);
       return;
     }
 
