@@ -46,7 +46,36 @@ function newRuleItem(color){
   return { id: uid(), type:'rule', color: color || '#52617a' };
 }
 function newGroupItem(){
-  return { id: uid(), type:'group', name:'', children: [] };
+  return { id: uid(), type:'group', name:'', color:'#52617a', children: [] };
+}
+
+function clampInt(v, min, max, fb){
+  const n = parseInt(v, 10);
+  return Number.isFinite(n) ? Math.max(min, Math.min(max, n)) : fb;
+}
+
+function findItemById(id){
+  if (!id) return null;
+  for (const it of state.items){
+    if (it.id === id) return it;
+    if (it.type === 'group' && Array.isArray(it.children)){
+      const c = it.children.find(ch => ch.id === id);
+      if (c) return c;
+    }
+  }
+  return null;
+}
+
+function getTopLevelItemId(id){
+  if (!id) return null;
+  const top = state.items.find(i => i.id === id);
+  if (top) return top.id;
+  for (const it of state.items){
+    if (it.type === 'group' && Array.isArray(it.children) && it.children.some(c => c.id === id)){
+      return it.id;
+    }
+  }
+  return null;
 }
 
 // 残り時間ではなく「何時何分に完了するか」を時刻表記で返す(スタミナ用)。

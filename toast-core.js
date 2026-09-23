@@ -246,7 +246,7 @@ function askRemoveItem(id){
   if (colorDefault){
     const colorEl = toastEl.querySelector('.toast-color input[type="color"]');
     if (colorEl){
-      colorEl.addEventListener('input', ()=>{
+      const onColorChange = ()=>{
         it.color = colorEl.value;
         if (isHeader){
           if (refs[id]?.nameEditor) refs[id].nameEditor.setColor(it.color);
@@ -259,7 +259,9 @@ function askRemoveItem(id){
           if (refs[id]?.nameEditor) refs[id].nameEditor.setColor(it.color);
         }
         save();
-      });
+      };
+      colorEl.addEventListener('input', onColorChange);
+      colorEl.addEventListener('change', onColorChange);
       colorEl.addEventListener('pointerdown', e=>e.stopPropagation());
     }
   }

@@ -189,7 +189,10 @@ function save(immediate){ requestSave(immediate ? 'now' : 'debounced'); }
 function saveAfterPaint(){ requestSave('afterPaint'); }
 
 function uid(){ return 'x' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
-// clampInt はここではなく card-logic.js 側で定義（旧app.js時代に同名関数が2つあり、後勝ちでそちらが有効だった名残）。
+function clampInt(v, min, max, fb){
+  const n = parseInt(v, 10);
+  return Number.isFinite(n) ? Math.max(min, Math.min(max, n)) : fb;
+}
 
 // アプリ内のタップ操作は pointerdown に統一。ネイティブ入力の編集開始だけは、
 // 長押しでキーボードを出さないため短い指離し時にfocusする。

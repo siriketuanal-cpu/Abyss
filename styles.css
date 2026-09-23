@@ -436,7 +436,7 @@
   #setupFields .toast-field.wide{grid-column:1 / -1;}
   #toast .toast-label,
   #setupFields .toast-label{
-    min-width:0; color:#8e96a5; font-size:11px; font-weight:600; line-height:1.2;
+    min-width:0; color:#b0b7c3; font-size:11.5px; font-weight:600; line-height:1.2;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   }
   #toast .toast-fields > button{
@@ -492,7 +492,26 @@
     min-width:0; width:100%; height:100%; color:var(--text); font-size:12px;
     white-space:nowrap;
   }
-  #toast .toast-color input[type="color"]{width:24px;height:20px;padding:1px;border:1px solid var(--line);border-radius:4px;background:transparent;}
+  #toast .toast-color input[type="color"],
+  #setupFields .toast-color input[type="color"]{
+    -webkit-appearance:none; appearance:none;
+    width:22px; height:22px; padding:0;
+    border:1.5px solid rgba(255,255,255,0.3); border-radius:50%;
+    background:transparent; cursor:pointer; outline:none;
+    box-sizing:border-box; flex-shrink:0;
+  }
+  #toast .toast-color input[type="color"]::-webkit-color-swatch-wrapper,
+  #setupFields .toast-color input[type="color"]::-webkit-color-swatch-wrapper{
+    padding:0; border-radius:50%;
+  }
+  #toast .toast-color input[type="color"]::-webkit-color-swatch,
+  #setupFields .toast-color input[type="color"]::-webkit-color-swatch{
+    border:none; border-radius:50%;
+  }
+  #toast .toast-color input[type="color"]::-moz-color-swatch,
+  #setupFields .toast-color input[type="color"]::-moz-color-swatch{
+    border:none; border-radius:50%;
+  }
   #toast .toast-color input[type="text"],
   #setupFields .toast-color input[type="text"]{
     width:2.7em; height:22px; padding:1px 3px; border:1px solid var(--line); border-radius:4px;

@@ -189,7 +189,10 @@ function save(immediate){ requestSave(immediate ? 'now' : 'debounced'); }
 function saveAfterPaint(){ requestSave('afterPaint'); }
 
 function uid(){ return 'x' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
-// clampInt はここではなく card-logic.js 側で定義（旧app.js時代に同名関数が2つあり、後勝ちでそちらが有効だった名残）。
+function clampInt(v, min, max, fb){
+  const n = parseInt(v, 10);
+  return Number.isFinite(n) ? Math.max(min, Math.min(max, n)) : fb;
+}
 
 // アプリ内のタップ操作は pointerdown に統一。ネイティブ入力の編集開始だけは、
 // 長押しでキーボードを出さないため短い指離し時にfocusする。
@@ -1055,7 +1058,7 @@ function askRemoveItem(id){
   if (colorDefault){
     const colorEl = toastEl.querySelector('.toast-color input[type="color"]');
     if (colorEl){
-      colorEl.addEventListener('input', ()=>{
+      const onColorChange = ()=>{
         it.color = colorEl.value;
         if (isHeader){
           if (refs[id]?.nameEditor) refs[id].nameEditor.setColor(it.color);
@@ -1068,7 +1071,9 @@ function askRemoveItem(id){
           if (refs[id]?.nameEditor) refs[id].nameEditor.setColor(it.color);
         }
         save();
-      });
+      };
+      colorEl.addEventListener('input', onColorChange);
+      colorEl.addEventListener('change', onColorChange);
       colorEl.addEventListener('pointerdown', e=>e.stopPropagation());
     }
   }
@@ -1913,13 +1918,6 @@ document.addEventListener('pointerdown', (e) => {
   }
 }, {capture:true, passive:false});
 
-// clampInt の定義はここ1箇所のみ（state.js/engine.js/panels.js/toast-fields.jsからも呼ばれる。読み込み順で
-// 先に来るファイルの中では「即実行されるコード」からは呼ばれていないため、この順のままなら安全）。
-function clampInt(v, min, max, fb){
-  const n = parseInt(v,10);
-  return Number.isFinite(n) ? Math.max(min, Math.min(max,n)) : fb;
-}
-
 function getTopLevelItemId(id){
   if (!id) return null;
   const top = state.items.find(i => i.id === id);
@@ -1930,50 +1928,6 @@ function getTopLevelItemId(id){
     }
   }
   return null;
-}
-
-function getItemSpan(it){
-  if (!it) return 1;
-  if (it.type === 'header' || it.type === 'rule') return 4;
-  if (it.type === 'group'){
-    return (it.children && it.children.length > 1) ? 2 : 1;
-  }
-  return 1;
-}
-
-function getRowAssignments(){
-  const rows = [];
-  let currentRow = [];
-  let currentCol = 0;
-  for (let i = 0; i < state.items.length; i++){
-    const it = state.items[i];
-    const span = getItemSpan(it);
-    if (span === 4){
-      if (currentRow.length > 0){
-        rows.push(currentRow);
-        currentRow = [];
-        currentCol = 0;
-      }
-      rows.push([i]);
-      continue;
-    }
-    if (currentCol + span > 4){
-      rows.push(currentRow);
-      currentRow = [];
-      currentCol = 0;
-    }
-    currentRow.push(i);
-    currentCol += span;
-    if (currentCol >= 4){
-      rows.push(currentRow);
-      currentRow = [];
-      currentCol = 0;
-    }
-  }
-  if (currentRow.length > 0){
-    rows.push(currentRow);
-  }
-  return rows;
 }
 
 function startMoveItem(id){

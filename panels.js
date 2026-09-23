@@ -12,6 +12,8 @@ const addPanelLabelEl = document.getElementById('addPanelLabel');
 function closeAddPanel(){
   addPanelEl.classList.remove('show');
   addPanelEl.classList.remove('group-mode');
+  pendingAddGroupId = null;
+  pendingInsertAfterId = null;
 }
 function openAddPanel(opts){
   opts = opts || {};
@@ -22,14 +24,14 @@ function openAddPanel(opts){
   if (addPanelLabelEl){
     addPanelLabelEl.textContent = isGroup ? 'タイマーを追加' : '枠を追加';
   }
-  if (!opts.groupId) pendingAddGroupId = null;
-  if (!opts.insertAfterId) pendingInsertAfterId = null;
   addPanelEl.classList.add('show');
   closeSetup();
 }
 function closeSetup(){
   setupType = null;
   setupPanelEl.classList.remove('show');
+  pendingAddGroupId = null;
+  pendingInsertAfterId = null;
 }
 const SHARED_COLORS = ['#9b8bff','#b48cff','#6fc7ff','#70d6b0','#ffd166','#ff9f68','#ff7b9c','#d7dbe7','#52617a'];
 function fillColorPalette(defaultColor){
@@ -178,17 +180,15 @@ function openSetup(type){
 }
 function pushTopItem(item){
   const targetId = getTopLevelItemId(pendingInsertAfterId);
+  pendingInsertAfterId = null;
   if (targetId){
     const idx = state.items.findIndex(i => i.id === targetId);
     if (idx !== -1){
       state.items.splice(idx + 1, 0, item);
-    } else {
-      state.items.push(item);
+      return;
     }
-    pendingInsertAfterId = null;
-  } else {
-    state.items.push(item);
   }
+  state.items.push(item);
 }
 function pushNewTimer(item){
   const group = pendingAddGroupId ? state.items.find(g=>g.id===pendingAddGroupId && g.type==='group') : null;
