@@ -138,7 +138,7 @@ function askRemoveItem(id){
   if (isGroup){
     fields = `
       <button type="button" data-act="editName">アカウント名を変更</button>
-      <label class="toast-color-btn"><span class="toast-color-label">色</span><input type="color" value="${colorDefault}" aria-label="色"></label>
+      <button type="button" class="toast-color-btn" data-act="openColorPicker"><span class="toast-color-label">色</span><span class="toast-color-swatch" style="background-color:${colorDefault}"></span></button>
       <button type="button" class="toast-half-btn" data-act="toggleGroupLayout">${it.layout === '2x2' ? '配置：⊞ 2×2' : '配置：☰ 1行'}</button>
       <div class="toast-fields-btns">
         ${canAdd ? '<button type="button" data-act="add">タイマー追加</button>' : ''}
@@ -152,7 +152,7 @@ function askRemoveItem(id){
   } else if (isHeader){
     fields = `
       <button type="button" data-act="editName">見出し名を変更</button>
-      <label class="toast-color-btn"><span class="toast-color-label">色</span><input type="color" value="${colorDefault}" aria-label="色"></label>
+      <button type="button" class="toast-color-btn" data-act="openColorPicker"><span class="toast-color-label">色</span><span class="toast-color-swatch" style="background-color:${colorDefault}"></span></button>
       <button type="button" class="toast-half-btn" data-act="toggleFoldLock">${it.foldLock ? '折りたたみ：🔒' : '折りたたみ：🔓'}</button>
       <div class="toast-fields-btns">
         <button type="button" data-act="insertBelow">枠を追加</button>
@@ -161,7 +161,7 @@ function askRemoveItem(id){
     `;
   } else if (isRule){
     fields = `
-      <label class="toast-color-btn wide"><span class="toast-color-label">色</span><input type="color" value="${colorDefault}" aria-label="色"></label>
+      <button type="button" class="toast-color-btn wide" data-act="openColorPicker"><span class="toast-color-label">色</span><span class="toast-color-swatch" style="background-color:${colorDefault}"></span></button>
       <div class="toast-fields-btns">
         <button type="button" data-act="insertBelow">枠を追加</button>
         <button type="button" data-act="startMove">移動</button>
@@ -234,6 +234,28 @@ function askRemoveItem(id){
           }
         });
       }
+      else if (act === 'openColorPicker'){
+        openColorPickerPopup({
+          label: isHeader ? '見出しの色' : (isRule ? '仕切り線の色' : 'アカウント枠の色'),
+          currentColor: it.color || colorDefault,
+          onSelect: (newColor)=>{
+            it.color = newColor;
+            if (isHeader){
+              if (refs[id]?.nameEditor) refs[id].nameEditor.setColor(it.color);
+              else if (refs[id]?.nameEl) refs[id].nameEl.style.color = it.color;
+              if (refs[id]?.menuBtn) refs[id].menuBtn.style.setProperty('--header-color', it.color);
+            } else if (isRule && refs[id]?.el){
+              refs[id].el.style.borderTopColor = it.color;
+            } else if (isGroup && refs[id]?.el){
+              refs[id].el.style.borderColor = it.color;
+              // アカウント枠は名前テキストの色は変えない
+            }
+            const swatch = toastEl.querySelector('.toast-color-swatch');
+            if (swatch) swatch.style.backgroundColor = it.color;
+            save();
+          }
+        });
+      }
     }
   );
   currentToastId = id;
@@ -242,28 +264,6 @@ function askRemoveItem(id){
   if (targetRef && targetRef.el){
     targetRef.el.classList.add('longpress-target');
     longPressTargetEl = targetRef.el;
-  }
-  if (colorDefault){
-    const colorEl = toastEl.querySelector('.toast-color-btn input[type="color"]');
-    if (colorEl){
-      const onColorChange = ()=>{
-        it.color = colorEl.value;
-        if (isHeader){
-          if (refs[id]?.nameEditor) refs[id].nameEditor.setColor(it.color);
-          else if (refs[id]?.nameEl) refs[id].nameEl.style.color = it.color;
-          if (refs[id]?.menuBtn) refs[id].menuBtn.style.setProperty('--header-color', it.color);
-        } else if (isRule && refs[id]?.el){
-          refs[id].el.style.borderTopColor = it.color;
-        } else if (isGroup && refs[id]?.el){
-          refs[id].el.style.borderColor = it.color;
-          if (refs[id]?.nameEditor) refs[id].nameEditor.setColor(it.color);
-        }
-        save();
-      };
-      colorEl.addEventListener('input', onColorChange);
-      colorEl.addEventListener('change', onColorChange);
-      colorEl.addEventListener('pointerdown', e=>e.stopPropagation());
-    }
   }
   if (isStam) bindStamToastRows(it);
   if (isOrb) bindOrbToastRows(it);

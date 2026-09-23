@@ -63,6 +63,31 @@
     </div>
   </div>
 </div>
+<div id="colorPickerOverlay" aria-hidden="true">
+  <div id="colorPickerPanel" role="dialog" aria-modal="true">
+    <div id="colorPickerLabel">色を選択</div>
+    <div class="color-palette-container">
+      <div class="color-palette-row" id="colorPresetRow1"></div>
+      <div class="color-palette-row" id="colorPresetRow2"></div>
+      <div class="color-custom-section">
+        <div class="color-custom-header">
+          <span>カスタム保存枠 (6枠)</span>
+          <span class="color-custom-hint">＋で色作成</span>
+        </div>
+        <div class="color-custom-row">
+          <div class="color-custom-slots" id="colorCustomSlots"></div>
+          <label class="color-custom-add-btn" title="新しい色を作成して保存">
+            <span>＋</span>
+            <input type="color" id="nativeColorInput" aria-label="自由な色を選択"/>
+          </label>
+        </div>
+      </div>
+    </div>
+    <div id="colorPickerActions">
+      <button type="button" id="colorPickerClose">閉じる</button>
+    </div>
+  </div>
+</div>
 <!-- 開発中はこの並び順のまま分割。APK化前に単一app.jsへ結合予定（順番はこの通りに保つこと）
      並び替え注意: card-builders.js の MENU_BTN_SEL を card-logic.js / resume-fit.js が参照しているので、
      card-builders.js は必ずその2つより前に読み込むこと。

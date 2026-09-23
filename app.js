@@ -120,6 +120,192 @@ if (nameEditOverlayEl){
   });
 }
 
+// ── カラーパレット（1段目・2段目・3段目カスタム6枠） ──
+const CUSTOM_COLORS_STORAGE_KEY = 'freetimer:custom_colors:v1';
+const DEFAULT_CUSTOM_COLORS = ['#38bdf8', '#f472b6', '#4ade80', '#fbbf24', '#a78bfa', '#fb923c'];
+
+const PRESET_COLOR_ROW_1 = [
+  '#ffffff', // 白（黒の場所を白に）
+  '#ef4444', // 赤
+  '#f97316', // 橙
+  '#eab308', // 黄
+  '#22c55e', // 緑
+  '#06b6d4', // 水色
+  '#3b82f6', // 青
+  '#a855f7'  // 紫
+];
+
+const PRESET_COLOR_ROW_2 = [
+  '#ec4899', // ピンク
+  '#f43f5e', // ローズ
+  '#10b981', // エメラルド
+  '#60a5fa', // ライトブルー
+  '#6366f1', // インディゴ
+  '#f59e0b', // アンバー
+  '#9b8bff', // 見出し色
+  '#555b68'  // ★アカウント枠デフォルト色（一番右下）
+];
+
+const colorPickerOverlayEl = document.getElementById('colorPickerOverlay');
+const colorPickerLabelEl = document.getElementById('colorPickerLabel');
+const colorPresetRow1El = document.getElementById('colorPresetRow1');
+const colorPresetRow2El = document.getElementById('colorPresetRow2');
+const colorCustomSlotsEl = document.getElementById('colorCustomSlots');
+const nativeColorInputEl = document.getElementById('nativeColorInput');
+const colorPickerCloseEl = document.getElementById('colorPickerClose');
+
+let colorPickerOnSelect = null;
+let activeCustomSlotIndex = 0;
+let colorPickerGuardUntil = 0;
+
+function loadCustomColors(){
+  try {
+    const raw = localStorage.getItem(CUSTOM_COLORS_STORAGE_KEY);
+    if (raw){
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length >= 4){
+        const list = parsed.map(c => (typeof c === 'string' && c.startsWith('#')) ? c : '#38bdf8');
+        while (list.length < 6) list.push(DEFAULT_CUSTOM_COLORS[list.length] || '#38bdf8');
+        return list.slice(0, 6);
+      }
+    }
+  } catch(e){}
+  return [...DEFAULT_CUSTOM_COLORS];
+}
+
+function saveCustomColors(colors){
+  try {
+    localStorage.setItem(CUSTOM_COLORS_STORAGE_KEY, JSON.stringify(colors.slice(0, 6)));
+  } catch(e){}
+}
+
+function closeColorPickerPopup(){
+  if (!colorPickerOverlayEl) return;
+  colorPickerOverlayEl.classList.remove('show');
+  colorPickerOverlayEl.setAttribute('aria-hidden', 'true');
+  colorPickerOnSelect = null;
+}
+
+function renderColorPickerSwatches(currentColor){
+  if (!colorPresetRow1El || !colorPresetRow2El || !colorCustomSlotsEl) return;
+  const curLower = (currentColor || '').toLowerCase();
+
+  // 1段目
+  colorPresetRow1El.innerHTML = '';
+  PRESET_COLOR_ROW_1.forEach(hex => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'color-swatch-btn';
+    btn.style.backgroundColor = hex;
+    btn.title = hex;
+    if (hex.toLowerCase() === curLower) btn.classList.add('active');
+    btn.addEventListener('click', (e)=>{
+      e.preventDefault();
+      e.stopPropagation();
+      if (Date.now() < colorPickerGuardUntil) return; // 貫通タップガード
+      if (colorPickerOnSelect) colorPickerOnSelect(hex);
+      closeColorPickerPopup();
+    });
+    colorPresetRow1El.appendChild(btn);
+  });
+
+  // 2段目
+  colorPresetRow2El.innerHTML = '';
+  PRESET_COLOR_ROW_2.forEach(hex => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'color-swatch-btn';
+    btn.style.backgroundColor = hex;
+    btn.title = hex === '#555b68' ? 'アカウント枠初期色' : hex;
+    if (hex.toLowerCase() === curLower) btn.classList.add('active');
+    btn.addEventListener('click', (e)=>{
+      e.preventDefault();
+      e.stopPropagation();
+      if (Date.now() < colorPickerGuardUntil) return; // 貫通タップガード
+      if (colorPickerOnSelect) colorPickerOnSelect(hex);
+      closeColorPickerPopup();
+    });
+    colorPresetRow2El.appendChild(btn);
+  });
+
+  // 3段目 (カスタム6枠)
+  const customColors = loadCustomColors();
+  colorCustomSlotsEl.innerHTML = '';
+  customColors.forEach((hex, idx) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'color-swatch-btn custom-slot';
+    btn.style.backgroundColor = hex;
+    btn.title = `カスタム ${idx + 1} (${hex})`;
+    if (hex.toLowerCase() === curLower) btn.classList.add('active');
+    btn.addEventListener('click', (e)=>{
+      e.preventDefault();
+      e.stopPropagation();
+      if (Date.now() < colorPickerGuardUntil) return; // 貫通タップガード
+      activeCustomSlotIndex = idx;
+      if (colorPickerOnSelect) colorPickerOnSelect(hex);
+      closeColorPickerPopup();
+    });
+    colorCustomSlotsEl.appendChild(btn);
+  });
+}
+
+function openColorPickerPopup(opts){
+  opts = opts || {};
+  if (!colorPickerOverlayEl) return;
+  // 貫通タップ・ゴーストクリックガード（開いた直後300msはタップを受け付けない）
+  colorPickerGuardUntil = Date.now() + 300;
+  if (colorPickerLabelEl) colorPickerLabelEl.textContent = opts.label || '色を選択';
+  colorPickerOnSelect = typeof opts.onSelect === 'function' ? opts.onSelect : null;
+  const current = opts.currentColor || '#555b68';
+  if (nativeColorInputEl) nativeColorInputEl.value = current.startsWith('#') ? current : '#555b68';
+  renderColorPickerSwatches(current);
+  colorPickerOverlayEl.classList.add('show');
+  colorPickerOverlayEl.setAttribute('aria-hidden', 'false');
+}
+
+if (colorPickerCloseEl){
+  colorPickerCloseEl.addEventListener('click', (e)=>{
+    e.preventDefault();
+    e.stopPropagation();
+    if (Date.now() < colorPickerGuardUntil) return;
+    closeColorPickerPopup();
+  });
+}
+
+if (colorPickerOverlayEl){
+  colorPickerOverlayEl.addEventListener('pointerdown', (e)=>{
+    if (e.target === colorPickerOverlayEl){
+      e.preventDefault();
+      e.stopPropagation();
+      if (Date.now() < colorPickerGuardUntil) return;
+      closeColorPickerPopup();
+    }
+  });
+}
+
+if (nativeColorInputEl){
+  nativeColorInputEl.addEventListener('input', (e)=>{
+    const newColor = e.target.value;
+    if (!newColor) return;
+    const customColors = loadCustomColors();
+    customColors[activeCustomSlotIndex] = newColor;
+    saveCustomColors(customColors);
+    renderColorPickerSwatches(newColor);
+    if (colorPickerOnSelect) colorPickerOnSelect(newColor);
+  });
+  nativeColorInputEl.addEventListener('change', (e)=>{
+    const newColor = e.target.value;
+    if (!newColor) return;
+    const customColors = loadCustomColors();
+    customColors[activeCustomSlotIndex] = newColor;
+    saveCustomColors(customColors);
+    renderColorPickerSwatches(newColor);
+    if (colorPickerOnSelect) colorPickerOnSelect(newColor);
+    closeColorPickerPopup();
+  });
+}
+
 function normalizeIdleClaim(it){
   // claim は一時的なUI状態（放置=受取 / 遠征=再出発）。永続化すると claimId とズレるため、読み込み時は running に戻す。
   if (it && (it.type === 'idle' || it.type === 'exped') && it.state === 'claim') it.state = 'running';
@@ -950,7 +1136,7 @@ function askRemoveItem(id){
   if (isGroup){
     fields = `
       <button type="button" data-act="editName">アカウント名を変更</button>
-      <label class="toast-color-btn"><span class="toast-color-label">色</span><input type="color" value="${colorDefault}" aria-label="色"></label>
+      <button type="button" class="toast-color-btn" data-act="openColorPicker"><span class="toast-color-label">色</span><span class="toast-color-swatch" style="background-color:${colorDefault}"></span></button>
       <button type="button" class="toast-half-btn" data-act="toggleGroupLayout">${it.layout === '2x2' ? '配置：⊞ 2×2' : '配置：☰ 1行'}</button>
       <div class="toast-fields-btns">
         ${canAdd ? '<button type="button" data-act="add">タイマー追加</button>' : ''}
@@ -964,7 +1150,7 @@ function askRemoveItem(id){
   } else if (isHeader){
     fields = `
       <button type="button" data-act="editName">見出し名を変更</button>
-      <label class="toast-color-btn"><span class="toast-color-label">色</span><input type="color" value="${colorDefault}" aria-label="色"></label>
+      <button type="button" class="toast-color-btn" data-act="openColorPicker"><span class="toast-color-label">色</span><span class="toast-color-swatch" style="background-color:${colorDefault}"></span></button>
       <button type="button" class="toast-half-btn" data-act="toggleFoldLock">${it.foldLock ? '折りたたみ：🔒' : '折りたたみ：🔓'}</button>
       <div class="toast-fields-btns">
         <button type="button" data-act="insertBelow">枠を追加</button>
@@ -973,7 +1159,7 @@ function askRemoveItem(id){
     `;
   } else if (isRule){
     fields = `
-      <label class="toast-color-btn wide"><span class="toast-color-label">色</span><input type="color" value="${colorDefault}" aria-label="色"></label>
+      <button type="button" class="toast-color-btn wide" data-act="openColorPicker"><span class="toast-color-label">色</span><span class="toast-color-swatch" style="background-color:${colorDefault}"></span></button>
       <div class="toast-fields-btns">
         <button type="button" data-act="insertBelow">枠を追加</button>
         <button type="button" data-act="startMove">移動</button>
@@ -1046,6 +1232,28 @@ function askRemoveItem(id){
           }
         });
       }
+      else if (act === 'openColorPicker'){
+        openColorPickerPopup({
+          label: isHeader ? '見出しの色' : (isRule ? '仕切り線の色' : 'アカウント枠の色'),
+          currentColor: it.color || colorDefault,
+          onSelect: (newColor)=>{
+            it.color = newColor;
+            if (isHeader){
+              if (refs[id]?.nameEditor) refs[id].nameEditor.setColor(it.color);
+              else if (refs[id]?.nameEl) refs[id].nameEl.style.color = it.color;
+              if (refs[id]?.menuBtn) refs[id].menuBtn.style.setProperty('--header-color', it.color);
+            } else if (isRule && refs[id]?.el){
+              refs[id].el.style.borderTopColor = it.color;
+            } else if (isGroup && refs[id]?.el){
+              refs[id].el.style.borderColor = it.color;
+              // アカウント枠は名前テキストの色は変えない
+            }
+            const swatch = toastEl.querySelector('.toast-color-swatch');
+            if (swatch) swatch.style.backgroundColor = it.color;
+            save();
+          }
+        });
+      }
     }
   );
   currentToastId = id;
@@ -1054,28 +1262,6 @@ function askRemoveItem(id){
   if (targetRef && targetRef.el){
     targetRef.el.classList.add('longpress-target');
     longPressTargetEl = targetRef.el;
-  }
-  if (colorDefault){
-    const colorEl = toastEl.querySelector('.toast-color-btn input[type="color"]');
-    if (colorEl){
-      const onColorChange = ()=>{
-        it.color = colorEl.value;
-        if (isHeader){
-          if (refs[id]?.nameEditor) refs[id].nameEditor.setColor(it.color);
-          else if (refs[id]?.nameEl) refs[id].nameEl.style.color = it.color;
-          if (refs[id]?.menuBtn) refs[id].menuBtn.style.setProperty('--header-color', it.color);
-        } else if (isRule && refs[id]?.el){
-          refs[id].el.style.borderTopColor = it.color;
-        } else if (isGroup && refs[id]?.el){
-          refs[id].el.style.borderColor = it.color;
-          if (refs[id]?.nameEditor) refs[id].nameEditor.setColor(it.color);
-        }
-        save();
-      };
-      colorEl.addEventListener('input', onColorChange);
-      colorEl.addEventListener('change', onColorChange);
-      colorEl.addEventListener('pointerdown', e=>e.stopPropagation());
-    }
   }
   if (isStam) bindStamToastRows(it);
   if (isOrb) bindOrbToastRows(it);
@@ -1625,9 +1811,6 @@ function buildGroupCard(it){
   const nameEditor = createInlineText(it.name || '', 'アカウント', (value)=>{
     if (it.name !== value){ it.name = value; save(); }
   });
-  if (it.color){
-    nameEditor.setColor(it.color);
-  }
   nameRowEl.appendChild(nameEditor.wrap);
   refs[it.id] = { el: wrap, nameEl: nameEditor.wrap, nameEditor,
     bodyEl: wrap.querySelector('[data-role="body"]'),
