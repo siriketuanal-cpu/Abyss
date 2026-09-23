@@ -50,44 +50,37 @@ document.addEventListener('pointerdown', (e) => {
   } catch(err){}
   // 移動選択中（入れ替え待機中）の場合：
   if (movingItemId != null){
-    e.preventDefault();
     e.stopPropagation();
 
     const host = (e.target && e.target.closest) ? e.target.closest('[data-id]') : null;
     const targetTopId = host ? (getTopLevelItemId(host.dataset.id) || host.dataset.id) : null;
 
     if (!targetTopId || targetTopId === movingItemId){
+      // 自身または余白タップ：キャンセル
       cancelMove();
-      showNotice('移動をキャンセルしました', 1200);
       return;
     }
 
+    // 別のトップレベル要素（アカウント枠など）がタップされた：即座にスワップ！
     const srcId = movingItemId;
-    const dstId = targetTopId;
-    const srcItem = findItemById(srcId);
-    const dstItem = findItemById(dstId);
-
     cancelMove();
-
-    if (srcItem && dstItem){
-      const srcName = getItemDisplayName(srcItem);
-      const dstName = getItemDisplayName(dstItem);
-      askSwapItems(srcId, dstId, srcName, dstName);
-    }
+    swapTopItems(srcId, targetTopId);
     return;
   }
 
-  // 待機中（受取・再出発・使い切り計算中）のタイマーがある場合：枠外タップで安全に通常表示へ復帰
-  if (claimId != null){
-    const r = getTimerRef(claimId);
-    if (!r || !r.el.contains(e.target)) cancelClaim(claimId);
-  }
-  if (pending40Id != null){
-    const r = getTimerRef(pending40Id);
+  // 待機中（受取・再出発・使い切り計算中）のタイマーがある場合：
+  const activePendingId = claimId || pending40Id;
+  if (activePendingId != null){
+    const r = getTimerRef(activePendingId);
     if (!r || !r.el.contains(e.target)){
-      const id = pending40Id;
-      pending40Id = null;
-      paintUseChunkPreview(id);
+      if (claimId != null) cancelClaim(claimId);
+      if (pending40Id != null){
+        const id = pending40Id;
+        pending40Id = null;
+        paintUseChunkPreview(id);
+      }
+      e.stopPropagation();
+      return;
     }
   }
   // ポップアップモーダル（トースト・追加パネル・設定パネル）の枠外タップ処理を一本化
@@ -193,7 +186,6 @@ function startMoveItem(id){
   if (ref && ref.el){
     ref.el.classList.add('moving-source');
   }
-  showNotice('入れ替え先をタップ（余白タップでキャンセル）', 0);
 }
 
 function cancelMove(){
@@ -207,7 +199,6 @@ function cancelMove(){
     }
     movingItemId = null;
   }
-  hideNotice();
 }
 
 function swapTopItems(idA, idB){

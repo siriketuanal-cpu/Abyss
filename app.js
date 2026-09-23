@@ -762,9 +762,6 @@ function bindTimerShortAction(el, shortAction){
 
   el.addEventListener('pointerdown', e=>{
     if (!isPrimary(e) || active || editingId != null || isEditTarget(e.target)) return;
-    // 待機中（受取待機・使い切り計算中）の別タイマーがある場合、このタイマーの操作をブロック（誤タップ防止）
-    const otherActiveId = claimId || pending40Id;
-    if (otherActiveId != null && el.dataset.id !== otherActiveId) return;
     active = true; moved = false; pid = e.pointerId;
     sx = e.clientX; sy = e.clientY;
   }, {capture:true, passive:true});
@@ -876,7 +873,7 @@ function showConfirmToast(html, onAct){
   toastEl.addEventListener('pointerdown', onClick);
 }
 function cancelAllPendingStates(){
-  if (typeof cancelMove === 'function') cancelMove();
+  if (movingItemId != null && typeof cancelMove === 'function') cancelMove();
   if (pending40Id){
     const prev = pending40Id;
     pending40Id = null;
@@ -901,10 +898,6 @@ function getItemDisplayName(it){
   if (it.type === 'header') return it.name || '見出し';
   if (it.type === 'rule') return '仕切り線';
   if (it.name) return it.name;
-  if (it.type === 'stam') return 'スタミナ';
-  if (it.type === 'orb') return 'オーブ';
-  if (it.type === 'idle') return '放置';
-  if (it.type === 'exped') return '遠征';
   return 'タイマー';
 }
 
@@ -932,27 +925,6 @@ function cloneGroup(id){
   state.items.splice(topIdx + 1, 0, copy);
   save(); render(); startTicking(true);
   showNotice('枠を複製しました', 1500);
-}
-
-function askSwapItems(idA, idB, nameA, nameB){
-  closeToast();
-  const html = `
-    <div class="toast-fields">
-      <div style="text-align:center; padding:8px 4px 4px; font-size:13.5px; font-weight:700; color:#fff; line-height:1.45;">
-        「${escapeHtml(nameA)}」と<br>「${escapeHtml(nameB)}」を入れ替えますか？
-      </div>
-    </div>
-    <div class="toast-actions">
-      <button type="button" class="del" data-act="cancel">やめる</button>
-      <button type="button" class="done" data-act="swap">入れ替える</button>
-    </div>
-  `;
-  showConfirmToast(html, (act)=>{
-    if (act === 'swap'){
-      swapTopItems(idA, idB);
-      showNotice('配置を入れ替えました', 1500);
-    }
-  });
 }
 
 function askRemoveItem(id){
@@ -1879,44 +1851,37 @@ document.addEventListener('pointerdown', (e) => {
   } catch(err){}
   // 移動選択中（入れ替え待機中）の場合：
   if (movingItemId != null){
-    e.preventDefault();
     e.stopPropagation();
 
     const host = (e.target && e.target.closest) ? e.target.closest('[data-id]') : null;
     const targetTopId = host ? (getTopLevelItemId(host.dataset.id) || host.dataset.id) : null;
 
     if (!targetTopId || targetTopId === movingItemId){
+      // 自身または余白タップ：キャンセル
       cancelMove();
-      showNotice('移動をキャンセルしました', 1200);
       return;
     }
 
+    // 別のトップレベル要素（アカウント枠など）がタップされた：即座にスワップ！
     const srcId = movingItemId;
-    const dstId = targetTopId;
-    const srcItem = findItemById(srcId);
-    const dstItem = findItemById(dstId);
-
     cancelMove();
-
-    if (srcItem && dstItem){
-      const srcName = getItemDisplayName(srcItem);
-      const dstName = getItemDisplayName(dstItem);
-      askSwapItems(srcId, dstId, srcName, dstName);
-    }
+    swapTopItems(srcId, targetTopId);
     return;
   }
 
-  // 待機中（受取・再出発・使い切り計算中）のタイマーがある場合：枠外タップで安全に通常表示へ復帰
-  if (claimId != null){
-    const r = getTimerRef(claimId);
-    if (!r || !r.el.contains(e.target)) cancelClaim(claimId);
-  }
-  if (pending40Id != null){
-    const r = getTimerRef(pending40Id);
+  // 待機中（受取・再出発・使い切り計算中）のタイマーがある場合：
+  const activePendingId = claimId || pending40Id;
+  if (activePendingId != null){
+    const r = getTimerRef(activePendingId);
     if (!r || !r.el.contains(e.target)){
-      const id = pending40Id;
-      pending40Id = null;
-      paintUseChunkPreview(id);
+      if (claimId != null) cancelClaim(claimId);
+      if (pending40Id != null){
+        const id = pending40Id;
+        pending40Id = null;
+        paintUseChunkPreview(id);
+      }
+      e.stopPropagation();
+      return;
     }
   }
   // ポップアップモーダル（トースト・追加パネル・設定パネル）の枠外タップ処理を一本化
@@ -2022,7 +1987,6 @@ function startMoveItem(id){
   if (ref && ref.el){
     ref.el.classList.add('moving-source');
   }
-  showNotice('入れ替え先をタップ（余白タップでキャンセル）', 0);
 }
 
 function cancelMove(){
@@ -2036,7 +2000,6 @@ function cancelMove(){
     }
     movingItemId = null;
   }
-  hideNotice();
 }
 
 function swapTopItems(idA, idB){

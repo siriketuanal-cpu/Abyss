@@ -64,7 +64,7 @@ function showConfirmToast(html, onAct){
   toastEl.addEventListener('pointerdown', onClick);
 }
 function cancelAllPendingStates(){
-  if (typeof cancelMove === 'function') cancelMove();
+  if (movingItemId != null && typeof cancelMove === 'function') cancelMove();
   if (pending40Id){
     const prev = pending40Id;
     pending40Id = null;
@@ -89,10 +89,6 @@ function getItemDisplayName(it){
   if (it.type === 'header') return it.name || '見出し';
   if (it.type === 'rule') return '仕切り線';
   if (it.name) return it.name;
-  if (it.type === 'stam') return 'スタミナ';
-  if (it.type === 'orb') return 'オーブ';
-  if (it.type === 'idle') return '放置';
-  if (it.type === 'exped') return '遠征';
   return 'タイマー';
 }
 
@@ -120,27 +116,6 @@ function cloneGroup(id){
   state.items.splice(topIdx + 1, 0, copy);
   save(); render(); startTicking(true);
   showNotice('枠を複製しました', 1500);
-}
-
-function askSwapItems(idA, idB, nameA, nameB){
-  closeToast();
-  const html = `
-    <div class="toast-fields">
-      <div style="text-align:center; padding:8px 4px 4px; font-size:13.5px; font-weight:700; color:#fff; line-height:1.45;">
-        「${escapeHtml(nameA)}」と<br>「${escapeHtml(nameB)}」を入れ替えますか？
-      </div>
-    </div>
-    <div class="toast-actions">
-      <button type="button" class="del" data-act="cancel">やめる</button>
-      <button type="button" class="done" data-act="swap">入れ替える</button>
-    </div>
-  `;
-  showConfirmToast(html, (act)=>{
-    if (act === 'swap'){
-      swapTopItems(idA, idB);
-      showNotice('配置を入れ替えました', 1500);
-    }
-  });
 }
 
 function askRemoveItem(id){
