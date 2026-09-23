@@ -244,7 +244,7 @@ function askRemoveItem(id){
     longPressTargetEl = targetRef.el;
   }
   if (colorDefault){
-    const colorEl = toastEl.querySelector('.toast-color input[type="color"]');
+    const colorEl = toastEl.querySelector('.toast-color-btn input[type="color"]');
     if (colorEl){
       const onColorChange = ()=>{
         it.color = colorEl.value;
