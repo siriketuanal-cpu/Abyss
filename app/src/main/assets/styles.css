@@ -401,7 +401,7 @@
     transform:translate(-50%, -50%); width:min(88vw, 280px); max-width:90%;
     background:#1c1e26; color:var(--text); border:1px solid rgba(255,255,255,0.14);
     border-radius:14px; padding:12px 14px 10px; font-size:12px; z-index:30;
-    display:none; box-shadow:0 0 0 1px rgba(255,255,255,.05), 0 12px 32px rgba(0,0,0,.6);
+    display:none; box-shadow:none;
   }
   #toast.show{display:block;}
   #addPanel.show,
@@ -706,7 +706,7 @@
   #nameEditPanel{
     width:min(92vw, 340px); max-width:100%; background:var(--card); border:1px solid var(--line);
     border-radius:14px; padding:16px; display:flex; flex-direction:column; gap:12px;
-    box-shadow:0 0 0 1px rgba(255,255,255,.05), 0 6px 0 rgba(0,0,0,.4);
+    box-shadow:none;
     pointer-events:auto;
   }
   #nameEditLabel{font-size:13px; color:var(--sub); text-align:center;}
@@ -725,7 +725,7 @@
   /* カラーピッカー・パレット選択ポップアップ */
   #colorPickerOverlay{
     display:none; position:fixed; inset:0; z-index:40;
-    background:rgba(0,0,0,0.4);
+    background:transparent;
     align-items:center; justify-content:center;
     padding:16px; box-sizing:border-box;
     pointer-events:none;
@@ -734,7 +734,7 @@
   #colorPickerPanel{
     width:min(92vw, 340px); max-width:100%; background:var(--card); border:1px solid var(--line);
     border-radius:14px; padding:16px; display:flex; flex-direction:column; gap:12px;
-    box-shadow:0 0 0 1px rgba(255,255,255,.05), 0 8px 24px rgba(0,0,0,.6);
+    box-shadow:none;
     pointer-events:auto;
   }
   #colorPickerLabel{font-size:13px; font-weight:700; color:var(--text); text-align:center;}

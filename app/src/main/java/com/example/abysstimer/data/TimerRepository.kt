@@ -24,6 +24,10 @@ class TimerRepository(private val itemDao: ItemDao) {
         itemDao.updateItem(item)
     }
 
+    suspend fun updateItems(items: List<ItemEntity>) {
+        itemDao.updateItems(items)
+    }
+
     suspend fun deleteItem(item: ItemEntity) {
         itemDao.deleteItem(item)
         if (item.type == "group") {
@@ -54,5 +58,9 @@ class TimerRepository(private val itemDao: ItemDao) {
             CustomColorEntity(index, hex)
         }
         itemDao.insertCustomColors(entities)
+    }
+
+    suspend fun replaceAllItems(items: List<ItemEntity>) {
+        itemDao.replaceAllItems(items)
     }
 }

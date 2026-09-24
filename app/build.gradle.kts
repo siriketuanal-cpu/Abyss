@@ -10,11 +10,11 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.aistudio.abysstimer.pxvwt"
+        applicationId = "com.aistudio.abysstimer.native.pxvwt"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 9
+        versionName = "1.0.8"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -62,4 +62,21 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended:1.7.5")
 
     debugImplementation(libs.androidx.compose.ui.tooling)
+}
+
+tasks.matching { it.name == "assembleDebug" }.configureEach {
+    doLast {
+        val srcApk = layout.buildDirectory.file("outputs/apk/debug/app-debug.apk").get().asFile
+        if (srcApk.exists()) {
+            copy {
+                from(srcApk)
+                into(rootDir)
+                rename { "AbyssTimer.apk" }
+            }
+            copy {
+                from(srcApk)
+                into(file("${rootDir}/.build-outputs"))
+            }
+        }
+    }
 }

@@ -20,6 +20,9 @@ interface ItemDao {
     @Update
     suspend fun updateItem(item: ItemEntity)
 
+    @Update
+    suspend fun updateItems(items: List<ItemEntity>)
+
     @Delete
     suspend fun deleteItem(item: ItemEntity)
 
@@ -28,6 +31,15 @@ interface ItemDao {
 
     @Query("DELETE FROM items WHERE parentId = :parentId")
     suspend fun deleteChildrenOf(parentId: String)
+
+    @Query("DELETE FROM items")
+    suspend fun clearAllItems()
+
+    @Transaction
+    suspend fun replaceAllItems(items: List<ItemEntity>) {
+        clearAllItems()
+        insertItems(items)
+    }
 
     @Query("SELECT * FROM custom_colors ORDER BY slotIndex ASC")
     fun getAllCustomColorsFlow(): Flow<List<CustomColorEntity>>
