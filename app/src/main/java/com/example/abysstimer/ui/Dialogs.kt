@@ -32,6 +32,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
@@ -534,20 +535,24 @@ fun SetupDialog(
                         // Row 3 (wide): 方式
                         WebSetupFieldContainer(modifier = Modifier.fillMaxWidth()) {
                             Text("方式", color = Color(0xFFA0A6B8), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            val isOrbDown = orbMode == "down"
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(6.dp))
-                                    .background(Color(0x1F7DD3FC))
-                                    .border(BorderStroke(1.dp, Color(0x597DD3FC)), RoundedCornerShape(6.dp))
+                                    .background(if (isOrbDown) Color(0x1F38BDF8) else Color(0x1FA78BFA))
+                                    .border(
+                                        BorderStroke(1.dp, if (isOrbDown) Color(0x6638BDF8) else Color(0x66A78BFA)),
+                                        RoundedCornerShape(6.dp)
+                                    )
                                     .pointerDownTap {
-                                        orbMode = if (orbMode == "down") "up" else "down"
+                                        orbMode = if (isOrbDown) "up" else "down"
                                     }
                                     .padding(horizontal = 8.dp, vertical = 3.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = if (orbMode == "down") "▼ 残り時間(減算)" else "▲ 経過時間(蓄積)",
-                                    color = Color(0xFF7DD3FC),
+                                    text = if (isOrbDown) "▼ 残り時間 (減算)" else "▲ 経過時間 (蓄積)",
+                                    color = if (isOrbDown) Color(0xFF38BDF8) else Color(0xFFA78BFA),
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -559,20 +564,24 @@ fun SetupDialog(
                         // Row 1 (wide): 方式
                         WebSetupFieldContainer(modifier = Modifier.fillMaxWidth()) {
                             Text("方式", color = Color(0xFFA0A6B8), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            val isCountDown = countMode == "down"
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(6.dp))
-                                    .background(Color(0x1F7DD3FC))
-                                    .border(BorderStroke(1.dp, Color(0x597DD3FC)), RoundedCornerShape(6.dp))
+                                    .background(if (isCountDown) Color(0x1F38BDF8) else Color(0x1F34D399))
+                                    .border(
+                                        BorderStroke(1.dp, if (isCountDown) Color(0x6638BDF8) else Color(0x6634D399)),
+                                        RoundedCornerShape(6.dp)
+                                    )
                                     .pointerDownTap {
-                                        countMode = if (countMode == "down") "up" else "down"
+                                        countMode = if (isCountDown) "up" else "down"
                                     }
                                     .padding(horizontal = 8.dp, vertical = 3.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = if (countMode == "down") "▼ カウントダウン" else "▲ カウントアップ",
-                                    color = Color(0xFF7DD3FC),
+                                    text = if (isCountDown) "▼ カウントダウン" else "▲ カウントアップ",
+                                    color = if (isCountDown) Color(0xFF38BDF8) else Color(0xFF34D399),
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -707,6 +716,83 @@ fun SetupDialog(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+// Shared Foldable Bottom Action for Toast Dialogs (Ultra-compact collapsed '…' with zero wasted padding, expanding seamlessly)
+@Composable
+fun FoldableToastFooter(
+    onDelete: () -> Unit,
+    extraContent: (@Composable () -> Unit)? = null
+) {
+    var isExpanded by remember { mutableStateOf(false) }
+    var isConfirmingDelete by remember { mutableStateOf(false) }
+
+    if (isConfirmingDelete) {
+        LaunchedEffect(Unit) {
+            kotlinx.coroutines.delay(3000)
+            isConfirmingDelete = false
+        }
+    }
+
+    if (!isExpanded) {
+        // Ultra-compact trigger button: zero vertical margin, height 18dp, fits tightly
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(18.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .pointerDownTap { isExpanded = true },
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "⋯",
+                color = Color(0xFF6E7387),
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.15.em
+            )
+        }
+    } else {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            // Extra actions if any (like duplicate group)
+            extraContent?.invoke()
+
+            // Unified elegant Delete button
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(34.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .border(
+                        1.dp,
+                        if (isConfirmingDelete) Color(0xFFFF5252) else Color(0x33FF5252),
+                        RoundedCornerShape(6.dp)
+                    )
+                    .background(if (isConfirmingDelete) Color(0xFF451818) else Color(0xFF221417))
+                    .pointerDownTap {
+                        if (isConfirmingDelete) {
+                            onDelete()
+                        } else {
+                            isConfirmingDelete = true
+                        }
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = if (isConfirmingDelete) "本当に削除しますか？" else "削除",
+                    color = if (isConfirmingDelete) Color(0xFFFF6B6B) else Color(0xFFEF5350),
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
     }
@@ -871,7 +957,7 @@ fun GroupToastDialog(
                         }
                     }
 
-                    // Row 3: タイマー追加 | 枠を追加
+                    // Row 3: タイマー追加 (ティール系アクセント) | 枠を追加 (エメラルド系アクセント)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -879,122 +965,77 @@ fun GroupToastDialog(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(42.dp)
+                                .height(40.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFF22252D))
-                                .border(BorderStroke(1.dp, Color(255, 255, 255, 12)), RoundedCornerShape(8.dp))
+                                .background(Color(0x1A5EEAD4))
+                                .border(BorderStroke(1.dp, Color(0x595EEAD4)), RoundedCornerShape(8.dp))
                                 .pointerDownTap {
                                     onDismiss()
                                     onAddChildTimer()
                                 },
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("タイマー追加", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text("タイマー追加", color = Color(0xFF5EEAD4), fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
                         }
 
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(42.dp)
+                                .height(40.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFF22252D))
-                                .border(BorderStroke(1.dp, Color(255, 255, 255, 12)), RoundedCornerShape(8.dp))
+                                .background(Color(0x1A34D399))
+                                .border(BorderStroke(1.dp, Color(0x5934D399)), RoundedCornerShape(8.dp))
                                 .pointerDownTap {
                                     onDismiss()
                                     onAddGroupBelow()
                                 },
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("枠を追加", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text("枠を追加", color = Color(0xFF34D399), fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
                         }
                     }
 
-                    // Row 4: 移動 | 枠を複製
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    // Row 4: 移動 (単独ライン・アンバー系アクセント)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(36.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0x1AFBBF24))
+                            .border(BorderStroke(1.dp, Color(0x59FBBF24)), RoundedCornerShape(8.dp))
+                            .pointerDownTap {
+                                onDismiss()
+                                onStartMove()
+                            },
+                        contentAlignment = Alignment.Center
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(42.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFF22252D))
-                                .border(BorderStroke(1.dp, Color(255, 255, 255, 12)), RoundedCornerShape(8.dp))
-                                .pointerDownTap {
-                                    onDismiss()
-                                    onStartMove()
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("移動", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                        }
-
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(42.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFF22252D))
-                                .border(BorderStroke(1.dp, Color(255, 255, 255, 12)), RoundedCornerShape(8.dp))
-                                .pointerDownTap {
-                                    onDismiss()
-                                    onCloneGroup()
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("枠を複製", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                        }
+                        Text("移動", color = Color(0xFFFBBF24), fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
                     }
 
-                    // Row 5: 削除 (赤) | 完了 (紫)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        if (isConfirmingDelete) {
-                            LaunchedEffect(Unit) {
-                                kotlinx.coroutines.delay(3000)
-                                isConfirmingDelete = false
+                    // Row 5: ⋯ 折りたたみ（枠を複製 ＋ 削除）
+                    FoldableToastFooter(
+                        onDelete = {
+                            onDismiss()
+                            onDelete()
+                        },
+                        extraContent = {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(34.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color(0xFF22252D))
+                                    .border(BorderStroke(1.dp, Color(255, 255, 255, 16)), RoundedCornerShape(6.dp))
+                                    .pointerDownTap {
+                                        onDismiss()
+                                        onCloneGroup()
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("枠を複製", color = Color(0xFFC5C8D4), fontSize = 12.5.sp, fontWeight = FontWeight.Medium)
                             }
                         }
-
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(42.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(if (isConfirmingDelete) Color(0xFFFF4D4D) else Color(0xFFB82C2C)) // 赤
-                                .pointerDownTap {
-                                    if (isConfirmingDelete) {
-                                        onDismiss()
-                                        onDelete()
-                                    } else {
-                                        isConfirmingDelete = true
-                                    }
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = if (isConfirmingDelete) "本当に削除？" else "削除",
-                                color = Color.White,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(42.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFF53459A)) // 紫
-                                .pointerDownTap { onDismiss() },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("完了", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
+                    )
                 }
             }
         }
@@ -1150,7 +1191,7 @@ fun HeaderToastDialog(
                         }
                     }
 
-                    // Row 3: 枠を追加 (ミントグリーン) | 移動 (イエロー)
+                    // Row 3: 枠を追加 (エメラルド系アクセント) | 移動 (アンバー系アクセント)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -1158,84 +1199,43 @@ fun HeaderToastDialog(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(42.dp)
+                                .height(40.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFF22252D))
-                                .border(BorderStroke(1.dp, Color(0xFF70D6B0)), RoundedCornerShape(8.dp))
+                                .background(Color(0x1A34D399))
+                                .border(BorderStroke(1.dp, Color(0x5934D399)), RoundedCornerShape(8.dp))
                                 .pointerDownTap {
                                     onDismiss()
                                     onAddGroupBelow()
                                 },
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("枠を追加", color = Color(0xFF70D6B0), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text("枠を追加", color = Color(0xFF34D399), fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
                         }
 
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(42.dp)
+                                .height(40.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFF22252D))
-                                .border(BorderStroke(1.dp, Color(0xFFFFD166)), RoundedCornerShape(8.dp))
+                                .background(Color(0x1AFBBF24))
+                                .border(BorderStroke(1.dp, Color(0x59FBBF24)), RoundedCornerShape(8.dp))
                                 .pointerDownTap {
                                     onDismiss()
                                     onStartMove()
                                 },
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("移動", color = Color(0xFFFFD166), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text("移動", color = Color(0xFFFBBF24), fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
                         }
                     }
 
-                    // Row 4: 削除 (赤) | 完了 (紫)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        if (isConfirmingDelete) {
-                            LaunchedEffect(Unit) {
-                                kotlinx.coroutines.delay(3000)
-                                isConfirmingDelete = false
-                            }
+                    // Row 4: ⋯ 折りたたみアクション（削除）
+                    FoldableToastFooter(
+                        onDelete = {
+                            onDismiss()
+                            onDelete()
                         }
-
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(42.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(if (isConfirmingDelete) Color(0xFFFF4D4D) else Color(0xFFB82C2C)) // 赤
-                                .pointerDownTap {
-                                    if (isConfirmingDelete) {
-                                        onDismiss()
-                                        onDelete()
-                                    } else {
-                                        isConfirmingDelete = true
-                                    }
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = if (isConfirmingDelete) "本当に削除？" else "削除",
-                                color = Color.White,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(42.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFF53459A)) // 紫
-                                .pointerDownTap { onDismiss() },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("完了", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
+                    )
                 }
             }
         }
@@ -2865,7 +2865,7 @@ fun RuleToastDialog(
                     }
                 }
 
-                // Row 2: 枠を追加 | 移動
+                // Row 2: 枠を追加 (エメラルド系アクセント) | 移動 (アンバー系アクセント)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -2873,84 +2873,43 @@ fun RuleToastDialog(
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .height(42.dp)
+                            .height(40.dp)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFF22252D))
-                            .border(BorderStroke(1.dp, Color(0xFF70D6B0)), RoundedCornerShape(8.dp))
+                            .background(Color(0x1A34D399))
+                            .border(BorderStroke(1.dp, Color(0x5934D399)), RoundedCornerShape(8.dp))
                             .pointerDownTap {
                                 onDismiss()
                                 onAddGroupBelow()
                             },
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("枠を追加", color = Color(0xFF70D6B0), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Text("枠を追加", color = Color(0xFF34D399), fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
                     }
 
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .height(42.dp)
+                            .height(40.dp)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFF22252D))
-                            .border(BorderStroke(1.dp, Color(0xFFFFD166)), RoundedCornerShape(8.dp))
+                            .background(Color(0x1AFBBF24))
+                            .border(BorderStroke(1.dp, Color(0x59FBBF24)), RoundedCornerShape(8.dp))
                             .pointerDownTap {
                                 onDismiss()
                                 onStartMove()
                             },
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("移動", color = Color(0xFFFFD166), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Text("移動", color = Color(0xFFFBBF24), fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
                     }
                 }
 
-                // Row 3: 削除 | 完了
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (isConfirmingDelete) {
-                        LaunchedEffect(Unit) {
-                            kotlinx.coroutines.delay(3000)
-                            isConfirmingDelete = false
-                        }
+                // Row 3: ⋯ 折りたたみアクション（削除）
+                FoldableToastFooter(
+                    onDelete = {
+                        onDismiss()
+                        onDelete()
                     }
-
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(42.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (isConfirmingDelete) Color(0xFFFF4D4D) else Color(0xFFB82C2C))
-                            .pointerDownTap {
-                                if (isConfirmingDelete) {
-                                    onDismiss()
-                                    onDelete()
-                                } else {
-                                    isConfirmingDelete = true
-                                }
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = if (isConfirmingDelete) "本当に削除？" else "削除",
-                            color = Color.White,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(42.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFF53459A))
-                            .pointerDownTap { onDismiss() },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("完了", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
+                )
             }
         }
     }
@@ -3055,55 +3014,8 @@ fun StaminaToastDialog(
                     }
                 }
 
-                // Row 4: 削除 / 完了 (height 34.dp matching web's .toast-actions button height)
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (isConfirmingDelete) {
-                        LaunchedEffect(Unit) {
-                            kotlinx.coroutines.delay(3000)
-                            isConfirmingDelete = false
-                        }
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(34.dp)
-                            .border(1.dp, if (isConfirmingDelete) Color(0xFFFF8B8B) else Color(0xFFFF5252), RoundedCornerShape(6.dp))
-                            .background(if (isConfirmingDelete) Color(0xFF421E1E) else Color(0xFF2C1E1E), RoundedCornerShape(6.dp))
-                            .pointerDownTap {
-                                if (isConfirmingDelete) {
-                                    onDelete()
-                                } else {
-                                    isConfirmingDelete = true
-                                }
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = if (isConfirmingDelete) "本当に削除？" else "削除",
-                            color = Color(0xFFFF6B6B),
-                            fontSize = 12.5.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .weight(1.2f)
-                            .height(34.dp)
-                            .background(Color(0xFF8C7CFF), RoundedCornerShape(6.dp))
-                            .pointerDownTap {
-                                commitChanges()
-                                onDismiss()
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("完了", color = Color.White, fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
+                // Row 4: ⋯ 折りたたみアクション
+                FoldableToastFooter(onDelete = onDelete)
             }
         }
     }
@@ -3244,76 +3156,34 @@ fun OrbToastDialog(
                     )
                 }
 
-                // Row 3: 方式ボタン
+                // Row 3: 方式ボタン (Improved contrast and clear color differentiation)
+                val isOrbDown = orbMode == "down"
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(32.dp)
-                        .border(1.dp, Color(0x597DD3FC), RoundedCornerShape(6.dp))
-                        .background(Color(0x1F7DD3FC), RoundedCornerShape(6.dp))
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(if (isOrbDown) Color(0x1F38BDF8) else Color(0x1FA78BFA))
+                        .border(
+                            1.dp,
+                            if (isOrbDown) Color(0x6638BDF8) else Color(0x66A78BFA),
+                            RoundedCornerShape(6.dp)
+                        )
                         .pointerDownTap { 
-                            val nextMode = if (orbMode == "down") "up" else "down"
-                            orbMode = nextMode
+                            orbMode = if (isOrbDown) "up" else "down"
                         },
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = if (orbMode == "down") "方式：▼ 残り時間(減算)" else "方式：▲ 経過時間(蓄積)",
-                        color = Color(0xFF7DD3FC),
+                        text = if (isOrbDown) "方式：▼ 残り時間 (減算)" else "方式：▲ 経過時間 (蓄積)",
+                        color = if (isOrbDown) Color(0xFF38BDF8) else Color(0xFFA78BFA),
                         fontSize = 11.5.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
 
-                // Row 4: 削除 / 完了
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (isConfirmingDelete) {
-                        LaunchedEffect(Unit) {
-                            kotlinx.coroutines.delay(3000)
-                            isConfirmingDelete = false
-                        }
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(34.dp)
-                            .border(1.dp, if (isConfirmingDelete) Color(0xFFFF8B8B) else Color(0xFFFF5252), RoundedCornerShape(6.dp))
-                            .background(if (isConfirmingDelete) Color(0xFF421E1E) else Color(0xFF2C1E1E), RoundedCornerShape(6.dp))
-                            .pointerDownTap {
-                                if (isConfirmingDelete) {
-                                    onDelete()
-                                } else {
-                                    isConfirmingDelete = true
-                                }
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = if (isConfirmingDelete) "本当に削除？" else "削除",
-                            color = Color(0xFFFF6B6B),
-                            fontSize = 12.5.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .weight(1.2f)
-                            .height(34.dp)
-                            .background(Color(0xFF8C7CFF), RoundedCornerShape(6.dp))
-                            .pointerDownTap {
-                                commitChanges()
-                                onDismiss()
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("完了", color = Color.White, fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
+                // Row 4: ⋯ 折りたたみアクション
+                FoldableToastFooter(onDelete = onDelete)
             }
         }
     }
@@ -3379,7 +3249,8 @@ fun IdleExpedToastDialog(
                 modifier = Modifier.padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Row 1: 方式 (height 34.dp)
+                // Row 1: 方式 (height 34.dp with high-contrast color distinguishing down/up)
+                val isCountDown = countMode == "down"
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -3393,17 +3264,21 @@ fun IdleExpedToastDialog(
                     Text("方式", fontSize = 12.sp, color = Color(0xFFC5C8D4), fontWeight = FontWeight.Medium)
                     Box(
                         modifier = Modifier
-                            .border(1.dp, Color(0x597DD3FC), RoundedCornerShape(4.dp))
-                            .background(Color(0x1F7DD3FC), RoundedCornerShape(4.dp))
+                            .clip(RoundedCornerShape(4.dp))
+                            .border(
+                                1.dp,
+                                if (isCountDown) Color(0x6638BDF8) else Color(0x6634D399),
+                                RoundedCornerShape(4.dp)
+                            )
+                            .background(if (isCountDown) Color(0x1F38BDF8) else Color(0x1F34D399))
                             .padding(horizontal = 8.dp, vertical = 3.dp)
                             .pointerDownTap { 
-                                val nextMode = if (countMode == "down") "up" else "down"
-                                countMode = nextMode
+                                countMode = if (isCountDown) "up" else "down"
                             }
                     ) {
                         Text(
-                            text = if (countMode == "down") "▼ カウントダウン" else "▲ カウントアップ",
-                            color = Color(0xFF7DD3FC),
+                            text = if (isCountDown) "▼ カウントダウン" else "▲ カウントアップ",
+                            color = if (isCountDown) Color(0xFF38BDF8) else Color(0xFF34D399),
                             fontSize = 11.5.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -3467,55 +3342,8 @@ fun IdleExpedToastDialog(
                     }
                 }
 
-                // Row 4: 削除 / 完了 (height 34.dp)
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (isConfirmingDelete) {
-                        LaunchedEffect(Unit) {
-                            kotlinx.coroutines.delay(3000)
-                            isConfirmingDelete = false
-                        }
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(34.dp)
-                            .border(1.dp, if (isConfirmingDelete) Color(0xFFFF8B8B) else Color(0xFFFF5252), RoundedCornerShape(6.dp))
-                            .background(if (isConfirmingDelete) Color(0xFF421E1E) else Color(0xFF2C1E1E), RoundedCornerShape(6.dp))
-                            .pointerDownTap {
-                                if (isConfirmingDelete) {
-                                    onDelete()
-                                } else {
-                                    isConfirmingDelete = true
-                                }
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = if (isConfirmingDelete) "本当に削除？" else "削除",
-                            color = Color(0xFFFF6B6B),
-                            fontSize = 12.5.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .weight(1.2f)
-                            .height(34.dp)
-                            .background(Color(0xFF8C7CFF), RoundedCornerShape(6.dp))
-                            .pointerDownTap {
-                                commitChanges()
-                                onDismiss()
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("完了", color = Color.White, fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
+                // Row 4: ⋯ 折りたたみアクション
+                FoldableToastFooter(onDelete = onDelete)
             }
         }
     }

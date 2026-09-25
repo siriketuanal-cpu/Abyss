@@ -28,6 +28,13 @@ class TimerRepository(private val itemDao: ItemDao) {
         itemDao.updateItems(items)
     }
 
+    suspend fun batchUpdateAndInsert(
+        itemsToUpdate: List<ItemEntity>,
+        itemsToInsert: List<ItemEntity> = emptyList()
+    ) {
+        itemDao.batchUpdateAndInsert(itemsToUpdate, itemsToInsert)
+    }
+
     suspend fun deleteItem(item: ItemEntity) {
         itemDao.deleteItem(item)
         if (item.type == "group") {

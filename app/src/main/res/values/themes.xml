@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.AbyssTimer" parent="@android:style/Theme.NoTitleBar">
+        <item name="android:windowBackground">#0B0B14</item>
+        <item name="android:colorBackground">#0B0B14</item>
+    </style>
+</resources>

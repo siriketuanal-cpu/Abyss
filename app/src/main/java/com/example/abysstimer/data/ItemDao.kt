@@ -41,6 +41,19 @@ interface ItemDao {
         insertItems(items)
     }
 
+    @Transaction
+    suspend fun batchUpdateAndInsert(
+        itemsToUpdate: List<ItemEntity>,
+        itemsToInsert: List<ItemEntity> = emptyList()
+    ) {
+        if (itemsToUpdate.isNotEmpty()) {
+            updateItems(itemsToUpdate)
+        }
+        if (itemsToInsert.isNotEmpty()) {
+            insertItems(itemsToInsert)
+        }
+    }
+
     @Query("SELECT * FROM custom_colors ORDER BY slotIndex ASC")
     fun getAllCustomColorsFlow(): Flow<List<CustomColorEntity>>
 

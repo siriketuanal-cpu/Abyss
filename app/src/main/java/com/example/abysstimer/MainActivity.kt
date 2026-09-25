@@ -50,6 +50,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -79,10 +82,28 @@ fun Modifier.pointerDownTap(
     )
 }
 
+// Low-level pointer tap: intercepts and consumes press immediately at Initial pass
+// completely bypassing gesture disambiguation delays and preventing parent container interference
+fun Modifier.instantPointerTap(
+    enabled: Boolean = true,
+    onTap: () -> Unit
+): Modifier = if (!enabled) this else this.pointerInput(onTap) {
+    awaitPointerEventScope {
+        while (true) {
+            val event = awaitPointerEvent(PointerEventPass.Initial)
+            if (event.type == PointerEventType.Press) {
+                event.changes.forEach { it.consume() }
+                onTap()
+            }
+        }
+    }
+}
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        window.decorView.setBackgroundColor(android.graphics.Color.parseColor("#0B0B14"))
 
         val database = AppDatabase.getDatabase(applicationContext)
         val repository = TimerRepository(database.itemDao())
@@ -306,30 +327,25 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
                         )
                     }
             ) {
-                // List content (Grid)
-                if (!isInitialized) {
-                    // データベース読み込み中は何も表示しない（スプラッシュ終了後のスムーズな繋ぎ）
-                    Box(modifier = Modifier.fillMaxSize())
-                } else if (uiItems.isEmpty()) {
+                // List content (Grid) - Renders instantly on the very first frame
+                if (uiItems.isEmpty()) {
                     // 空の時は余計なプレースホルダーを出さず、通常背景のみ（右上の＋で追加可能）
                     Box(modifier = Modifier.fillMaxSize())
                 } else {
-                    val visibleItems by remember(uiItems) {
-                        derivedStateOf {
-                            val list = ArrayList<TimerUiState>(uiItems.size)
-                            var skipUntilNextHeader = false
-                            for (ui in uiItems) {
-                                if (ui.entity.type == "header") {
-                                    skipUntilNextHeader = ui.entity.collapsed && !ui.entity.foldLock
+                    val visibleItems = remember(uiItems) {
+                        val list = ArrayList<TimerUiState>(uiItems.size)
+                        var skipUntilNextHeader = false
+                        for (ui in uiItems) {
+                            if (ui.entity.type == "header") {
+                                skipUntilNextHeader = ui.entity.collapsed && !ui.entity.foldLock
+                                list.add(ui)
+                            } else {
+                                if (!skipUntilNextHeader) {
                                     list.add(ui)
-                                } else {
-                                    if (!skipUntilNextHeader) {
-                                        list.add(ui)
-                                    }
                                 }
                             }
-                            list
                         }
+                        list
                     }
 
                     LazyVerticalGrid(
@@ -521,26 +537,7 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
         )
     }
 
-    itemToEdit?.let { initialEntity ->
-        // Resolve the latest updated entity from the UI states to ensure instant state updates in open dialogs
-        val entity = remember(initialEntity, uiItems) {
-            var found: ItemEntity? = null
-            for (ui in uiItems) {
-                if (ui.entity.id == initialEntity.id) {
-                    found = ui.entity
-                    break
-                }
-                for (child in ui.children) {
-                    if (child.entity.id == initialEntity.id) {
-                        found = child.entity
-                        break
-                    }
-                }
-                if (found != null) break
-            }
-            found ?: initialEntity
-        }
-
+    itemToEdit?.let { entity ->
         EditItemDialog(
             entity = entity,
             customColors = customColors.map { it.hexColor },
@@ -630,9 +627,7 @@ fun HeaderCard(
     onToggleCollapse: () -> Unit,
     onEdit: () -> Unit
 ) {
-    val headerColor = remember(ui.entity.color) {
-        ui.entity.color?.let { Color(android.graphics.Color.parseColor(it)) } ?: Color(0xFF9B8BFF)
-    }
+    val headerColor = ui.parsedColor
 
     Column(
         modifier = Modifier
@@ -682,14 +677,20 @@ fun HeaderCard(
                 }
             }
 
-            // Circle settings button on right of header
+            // Settings button on right of header (refined subtle solid dot)
             Box(
                 modifier = Modifier
-                    .size(10.dp)
-                    .background(Color(0xFF0B0B14), CircleShape)
-                    .border(1.5.dp, headerColor, CircleShape)
-                    .pointerDownTap { onEdit() }
-            )
+                    .size(24.dp)
+                    .pointerDownTap { onEdit() },
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .clip(CircleShape)
+                        .background(headerColor.copy(alpha = 0.78f))
+                )
+            }
         }
         // Bottom divider line
         Box(
@@ -707,9 +708,7 @@ fun RuleCard(
     isMoveMode: Boolean = false,
     onEdit: () -> Unit
 ) {
-    val lineColor = remember(ui.entity.color) {
-        ui.entity.color?.let { Color(android.graphics.Color.parseColor(it)) } ?: Color(0xFF52617A)
-    }
+    val lineColor = ui.parsedColor
 
     Box(
         modifier = Modifier
@@ -748,6 +747,9 @@ fun GroupCard(
     val borderColor = if (isMovingSource) Color(0xFF4DA3FF) else groupColor
     val borderWidth = if (isMovingSource) 2.dp else 1.dp
     val groupShape = remember { RoundedCornerShape(8.dp) }
+    val borderStroke = remember(borderWidth, borderColor) {
+        BorderStroke(borderWidth, borderColor)
+    }
 
     Box(
         modifier = Modifier
@@ -758,7 +760,7 @@ fun GroupCard(
         Surface(
             shape = groupShape,
             color = Color(0xFF0B0B14),
-            border = BorderStroke(borderWidth, borderColor),
+            border = borderStroke,
             modifier = Modifier.fillMaxWidth()
         ) {
             Box(
@@ -862,17 +864,7 @@ fun TimerCard(
     var isCurFocused by remember(ui.entity.id) { mutableStateOf(false) }
     var localCurText by remember(ui.entity.id) { mutableStateOf("") }
 
-    val typeColor = remember(ui.entity.color, ui.entity.type) {
-        ui.entity.color?.let {
-            try { Color(android.graphics.Color.parseColor(it)) } catch (e: Exception) { null }
-        } ?: when (ui.entity.type) {
-            "stam" -> Color(0xFF5AA9FF)
-            "orb" -> Color(0xFFA78BFA)
-            "idle" -> Color(0xFFF0A85A)
-            "exped" -> Color(0xFF34D399)
-            else -> Color.White
-        }
-    }
+    val typeColor = ui.parsedColor
 
     val containerColor = Color(0xFF15151F)
 
@@ -891,34 +883,35 @@ fun TimerCard(
 
     val borderWidth = if (isClaimPreview || isIdleExpedClaim) 2.dp else 1.dp
     val cardShape = remember { RoundedCornerShape(10.dp) }
+    val borderStroke = remember(borderWidth, borderStrokeColor) {
+        BorderStroke(borderWidth, borderStrokeColor)
+    }
 
     Surface(
         shape = cardShape,
         color = containerColor,
-        border = BorderStroke(borderWidth, borderStrokeColor),
+        border = borderStroke,
         modifier = Modifier
             .fillMaxWidth()
             .height(56.dp)
-            .pointerDownTap(onTap = onTap)
+            .pointerDownTap(enabled = !isCurFocused, onTap = onTap)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            // 1. Menu Indicator Dot (Optimized with drawBehind)
+            // 1. Menu Indicator Dot (Refined subtle solid color dot, naturally nestled in top-left corner without intruding on numbers or clock)
             Box(
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(start = 5.dp, top = 5.dp)
-                    .size(16.dp)
-                    .pointerDownTap { onEdit() }
-                    .drawBehind {
-                        drawCircle(
-                            color = typeColor,
-                            radius = 5.dp.toPx(),
-                            center = androidx.compose.ui.geometry.Offset(5.dp.toPx(), 5.dp.toPx()),
-                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.5.dp.toPx()),
-                            alpha = 0.65f
-                        )
-                    }
-            )
+                    .size(28.dp)
+                    .instantPointerTap { onEdit() }
+            ) {
+                Box(
+                    modifier = Modifier
+                        .padding(start = 6.dp, top = 6.dp)
+                        .size(5.dp)
+                        .clip(CircleShape)
+                        .background(typeColor.copy(alpha = 0.70f))
+                )
+            }
 
             // 2. Type-Specific Layout
             when (ui.entity.type) {
