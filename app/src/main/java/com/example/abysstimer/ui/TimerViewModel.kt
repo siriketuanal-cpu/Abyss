@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.abysstimer.data.CustomColorEntity
 import com.example.abysstimer.data.ItemEntity
 import com.example.abysstimer.data.TimerRepository
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -299,26 +300,42 @@ class TimerViewModel(
         }
     }
 
-    // --- In-Memory Synchronous Update Helpers to prevent flicker and race conditions ---
+    // --- In-Memory Synchronous Update Helpers with Debounced Disk Persistence ---
+
+    private val pendingUpdates = java.util.concurrent.ConcurrentHashMap<String, ItemEntity>()
+    private var persistDebounceJob: Job? = null
+
+    private fun scheduleDebouncedPersist() {
+        persistDebounceJob?.cancel()
+        persistDebounceJob = viewModelScope.launch {
+            delay(300)
+            val itemsToSave = pendingUpdates.values.toList()
+            pendingUpdates.clear()
+            if (itemsToSave.isNotEmpty()) {
+                repository.updateItems(itemsToSave)
+            }
+        }
+    }
 
     private fun updateDbItemInMemoryAndPersist(updated: ItemEntity) {
         val currentList = _dbItems.value
         _dbItems.value = currentList.map { if (it.id == updated.id) updated else it }
-        viewModelScope.launch {
-            repository.updateItem(updated)
-        }
+        pendingUpdates[updated.id] = updated
+        scheduleDebouncedPersist()
     }
 
     private fun updateDbItemsInMemoryAndPersist(updatedList: List<ItemEntity>) {
         val updatedMap = updatedList.associateBy { it.id }
         val currentList = _dbItems.value
         _dbItems.value = currentList.map { updatedMap[it.id] ?: it }
-        viewModelScope.launch {
-            repository.updateItems(updatedList)
+        for (item in updatedList) {
+            pendingUpdates[item.id] = item
         }
+        scheduleDebouncedPersist()
     }
 
     private fun deleteDbItemInMemoryAndPersist(item: ItemEntity) {
+        pendingUpdates.remove(item.id)
         val currentList = _dbItems.value
         _dbItems.value = currentList.filter { it.id != item.id && it.parentId != item.id }
         viewModelScope.launch {
@@ -411,6 +428,14 @@ class TimerViewModel(
         cancelPendingStates()
     }
 
+    /**
+     * Resolves the parent group name for a child timer, or returns empty string if not found.
+     */
+    fun getGroupNameForChild(parentId: String?): String {
+        if (parentId == null) return ""
+        return _dbItems.value.find { it.id == parentId }?.name ?: ""
+    }
+
     fun updateCurrentValue(id: String, newCurrent: Int) {
         val now = System.currentTimeMillis()
         val item = _dbItems.value.find { it.id == id } ?: return
@@ -427,7 +452,14 @@ class TimerViewModel(
         val now = System.currentTimeMillis()
         val item = _dbItems.value.find { it.id == id } ?: return
         val validMax = newMax.coerceAtLeast(1)
-        val clampedCur = item.current.coerceAtMost(validMax)
+
+        // Calculate real-time current value first before updating max
+        val realCurrent = when (item.type) {
+            "stam" -> TimerEngine.calculateStamInfo(item, now).cur
+            "orb" -> TimerEngine.calculateOrbInfo(item, now).cur
+            else -> item.current
+        }
+        val clampedCur = realCurrent.coerceAtMost(validMax)
         val preservedStart = TimerEngine.preservePhaseStart(item, now)
         val updated = item.copy(
             max = validMax,
@@ -446,14 +478,78 @@ class TimerViewModel(
         val sourceParentId = source.parentId
         val targetParentId = target.parentId
 
-        val updates = mutableListOf<ItemEntity>()
+        if (sourceParentId == null && targetParentId == null) {
+            // Both are top-level items
+            val topLevels = items.filter { it.parentId == null }.sortedBy { it.position }.toMutableList()
+            val sIdx = topLevels.indexOfFirst { it.id == sourceId }
+            val tIdx = topLevels.indexOfFirst { it.id == targetId }
+            if (sIdx == -1 || tIdx == -1) return
 
-        if (sourceParentId == targetParentId) {
+            val isFoldedHeaderSource = source.type == "header" && source.collapsed && !source.foldLock
+
+            if (!isFoldedHeaderSource) {
+                // 通常の移動: 検索走査を行わず、単一アイテムを直接移動（軽量）
+                val updates = mutableListOf<ItemEntity>()
+                if (sIdx < tIdx) {
+                    for (i in (sIdx + 1)..tIdx) {
+                        updates.add(topLevels[i].copy(position = topLevels[i].position - 1))
+                    }
+                    updates.add(source.copy(position = topLevels[tIdx].position))
+                } else {
+                    for (i in tIdx until sIdx) {
+                        updates.add(topLevels[i].copy(position = topLevels[i].position + 1))
+                    }
+                    updates.add(source.copy(position = topLevels[tIdx].position))
+                }
+                if (updates.isNotEmpty()) {
+                    updateDbItemsInMemoryAndPersist(updates)
+                }
+                return
+            }
+
+            // 折りたたまれている見出しの場合のみ、配下の要素を一括移動
+            var sourceSectionEnd = sIdx + 1
+            while (sourceSectionEnd < topLevels.size && topLevels[sourceSectionEnd].type != "header") {
+                sourceSectionEnd++
+            }
+
+            // 折りたたみ配下の要素自身への移動は無視
+            if (tIdx >= sIdx && tIdx < sourceSectionEnd) return
+
+            val sourceSection = topLevels.subList(sIdx, sourceSectionEnd).toList()
+            topLevels.subList(sIdx, sourceSectionEnd).clear()
+
+            val newTIdx = topLevels.indexOfFirst { it.id == targetId }
+            if (newTIdx == -1) return
+
+            val isFoldedHeaderTarget = target.type == "header" && target.collapsed && !target.foldLock
+            val insertIdx = if (sIdx < tIdx) {
+                if (isFoldedHeaderTarget) {
+                    var endTarget = newTIdx + 1
+                    while (endTarget < topLevels.size && topLevels[endTarget].type != "header") {
+                        endTarget++
+                    }
+                    endTarget
+                } else {
+                    newTIdx + 1
+                }
+            } else {
+                newTIdx
+            }
+
+            topLevels.addAll(insertIdx, sourceSection)
+
+            val updatedTopLevels = topLevels.mapIndexed { idx, it ->
+                it.copy(position = idx)
+            }
+            updateDbItemsInMemoryAndPersist(updatedTopLevels)
+        } else if (sourceParentId == targetParentId) {
             val siblings = items.filter { it.parentId == sourceParentId }.sortedBy { it.position }
             val sourceIdx = siblings.indexOfFirst { it.id == sourceId }
             val targetIdx = siblings.indexOfFirst { it.id == targetId }
             if (sourceIdx == -1 || targetIdx == -1) return
 
+            val updates = mutableListOf<ItemEntity>()
             if (sourceIdx < targetIdx) {
                 // Move down: shift items between source and target up
                 for (i in (sourceIdx + 1)..targetIdx) {
@@ -467,8 +563,12 @@ class TimerViewModel(
                 }
                 updates.add(source.copy(position = siblings[targetIdx].position))
             }
+            if (updates.isNotEmpty()) {
+                updateDbItemsInMemoryAndPersist(updates)
+            }
         } else {
             // Move to different parent
+            val updates = mutableListOf<ItemEntity>()
             val oldSiblings = items.filter { it.parentId == sourceParentId }.sortedBy { it.position }
             val newSiblings = items.filter { it.parentId == targetParentId }.sortedBy { it.position }
             
@@ -491,10 +591,10 @@ class TimerViewModel(
             } else {
                 updates.add(source.copy(parentId = targetParentId, position = 0))
             }
-        }
 
-        if (updates.isNotEmpty()) {
-            updateDbItemsInMemoryAndPersist(updates)
+            if (updates.isNotEmpty()) {
+                updateDbItemsInMemoryAndPersist(updates)
+            }
         }
     }
 
@@ -612,25 +712,41 @@ class TimerViewModel(
         val item = _dbItems.value.find { it.id == id } ?: return
 
         var updated = item
+        var needsDbUpdate = false
 
         if (intervalMin != null && intervalMin != item.intervalMin) {
             val safeInt = intervalMin.coerceAtLeast(1)
-            val preservedStart = TimerEngine.preservePhaseStart(updated, now)
+            // Compute real-time recovered current before interval change
+            val realCurrent = when (item.type) {
+                "stam" -> TimerEngine.calculateStamInfo(item, now).cur
+                "orb" -> TimerEngine.calculateOrbInfo(item, now).cur
+                else -> item.current
+            }
+            val preservedStart = TimerEngine.preservePhaseStart(item, now)
             updated = updated.copy(
                 intervalMin = safeInt,
-                start = if (updated.current >= (max ?: updated.max)) now else preservedStart
+                current = realCurrent,
+                start = if (realCurrent >= (max ?: updated.max)) now else preservedStart
             )
+            needsDbUpdate = true
         }
 
         if (max != null && max != item.max) {
             val safeMax = max.coerceAtLeast(1)
-            val preservedStart = TimerEngine.preservePhaseStart(updated, now)
-            val newCur = updated.current.coerceAtMost(safeMax)
+            // Compute real-time recovered current before max change
+            val realCurrent = when (item.type) {
+                "stam" -> TimerEngine.calculateStamInfo(item, now).cur
+                "orb" -> TimerEngine.calculateOrbInfo(item, now).cur
+                else -> updated.current
+            }
+            val preservedStart = TimerEngine.preservePhaseStart(item, now)
+            val newCur = realCurrent.coerceAtMost(safeMax)
             updated = updated.copy(
                 max = safeMax,
                 current = newCur,
                 start = if (newCur >= safeMax) now else preservedStart
             )
+            needsDbUpdate = true
         }
 
         if (useChunkClear) {

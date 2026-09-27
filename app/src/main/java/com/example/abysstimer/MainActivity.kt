@@ -212,6 +212,8 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
     var activeSetupGroupId by remember { mutableStateOf<String?>(null) }
     var itemToEdit by remember { mutableStateOf<ItemEntity?>(null) }
     var movingItemId by remember { mutableStateOf<String?>(null) }
+    var isDeleteMode by remember { mutableStateOf(false) }
+    var itemToDelete by remember { mutableStateOf<ItemEntity?>(null) }
 
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -232,9 +234,11 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
         }
     }
 
-    // Predictive Back Handling: Cancel moving mode or close dialogs
-    BackHandler(enabled = movingItemId != null || showAddDialog || showBackupDialog || activeSetupType != null || itemToEdit != null) {
+    // Predictive Back Handling: Cancel delete mode, moving mode or close dialogs
+    BackHandler(enabled = isDeleteMode || itemToDelete != null || movingItemId != null || showAddDialog || showBackupDialog || activeSetupType != null || itemToEdit != null) {
         when {
+            itemToDelete != null -> itemToDelete = null
+            isDeleteMode -> isDeleteMode = false
             movingItemId != null -> movingItemId = null
             itemToEdit != null -> itemToEdit = null
             activeSetupType != null -> {
@@ -254,19 +258,33 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
     // Global focus tracking for defensive tap behavior
     var isAnyFocused by remember { mutableStateOf(false) }
 
+    val openEditDialog = remember(viewModel) {
+        { entity: ItemEntity ->
+            viewModel.cancelPendingStates()
+            itemToEdit = entity
+        }
+    }
+
+    LaunchedEffect(itemToEdit, showAddDialog, activeSetupType, showBackupDialog, isDeleteMode) {
+        if (itemToEdit != null || showAddDialog || activeSetupType != null || showBackupDialog || isDeleteMode) {
+            viewModel.cancelPendingStates()
+        }
+    }
+
     CompositionLocalProvider(LocalFocusTracker provides { isAnyFocused = it }) {
-        Scaffold(
-            modifier = Modifier.pointerInput(isAnyFocused) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val event = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
-                        if (isAnyFocused && event.type == androidx.compose.ui.input.pointer.PointerEventType.Press) {
-                            focusManager.clearFocus()
-                            event.changes.forEach { it.consume() }
+        Box(modifier = Modifier.fillMaxSize()) {
+            Scaffold(
+                modifier = Modifier.pointerInput(isAnyFocused) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                            if (isAnyFocused && event.type == androidx.compose.ui.input.pointer.PointerEventType.Press) {
+                                focusManager.clearFocus()
+                                event.changes.forEach { it.consume() }
+                            }
                         }
                     }
-                }
-            },
+                },
             topBar = {
                 // Fixed Header Area (32dp height)
                 Box(
@@ -282,27 +300,62 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
                             .size(32.dp)
                             .align(Alignment.CenterStart)
                             .pointerDownTap {
-                                showBackupDialog = true
+                                if (!isDeleteMode) {
+                                    viewModel.cancelPendingStates()
+                                    showBackupDialog = true
+                                }
                             }
                     )
 
-                    // 32dp Circle Add Button
+                    // Delete mode center hint
+                    if (isDeleteMode) {
+                        Text(
+                            text = "削除する枠をタップ",
+                            color = Color(0xFFFF6B6B),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.align(Alignment.Center)
+                        )
+                    }
+
+                    // 32dp Circle Add Button / Delete Mode Toggle
                     Box(
                         modifier = Modifier
                             .size(32.dp)
                             .align(Alignment.CenterEnd)
-                            .border(1.dp, Color(255, 255, 255, 25), CircleShape)
-                            .background(Color(255, 255, 255, 12), CircleShape)
-                            .pointerDownTap {
-                                activeSetupGroupId = null
-                                showAddDialog = true
+                            .border(
+                                width = 1.dp,
+                                color = if (isDeleteMode) Color(0xFFFF5252) else Color(255, 255, 255, 25),
+                                shape = CircleShape
+                            )
+                            .background(
+                                color = if (isDeleteMode) Color(0xFF451818) else Color(255, 255, 255, 12),
+                                shape = CircleShape
+                            )
+                            .pointerInput(isDeleteMode) {
+                                detectTapGestures(
+                                    onTap = {
+                                        if (isDeleteMode) {
+                                            isDeleteMode = false
+                                        } else {
+                                            viewModel.cancelPendingStates()
+                                            activeSetupGroupId = null
+                                            showAddDialog = true
+                                        }
+                                    },
+                                    onLongPress = {
+                                        // Start delete mode (NO vibration)
+                                        viewModel.cancelPendingStates()
+                                        isDeleteMode = !isDeleteMode
+                                    }
+                                )
                             },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "枠を追加",
-                            tint = Color(0xFFECEEF2),
+                            imageVector = if (isDeleteMode) Icons.Default.Close else Icons.Default.Add,
+                            contentDescription = if (isDeleteMode) "削除モード解除" else "枠を追加",
+                            tint = if (isDeleteMode) Color(0xFFFF6B6B) else Color(0xFFECEEF2),
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -319,8 +372,8 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
                             onPress = {
                                 keyboardController?.hide()
                                 focusManager.clearFocus(force = true)
-                                // Only cancel if we are NOT in move mode
-                                if (movingItemId == null) {
+                                // Only cancel if we are NOT in move or delete mode
+                                if (movingItemId == null && !isDeleteMode) {
                                     viewModel.cancelPendingStates()
                                 }
                             }
@@ -350,7 +403,9 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
 
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(4),
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .imePadding(),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                         contentPadding = PaddingValues(
@@ -382,6 +437,8 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
                                 .then(
                                     if (isMovingSource && ui.entity.type != "group") {
                                         Modifier.border(2.dp, Color(0xFF4DA3FF), RoundedCornerShape(10.dp))
+                                    } else if (isDeleteMode && ui.entity.type != "group") {
+                                        Modifier.border(1.2.dp, Color(0x66FF5252), RoundedCornerShape(8.dp))
                                     } else {
                                         Modifier
                                     }
@@ -394,10 +451,19 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
                                         collapsedCount = ui.collapsedCount,
                                         isMoveMode = movingItemId != null,
                                         onToggleCollapse = {
-                                            viewModel.toggleHeaderCollapsed(ui.entity.id)
+                                            if (isDeleteMode) {
+                                                itemToDelete = ui.entity
+                                            } else {
+                                                viewModel.cancelPendingStates()
+                                                viewModel.toggleHeaderCollapsed(ui.entity.id)
+                                            }
                                         },
                                         onEdit = {
-                                            itemToEdit = ui.entity
+                                            if (isDeleteMode) {
+                                                itemToDelete = ui.entity
+                                            } else {
+                                                openEditDialog(ui.entity)
+                                            }
                                         }
                                     )
                                 }
@@ -406,7 +472,11 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
                                         ui = ui,
                                         isMoveMode = movingItemId != null,
                                         onEdit = {
-                                            itemToEdit = ui.entity
+                                            if (isDeleteMode) {
+                                                itemToDelete = ui.entity
+                                            } else {
+                                                openEditDialog(ui.entity)
+                                            }
                                         }
                                     )
                                 }
@@ -417,13 +487,28 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
                                         isMoveMode = movingItemId != null,
                                         pendingChunkId = pendingChunkId,
                                         onCardTap = { child ->
-                                            viewModel.onCardShortTap(child)
+                                            if (isDeleteMode) {
+                                                itemToDelete = child
+                                            } else {
+                                                viewModel.onCardShortTap(child)
+                                            }
                                         },
-                                        onEditChild = { itemToEdit = it },
+                                        onEditChild = { child ->
+                                            if (isDeleteMode) {
+                                                itemToDelete = child
+                                            } else {
+                                                openEditDialog(child)
+                                            }
+                                        },
                                         onEditGroup = {
-                                            itemToEdit = ui.entity
+                                            if (isDeleteMode) {
+                                                itemToDelete = ui.entity
+                                            } else {
+                                                openEditDialog(ui.entity)
+                                            }
                                         },
                                         onQuickEditValue = { entity, field, newVal ->
+                                            viewModel.cancelPendingStates()
                                             if (field == "cur") {
                                                 viewModel.updateCurrentValue(entity.id, newVal)
                                             } else {
@@ -431,10 +516,18 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
                                             }
                                         },
                                         onAddChild = {
-                                            activeSetupGroupId = ui.entity.id
-                                            showAddDialog = true
+                                            if (isDeleteMode) {
+                                                itemToDelete = ui.entity
+                                            } else {
+                                                viewModel.cancelPendingStates()
+                                                activeSetupGroupId = ui.entity.id
+                                                showAddDialog = true
+                                            }
                                         },
-                                        onFocusChanged = { isAnyFocused = it }
+                                        onFocusChanged = { focused ->
+                                            if (focused) viewModel.cancelPendingStates()
+                                            isAnyFocused = focused
+                                        }
                                     )
                                 }
                                 else -> {
@@ -443,19 +536,31 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
                                         isGroupChild = false,
                                         isClaimPreview = ui.isClaimPreview,
                                         onTap = {
-                                            viewModel.onCardShortTap(ui.entity)
+                                            if (isDeleteMode) {
+                                                itemToDelete = ui.entity
+                                            } else {
+                                                viewModel.onCardShortTap(ui.entity)
+                                            }
                                         },
                                         onEdit = {
-                                            itemToEdit = ui.entity
+                                            if (isDeleteMode) {
+                                                itemToDelete = ui.entity
+                                            } else {
+                                                openEditDialog(ui.entity)
+                                            }
                                         },
                                         onQuickEditValue = { field, newVal ->
+                                            viewModel.cancelPendingStates()
                                             if (field == "cur") {
                                                 viewModel.updateCurrentValue(ui.entity.id, newVal)
                                             } else {
                                                 viewModel.updateMaxValue(ui.entity.id, newVal)
                                             }
                                         },
-                                        onFocusChanged = { isAnyFocused = it }
+                                        onFocusChanged = { focused ->
+                                            if (focused) viewModel.cancelPendingStates()
+                                            isAnyFocused = focused
+                                        }
                                     )
                                 }
                             }
@@ -469,6 +574,7 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
                                             if (movingItemId != ui.entity.id) {
                                                 viewModel.moveItemToTarget(movingItemId!!, ui.entity.id)
                                             }
+                                            viewModel.cancelPendingStates()
                                             movingItemId = null
                                         }
                                 )
@@ -538,9 +644,13 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
     }
 
     itemToEdit?.let { entity ->
+        val parentGroupName = remember(entity.parentId) {
+            viewModel.getGroupNameForChild(entity.parentId)
+        }
         EditItemDialog(
             entity = entity,
             customColors = customColors.map { it.hexColor },
+            groupName = parentGroupName,
             onDismiss = { itemToEdit = null },
             onSaveName = {
                 viewModel.updateItemName(entity.id, it)
@@ -577,18 +687,22 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
             onMoveUp = { /* Unused: viewModel.moveItemUp(entity.parentId ?: entity.id) */ },
             onMoveDown = { /* Unused: viewModel.moveItemDown(entity.parentId ?: entity.id) */ },
             onStartMove = {
+                viewModel.cancelPendingStates()
                 movingItemId = entity.parentId ?: entity.id
             },
             onCloneGroup = {
+                viewModel.cancelPendingStates()
                 viewModel.cloneGroup(entity.id)
                 itemToEdit = null
             },
             onAddChildTimer = {
+                viewModel.cancelPendingStates()
                 activeSetupGroupId = entity.id
                 showAddDialog = true
                 itemToEdit = null
             },
             onAddGroupBelow = {
+                viewModel.cancelPendingStates()
                 viewModel.addGroup()
                 itemToEdit = null
             }
@@ -614,6 +728,23 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
             }
         )
     }
+
+    itemToDelete?.let { entity ->
+        DeleteConfirmDialog(
+            itemName = entity.name,
+            itemType = entity.type,
+            onDismiss = {
+                itemToDelete = null
+                isDeleteMode = false
+            },
+            onConfirmDelete = {
+                viewModel.deleteItem(entity.id)
+                itemToDelete = null
+                isDeleteMode = false
+            }
+        )
+    }
+    }
 }
 }
 
@@ -633,12 +764,12 @@ fun HeaderCard(
         modifier = Modifier
             .fillMaxWidth()
             .pointerDownTap { onToggleCollapse() }
-            .padding(vertical = if (isMoveMode) 8.dp else 0.dp)
+            .padding(top = 2.dp, bottom = 0.dp, start = 2.dp, end = 2.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 6.dp, bottom = 2.dp, start = 2.dp, end = 2.dp),
+                .padding(bottom = 1.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -652,7 +783,12 @@ fun HeaderCard(
                     fontWeight = FontWeight.Bold,
                     color = if (ui.entity.name.isEmpty()) Color(0xFF8A8EA3) else headerColor,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    style = androidx.compose.ui.text.TextStyle(
+                        platformStyle = androidx.compose.ui.text.PlatformTextStyle(
+                            includeFontPadding = false
+                        )
+                    )
                 )
                 if (collapsedCount > 0) {
                     Spacer(modifier = Modifier.width(4.dp))
@@ -692,12 +828,13 @@ fun HeaderCard(
                 )
             }
         }
-        // Bottom divider line
+
+        // Crisp, visible bottom underline with header theme accent color
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(1.dp)
-                .background(Color(0xFF2A2A3A))
+                .height(1.2.dp)
+                .background(headerColor.copy(alpha = 0.35f))
         )
     }
 }
@@ -714,7 +851,7 @@ fun RuleCard(
         modifier = Modifier
             .fillMaxWidth()
             .pointerDownTap { onEdit() }
-            .padding(vertical = if (isMoveMode) 10.dp else 4.dp, horizontal = 2.dp),
+            .padding(top = 1.dp, bottom = 1.dp, start = 2.dp, end = 2.dp),
         contentAlignment = Alignment.CenterEnd
     ) {
         // Line bar
@@ -745,7 +882,7 @@ fun GroupCard(
     }
 
     val borderColor = if (isMovingSource) Color(0xFF4DA3FF) else groupColor
-    val borderWidth = if (isMovingSource) 2.dp else 1.dp
+    val borderWidth = if (isMovingSource) 2.dp else 1.2.dp
     val groupShape = remember { RoundedCornerShape(8.dp) }
     val borderStroke = remember(borderWidth, borderColor) {
         BorderStroke(borderWidth, borderColor)
@@ -754,7 +891,7 @@ fun GroupCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 11.dp) // Sufficient top headroom for lifted name tag
+            .padding(top = 4.dp) // Headroom ensuring stacked account frames or lines never collide with name tag
     ) {
         // Outer Fieldset Box with clean native Surface border (no clipping artifacts)
         Surface(
@@ -805,7 +942,7 @@ fun GroupCard(
                                         TimerCard(
                                             ui = slotUi,
                                             isGroupChild = true,
-                                            isClaimPreview = pendingChunkId == slotUi.entity.id,
+                                            isClaimPreview = slotUi.isClaimPreview,
                                             onTap = { onCardTap(slotUi.entity) },
                                             onEdit = { onEditChild(slotUi.entity) },
                                             onQuickEditValue = { field, newVal ->
@@ -881,7 +1018,7 @@ fun TimerCard(
         typeColor
     }
 
-    val borderWidth = if (isClaimPreview || isIdleExpedClaim) 2.dp else 1.dp
+    val borderWidth = if (isClaimPreview || isIdleExpedClaim) 2.dp else 1.2.dp
     val cardShape = remember { RoundedCornerShape(10.dp) }
     val borderStroke = remember(borderWidth, borderStrokeColor) {
         BorderStroke(borderWidth, borderStrokeColor)
@@ -928,6 +1065,8 @@ fun TimerCard(
                     }
 
                     // Absolute positioned Symmetrically aligned numbers (X / Y) at Bottom-Center with zero-delay native BasicTextField
+                    val curFocusRequester = remember { FocusRequester() }
+
                     Row(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
@@ -937,65 +1076,92 @@ fun TimerCard(
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Current value (symmetrical right-aligned, tap to edit instantly)
-                        BasicTextField(
-                            value = if (isCurFocused) localCurText else "${ui.calculatedCurrent}",
-                            onValueChange = { newVal ->
-                                val filtered = newVal.filter { it.isDigit() }
-                                if (filtered.length <= 3) {
-                                    localCurText = filtered
-                                }
-                            },
-                            textStyle = androidx.compose.ui.text.TextStyle(
-                                color = if (ui.isWarn) Color(0xFFFF6B6B) else Color(0xFFECEEF2),
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                textAlign = TextAlign.End,
-                                platformStyle = androidx.compose.ui.text.PlatformTextStyle(
-                                    includeFontPadding = false
-                                )
-                            ),
-                            keyboardOptions = KeyboardOptions(
-                                keyboardType = KeyboardType.Number,
-                                imeAction = ImeAction.Done
-                            ),
-                            keyboardActions = KeyboardActions(
-                                onDone = {
-                                    keyboardController?.hide()
-                                    focusManager.clearFocus(force = true)
-                                }
-                            ),
-                            singleLine = true,
-                            cursorBrush = SolidColor(Color.Transparent),
+                        // Current value container (weight 1f, symmetrical right-aligned)
+                        // Tap target precisely covers current digits down to left edge as requested
+                        Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(22.dp)
-                                .onFocusChanged { focusState ->
-                                    focusTracker(focusState.isFocused)
-                                    if (focusState.isFocused) {
-                                        if (!isCurFocused) {
-                                            isCurFocused = true
-                                            localCurText = ""
-                                            keyboardController?.show()
+                                .pointerDownTap(enabled = !isCurFocused) {
+                                    isCurFocused = true
+                                    localCurText = ""
+                                    try {
+                                        curFocusRequester.requestFocus()
+                                        keyboardController?.show()
+                                    } catch (e: Exception) {}
+                                },
+                            contentAlignment = Alignment.CenterEnd
+                        ) {
+                            if (!isCurFocused) {
+                                Text(
+                                    text = "${ui.calculatedCurrent}",
+                                    color = if (ui.isWarn) Color(0xFFFF6B6B) else Color(0xFFECEEF2),
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = TextAlign.End,
+                                    style = androidx.compose.ui.text.TextStyle(
+                                        platformStyle = androidx.compose.ui.text.PlatformTextStyle(
+                                            includeFontPadding = false
+                                        )
+                                    )
+                                )
+                            } else {
+                                BasicTextField(
+                                    value = localCurText,
+                                    onValueChange = { newVal ->
+                                        val filtered = newVal.filter { it.isDigit() }
+                                        if (filtered.length <= 3) {
+                                            localCurText = filtered
                                         }
-                                    } else {
-                                        if (isCurFocused) {
-                                            isCurFocused = false
+                                    },
+                                    textStyle = androidx.compose.ui.text.TextStyle(
+                                        color = if (ui.isWarn) Color(0xFFFF6B6B) else Color(0xFFECEEF2),
+                                        fontSize = 18.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        textAlign = TextAlign.End,
+                                        platformStyle = androidx.compose.ui.text.PlatformTextStyle(
+                                            includeFontPadding = false
+                                        )
+                                    ),
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = KeyboardType.Number,
+                                        imeAction = ImeAction.Done
+                                    ),
+                                    keyboardActions = KeyboardActions(
+                                        onDone = {
                                             keyboardController?.hide()
-                                            val parsed = localCurText.toIntOrNull()
-                                            if (parsed != null) {
-                                                onQuickEditValue?.invoke("cur", parsed)
+                                            focusManager.clearFocus(force = true)
+                                        }
+                                    ),
+                                    singleLine = true,
+                                    cursorBrush = SolidColor(Color.Transparent),
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .focusRequester(curFocusRequester)
+                                        .onFocusChanged { focusState ->
+                                            focusTracker(focusState.isFocused)
+                                            if (focusState.isFocused) {
+                                                keyboardController?.show()
+                                            } else {
+                                                if (isCurFocused) {
+                                                    isCurFocused = false
+                                                    keyboardController?.hide()
+                                                    val parsed = localCurText.toIntOrNull()
+                                                    if (parsed != null) {
+                                                        onQuickEditValue?.invoke("cur", parsed)
+                                                    }
+                                                    localCurText = ""
+                                                }
                                             }
-                                            localCurText = ""
+                                        },
+                                    decorationBox = { innerTextField ->
+                                        Box(contentAlignment = Alignment.CenterEnd, modifier = Modifier.fillMaxSize()) {
+                                            innerTextField()
                                         }
                                     }
-                                },
-                            decorationBox = { innerTextField ->
-                                Box(contentAlignment = Alignment.CenterEnd, modifier = Modifier.fillMaxSize()) {
-                                    innerTextField()
-                                }
+                                )
                             }
-                        )
+                        }
 
                         // Slash "/" centered
                         Text(

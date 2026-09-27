@@ -156,9 +156,40 @@ function swapTopItems(idA, idB){
   const idxA = state.items.findIndex(i => i.id === idA);
   const idxB = state.items.findIndex(i => i.id === idB);
   if (idxA === -1 || idxB === -1 || idxA === idxB) return;
-  const temp = state.items[idxA];
-  state.items[idxA] = state.items[idxB];
-  state.items[idxB] = temp;
+
+  const itemA = state.items[idxA];
+  const itemB = state.items[idxB];
+
+  // 折りたたんでいる見出しの場合のみ配下ごと一括移動
+  const isFoldedHeaderA = itemA.type === 'header' && !!itemA.collapsed && !itemA.foldLock;
+
+  if (isFoldedHeaderA){
+    let endA = idxA + 1;
+    while (endA < state.items.length && state.items[endA].type !== 'header') {
+      endA++;
+    }
+    if (idxB >= idxA && idxB < endA) return;
+
+    const sectionA = state.items.slice(idxA, endA);
+    state.items.splice(idxA, sectionA.length);
+
+    const newIdxB = state.items.findIndex(i => i.id === idB);
+    if (newIdxB === -1) return;
+
+    const isFoldedHeaderB = itemB.type === 'header' && !!itemB.collapsed && !itemB.foldLock;
+    let insertIdx = (idxA < idxB)
+      ? (isFoldedHeaderB
+          ? (()=>{ let nextH = newIdxB + 1; while (nextH < state.items.length && state.items[nextH].type !== 'header') nextH++; return nextH; })()
+          : newIdxB + 1)
+      : newIdxB;
+
+    state.items.splice(insertIdx, 0, ...sectionA);
+  } else {
+    // 通常の移動（単体スワップ）
+    const temp = state.items[idxA];
+    state.items[idxA] = state.items[idxB];
+    state.items[idxB] = temp;
+  }
   save();
   render();
   startTicking(true);

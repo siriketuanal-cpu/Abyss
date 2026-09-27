@@ -17,6 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
@@ -42,7 +43,6 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalContext
 import android.content.Context
 import androidx.activity.compose.BackHandler
-import android.view.WindowManager
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import com.example.abysstimer.data.ItemEntity
 
@@ -62,54 +62,33 @@ fun Modifier.pointerDownTap(
 @Composable
 fun FastDialog(
     onDismissRequest: () -> Unit,
-    properties: DialogProperties = DialogProperties(usePlatformDefaultWidth = false),
+    properties: DialogProperties? = null,
     content: @Composable () -> Unit
 ) {
-    Dialog(
-        onDismissRequest = onDismissRequest,
-        properties = properties
-    ) {
-        val view = LocalView.current
-        DisposableEffect(view) {
-            val window = (view.parent as? DialogWindowProvider)?.window
-            window?.let { w ->
-                w.setWindowAnimations(0)
-                w.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-                w.setDimAmount(0f)
-                w.setBackgroundDrawableResource(android.R.color.transparent)
-            }
-            onDispose {}
-        }
-        val focusManager = LocalFocusManager.current
-        val keyboardController = LocalSoftwareKeyboardController.current
-        var isAnyFocusedInDialog by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val currentOnDismiss by rememberUpdatedState(onDismissRequest)
+    var isAnyFocusedInDialog by remember { mutableStateOf(false) }
 
-        CompositionLocalProvider(LocalFocusTracker provides { isAnyFocusedInDialog = it }) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .imePadding()
-                    .pointerInput(isAnyFocusedInDialog) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            val event = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
-                            if (isAnyFocusedInDialog && event.type == androidx.compose.ui.input.pointer.PointerEventType.Press) {
-                                focusManager.clearFocus()
-                                event.changes.forEach { it.consume() }
-                            } else if (event.type == androidx.compose.ui.input.pointer.PointerEventType.Press) {
-                                // Background tap logic
-                                // We can't easily detect if we are tapping the background here in Initial pass without checking coordinates.
-                                // But detectTapGestures on background (handled later) will handle dismissal.
-                            }
-                        }
-                    }
-                }
+    // Direct back handling for instant overlay dismissal
+    BackHandler(enabled = true) {
+        keyboardController?.hide()
+        focusManager.clearFocus(force = true)
+        currentOnDismiss()
+    }
+
+    CompositionLocalProvider(LocalFocusTracker provides { isAnyFocusedInDialog = it }) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Transparent)
+                .imePadding()
                 .pointerInput(Unit) {
                     detectTapGestures(
                         onPress = {
                             keyboardController?.hide()
                             focusManager.clearFocus(force = true)
-                            onDismissRequest()
+                            currentOnDismiss()
                         }
                     )
                 },
@@ -119,8 +98,7 @@ fun FastDialog(
                 modifier = Modifier.pointerInput(Unit) {
                     detectTapGestures(
                         onPress = {
-                            keyboardController?.hide()
-                            focusManager.clearFocus(force = true)
+                            // Consumes touch event on dialog card background so taps inside do not dismiss overlay
                         }
                     )
                 }
@@ -129,7 +107,6 @@ fun FastDialog(
             }
         }
     }
-}
 }
 
 val SHARED_COLORS = listOf(
@@ -141,6 +118,60 @@ val FULL_PRESET_COLORS = listOf(
     "#9B8BFF", "#FF69B4", "#FF4500", "#00FA9A", "#6495ED", "#8A2BE2", "#52617A"
 )
 
+/**
+ * ToastDialogContainer:
+ * Wraps the 280dp toast menu with an integrated header band at the very top inside the card.
+ *
+ * Design:
+ * - A clean, unbroken 14dp rounded rectangle Surface with uniform border.
+ * - Inside at the top, a subtle header band displays the group name (account name)
+ *   with an understated background tint and a thin bottom divider.
+ * - Perfectly stable, zero risk of seam/cutout artifacts or font rendering misalignments.
+ */
+@Composable
+fun ToastDialogContainer(
+    groupName: String,
+    borderColor: Color,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val displayName = remember(groupName) {
+        if (groupName.isBlank()) "アカウント" else groupName
+    }
+
+    val cardRadius = 14.dp
+
+    Surface(
+        modifier = Modifier.width(280.dp),
+        shape = RoundedCornerShape(cardRadius),
+        color = Color(0xFF1B1D22),
+        border = BorderStroke(1.2.dp, borderColor)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 10.dp, end = 10.dp, top = 2.dp, bottom = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            // Header: Seamlessly embedded at top, extreme slim padding, matching group name color (#E8EAEF)
+            Text(
+                text = displayName,
+                color = Color(0xFFE8EAEF),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 0.dp)
+            )
+
+            // Content Area directly follows with natural compact spacing
+            content()
+        }
+    }
+}
+
 // --- Add Panel Dialog (Web App Spec) ---
 @Composable
 fun AddPanelDialog(
@@ -151,8 +182,8 @@ fun AddPanelDialog(
     FastDialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(14.dp),
-            color = Color(0xFF1C1E26),
-            border = BorderStroke(1.dp, Color(255, 255, 255, 36)),
+            color = Color(0xFF1B1D24),
+            border = BorderStroke(1.2.dp, Color(0xFF6FC7FF).copy(alpha = 0.65f)),
             modifier = Modifier.width(280.dp)
         ) {
             Column(
@@ -421,11 +452,25 @@ fun SetupDialog(
     var countMode by remember { mutableStateOf("down") } // "down" or "up"
     var orbMode by remember { mutableStateOf("down") } // "down" or "up"
 
+    val typeColor = remember(type, selectedColor) {
+        when (type) {
+            "stam" -> Color(0xFF6FC7FF)
+            "orb" -> Color(0xFFB48CFF)
+            "idle" -> Color(0xFFFF9F68)
+            "exped" -> Color(0xFF70D6B0)
+            else -> try {
+                Color(android.graphics.Color.parseColor(selectedColor))
+            } catch (e: Exception) {
+                Color(0xFF9B8BFF)
+            }
+        }
+    }
+
     FastDialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(14.dp),
-            color = Color(0xFF1C1E26),
-            border = BorderStroke(1.dp, Color(255, 255, 255, 36)),
+            color = Color(0xFF1B1D24),
+            border = BorderStroke(1.2.dp, typeColor.copy(alpha = 0.70f)),
             modifier = Modifier.width(280.dp)
         ) {
             Column(
@@ -721,78 +766,84 @@ fun SetupDialog(
     }
 }
 
-// Shared Foldable Bottom Action for Toast Dialogs (Ultra-compact collapsed '…' with zero wasted padding, expanding seamlessly)
+// --- Delete Confirmation Dialog (Triggered from Long-press "+" Delete Mode) ---
 @Composable
-fun FoldableToastFooter(
-    onDelete: () -> Unit,
-    extraContent: (@Composable () -> Unit)? = null
+fun DeleteConfirmDialog(
+    itemName: String,
+    itemType: String,
+    onDismiss: () -> Unit,
+    onConfirmDelete: () -> Unit
 ) {
-    var isExpanded by remember { mutableStateOf(false) }
-    var isConfirmingDelete by remember { mutableStateOf(false) }
-
-    if (isConfirmingDelete) {
-        LaunchedEffect(Unit) {
-            kotlinx.coroutines.delay(3000)
-            isConfirmingDelete = false
-        }
-    }
-
-    if (!isExpanded) {
-        // Ultra-compact trigger button: zero vertical margin, height 18dp, fits tightly
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(18.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .pointerDownTap { isExpanded = true },
-            contentAlignment = Alignment.Center
+    FastDialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = Color(0xFF1B1D24),
+            border = BorderStroke(1.2.dp, Color(0xFFFF6B6B).copy(alpha = 0.75f)),
+            modifier = Modifier.width(280.dp)
         ) {
-            Text(
-                text = "⋯",
-                color = Color(0xFF6E7387),
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.15.em
-            )
-        }
-    } else {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 4.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            // Extra actions if any (like duplicate group)
-            extraContent?.invoke()
-
-            // Unified elegant Delete button
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(34.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .border(
-                        1.dp,
-                        if (isConfirmingDelete) Color(0xFFFF5252) else Color(0x33FF5252),
-                        RoundedCornerShape(6.dp)
-                    )
-                    .background(if (isConfirmingDelete) Color(0xFF451818) else Color(0xFF221417))
-                    .pointerDownTap {
-                        if (isConfirmingDelete) {
-                            onDelete()
-                        } else {
-                            isConfirmingDelete = true
-                        }
-                    },
-                contentAlignment = Alignment.Center
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = if (isConfirmingDelete) "本当に削除しますか？" else "削除",
-                    color = if (isConfirmingDelete) Color(0xFFFF6B6B) else Color(0xFFEF5350),
-                    fontSize = 12.5.sp,
-                    fontWeight = FontWeight.Bold
+                    text = "削除の確認",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
                 )
+
+                val displayName = when {
+                    itemName.isNotEmpty() -> "「$itemName」"
+                    itemType == "group" -> "アカウント枠"
+                    itemType == "header" -> "見出し"
+                    itemType == "rule" -> "仕切り線"
+                    itemType == "stam" -> "スタミナタイマー"
+                    itemType == "orb" -> "オーブタイマー"
+                    itemType == "idle" -> "放置タイマー"
+                    itemType == "exped" -> "遠征タイマー"
+                    else -> "この項目"
+                }
+
+                Text(
+                    text = "${displayName}を削除しますか？",
+                    fontSize = 13.sp,
+                    color = Color(0xFFC5C8D4),
+                    textAlign = TextAlign.Center
+                )
+
+                HorizontalDivider(color = Color(255, 255, 255, 25), thickness = 1.dp)
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(36.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0xFF22252D))
+                            .border(BorderStroke(1.dp, Color(255, 255, 255, 20)), RoundedCornerShape(6.dp))
+                            .pointerDownTap { onDismiss() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("キャンセル", color = Color.White, fontSize = 12.5.sp, fontWeight = FontWeight.Medium)
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(36.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0xFF451818))
+                            .border(BorderStroke(1.dp, Color(0xFFFF5252)), RoundedCornerShape(6.dp))
+                            .pointerDownTap { onConfirmDelete() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("削除", color = Color(0xFFFF6B6B), fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
             }
         }
     }
@@ -846,11 +897,17 @@ fun GroupToastDialog(
         return
     }
 
+    val groupColor = remember(entity.color) {
+        entity.color?.let {
+            try { Color(android.graphics.Color.parseColor(it)) } catch (e: Exception) { Color(0xFF9B8BFF) }
+        } ?: Color(0xFF9B8BFF)
+    }
+
     FastDialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(14.dp),
             color = Color(0xFF1B1D22),
-            border = BorderStroke(1.dp, Color(255, 255, 255, 15)),
+            border = BorderStroke(1.2.dp, groupColor.copy(alpha = 0.70f)),
             modifier = Modifier.width(280.dp)
         ) {
             Column(
@@ -995,47 +1052,43 @@ fun GroupToastDialog(
                         }
                     }
 
-                    // Row 4: 移動 (単独ライン・アンバー系アクセント)
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(36.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0x1AFBBF24))
-                            .border(BorderStroke(1.dp, Color(0x59FBBF24)), RoundedCornerShape(8.dp))
-                            .pointerDownTap {
-                                onDismiss()
-                                onStartMove()
-                            },
-                        contentAlignment = Alignment.Center
+                    // Row 4: 移動 | 枠を複製
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text("移動", color = Color(0xFFFBBF24), fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
-                    }
-
-                    // Row 5: ⋯ 折りたたみ（枠を複製 ＋ 削除）
-                    FoldableToastFooter(
-                        onDelete = {
-                            onDismiss()
-                            onDelete()
-                        },
-                        extraContent = {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(34.dp)
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(Color(0xFF22252D))
-                                    .border(BorderStroke(1.dp, Color(255, 255, 255, 16)), RoundedCornerShape(6.dp))
-                                    .pointerDownTap {
-                                        onDismiss()
-                                        onCloneGroup()
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text("枠を複製", color = Color(0xFFC5C8D4), fontSize = 12.5.sp, fontWeight = FontWeight.Medium)
-                            }
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(40.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0x1AFBBF24))
+                                .border(BorderStroke(1.dp, Color(0x59FBBF24)), RoundedCornerShape(8.dp))
+                                .pointerDownTap {
+                                    onDismiss()
+                                    onStartMove()
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("移動", color = Color(0xFFFBBF24), fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
                         }
-                    )
+
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(40.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0xFF22252D))
+                                .border(BorderStroke(1.dp, Color(255, 255, 255, 16)), RoundedCornerShape(8.dp))
+                                .pointerDownTap {
+                                    onDismiss()
+                                    onCloneGroup()
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("枠を複製", color = Color(0xFFC5C8D4), fontSize = 12.5.sp, fontWeight = FontWeight.Medium)
+                        }
+                    }
                 }
             }
         }
@@ -1081,11 +1134,17 @@ fun HeaderToastDialog(
         return
     }
 
+    val headerColor = remember(entity.color) {
+        entity.color?.let {
+            try { Color(android.graphics.Color.parseColor(it)) } catch (e: Exception) { Color(0xFF9B8BFF) }
+        } ?: Color(0xFF9B8BFF)
+    }
+
     FastDialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(14.dp),
             color = Color(0xFF1B1D22),
-            border = BorderStroke(1.dp, Color(255, 255, 255, 15)),
+            border = BorderStroke(1.2.dp, headerColor.copy(alpha = 0.70f)),
             modifier = Modifier.width(280.dp)
         ) {
             Column(
@@ -1228,14 +1287,6 @@ fun HeaderToastDialog(
                             Text("移動", color = Color(0xFFFBBF24), fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
                         }
                     }
-
-                    // Row 4: ⋯ 折りたたみアクション（削除）
-                    FoldableToastFooter(
-                        onDelete = {
-                            onDismiss()
-                            onDelete()
-                        }
-                    )
                 }
             }
         }
@@ -1261,11 +1312,19 @@ fun FullColorPickerDialog(
         showRgbMixer = false
     }
 
+    val activeBorderColor = remember(selectedColor) {
+        try {
+            Color(android.graphics.Color.parseColor(selectedColor))
+        } catch (e: Exception) {
+            Color(0xFF9B8BFF)
+        }
+    }
+
     FastDialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(16.dp),
             color = Color(0xFF1B1D22),
-            border = BorderStroke(1.dp, Color(255, 255, 255, 15)),
+            border = BorderStroke(1.2.dp, activeBorderColor.copy(alpha = 0.70f)),
             modifier = Modifier.width(300.dp)
         ) {
             Column(
@@ -1528,6 +1587,7 @@ fun FullColorPickerDialog(
 fun EditItemDialog(
     entity: ItemEntity,
     customColors: List<String>,
+    groupName: String = "",
     onDismiss: () -> Unit,
     onSaveName: (String) -> Unit,
     onSaveColor: (String) -> Unit,
@@ -1596,6 +1656,7 @@ fun EditItemDialog(
     if (entity.type == "stam") {
         StaminaToastDialog(
             entity = entity,
+            groupName = groupName,
             onDismiss = onDismiss,
             onUpdateSettings = onUpdateSettings,
             onDelete = onDelete
@@ -1606,6 +1667,7 @@ fun EditItemDialog(
     if (entity.type == "orb") {
         OrbToastDialog(
             entity = entity,
+            groupName = groupName,
             onDismiss = onDismiss,
             onUpdateSettings = onUpdateSettings,
             onDelete = onDelete
@@ -1616,6 +1678,7 @@ fun EditItemDialog(
     if (entity.type == "idle" || entity.type == "exped") {
         IdleExpedToastDialog(
             entity = entity,
+            groupName = groupName,
             onDismiss = onDismiss,
             onUpdateSettings = onUpdateSettings,
             onDelete = onDelete
@@ -1692,6 +1755,7 @@ fun EditItemDialog(
         Surface(
             shape = RoundedCornerShape(16.dp),
             color = Color(0xFF15151F),
+            border = BorderStroke(1.2.dp, Color(0xFF6FC7FF).copy(alpha = 0.70f)),
             modifier = Modifier.fillMaxWidth().padding(12.dp)
         ) {
             Column(
@@ -1712,12 +1776,6 @@ fun EditItemDialog(
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
-                    IconButton(
-                        onClick = onDelete,
-                        colors = IconButtonDefaults.iconButtonColors(contentColor = Color(0xFFFF6B6B))
-                    ) {
-                        Icon(imageVector = Icons.Default.Delete, contentDescription = "Delete item")
-                    }
                 }
 
                 // Name edit (for everything except rules)
@@ -2829,11 +2887,17 @@ fun RuleToastDialog(
         return
     }
 
+    val ruleColor = remember(entity.color) {
+        entity.color?.let {
+            try { Color(android.graphics.Color.parseColor(it)) } catch (e: Exception) { Color(0xFF52617A) }
+        } ?: Color(0xFF52617A)
+    }
+
     FastDialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(14.dp),
             color = Color(0xFF1B1D22),
-            border = BorderStroke(1.dp, Color(255, 255, 255, 15)),
+            border = BorderStroke(1.2.dp, ruleColor.copy(alpha = 0.75f)),
             modifier = Modifier.width(280.dp)
         ) {
             Column(
@@ -2902,14 +2966,6 @@ fun RuleToastDialog(
                         Text("移動", color = Color(0xFFFBBF24), fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
                     }
                 }
-
-                // Row 3: ⋯ 折りたたみアクション（削除）
-                FoldableToastFooter(
-                    onDelete = {
-                        onDismiss()
-                        onDelete()
-                    }
-                )
             }
         }
     }
@@ -2918,6 +2974,7 @@ fun RuleToastDialog(
 @Composable
 fun StaminaToastDialog(
     entity: ItemEntity,
+    groupName: String = "",
     onDismiss: () -> Unit,
     onUpdateSettings: (Map<String, Any?>) -> Unit,
     onDelete: () -> Unit
@@ -2932,90 +2989,86 @@ fun StaminaToastDialog(
         val newMax = maxStr.toIntOrNull() ?: entity.max
         val newChunk = chunkStr.toIntOrNull()
 
-        onUpdateSettings(
-            mapOf(
-                "intervalMin" to newInterval,
-                "max" to newMax,
-                "useChunk" to newChunk,
-                "useChunkClear" to (newChunk == null)
+        val isIntervalChanged = newInterval != entity.intervalMin
+        val isMaxChanged = newMax != entity.max
+        val isChunkChanged = newChunk != entity.useChunk
+
+        if (isIntervalChanged || isMaxChanged || isChunkChanged) {
+            onUpdateSettings(
+                mapOf(
+                    "intervalMin" to newInterval,
+                    "max" to newMax,
+                    "useChunk" to newChunk,
+                    "useChunkClear" to (newChunk == null)
+                )
             )
-        )
+        }
     }
 
     FastDialog(onDismissRequest = {
         commitChanges()
         onDismiss()
     }) {
-        Surface(
-            shape = RoundedCornerShape(12.dp),
-            color = Color(0xFF1B1D22),
-            border = BorderStroke(1.dp, Color(255, 255, 255, 25)),
-            modifier = Modifier.width(280.dp)
+        ToastDialogContainer(
+            groupName = groupName,
+            borderColor = Color(0xFF6FC7FF).copy(alpha = 0.70f)
         ) {
-            Column(
-                modifier = Modifier.padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+            // Row 1: 回復(分) / 最大
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Row 1: 回復 / 最大
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    ToastItemRow(
-                        label = "回復",
-                        value = intervalStr,
-                        onValueChange = { intervalStr = it },
-                        modifier = Modifier.weight(1f)
-                    )
-                    ToastItemRow(
-                        label = "最大",
-                        value = maxStr,
-                        onValueChange = { maxStr = it },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                // Row 2: 使い切り
                 ToastItemRow(
-                    label = "使い切り",
-                    value = chunkStr,
-                    onValueChange = { chunkStr = it },
-                    placeholder = "なし",
-                    allowEmpty = true,
-                    modifier = Modifier.fillMaxWidth()
+                    label = "回復(分)",
+                    value = intervalStr,
+                    onValueChange = { intervalStr = it },
+                    modifier = Modifier.weight(1f)
                 )
+                ToastItemRow(
+                    label = "最大",
+                    value = maxStr,
+                    onValueChange = { maxStr = it },
+                    modifier = Modifier.weight(1f)
+                )
+            }
 
-                // Row 3: +1 +5 +10 (takes up full width, height 28.dp)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    listOf(1, 5, 10).forEach { delta ->
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(28.dp)
-                                .border(1.dp, Color(255, 209, 102, 102), RoundedCornerShape(6.dp))
-                                .background(Color(255, 209, 102, 31), RoundedCornerShape(6.dp))
-                                .pointerDownTap {
-                                    val curMax = maxStr.toIntOrNull() ?: entity.max
-                                    val nextMax = Math.min(999, curMax + delta)
-                                    maxStr = nextMax.toString()
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "+$delta",
-                                color = Color(0xFFFFD166),
-                                fontSize = 11.5.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
+            // Row 2: 使い切り
+            ToastItemRow(
+                label = "使い切り",
+                value = chunkStr,
+                onValueChange = { chunkStr = it },
+                placeholder = "なし",
+                allowEmpty = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            // Row 3: +1 +5 +10 (takes up full width, height 28.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                listOf(1, 5, 10).forEach { delta ->
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(28.dp)
+                            .border(1.dp, Color(255, 209, 102, 102), RoundedCornerShape(6.dp))
+                            .background(Color(255, 209, 102, 31), RoundedCornerShape(6.dp))
+                            .pointerDownTap {
+                                val curMax = maxStr.toIntOrNull() ?: entity.max
+                                val nextMax = Math.min(999, curMax + delta)
+                                maxStr = nextMax.toString()
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "+$delta",
+                            color = Color(0xFFFFD166),
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
-
-                // Row 4: ⋯ 折りたたみアクション
-                FoldableToastFooter(onDelete = onDelete)
             }
         }
     }
@@ -3024,9 +3077,10 @@ fun StaminaToastDialog(
 @Composable
 fun OrbToastDialog(
     entity: ItemEntity,
+    groupName: String = "",
     onDismiss: () -> Unit,
     onUpdateSettings: (Map<String, Any?>) -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit = {}
 ) {
     var maxStr by remember(entity.id) { mutableStateOf(entity.max.toString()) }
     var hoursInterval by remember(entity.id) { mutableStateOf((entity.intervalMin / 60).toString()) }
@@ -3058,132 +3112,132 @@ fun OrbToastDialog(
             }
         }
     }
-    var orbHoursStr by remember(entity.id, initialOrbMinutes) { mutableStateOf("%02d".format(initialOrbMinutes / 60)) }
-    var orbMinutesStr by remember(entity.id, initialOrbMinutes) { mutableStateOf("%02d".format(initialOrbMinutes % 60)) }
+    val defaultOrbH = "%02d".format(initialOrbMinutes / 60)
+    val defaultOrbM = "%02d".format(initialOrbMinutes % 60)
+    var orbHoursStr by remember(entity.id, initialOrbMinutes) { mutableStateOf(defaultOrbH) }
+    var orbMinutesStr by remember(entity.id, initialOrbMinutes) { mutableStateOf(defaultOrbM) }
 
     val commitChanges = {
         val newMax = maxStr.toIntOrNull() ?: entity.max
         val hInter = hoursInterval.toIntOrNull() ?: 6
         val newInterval = hInter * 60
         val newChunk = chunkStr.toIntOrNull()
-        val hEdit = orbHoursStr.toIntOrNull()
-        val mEdit = orbMinutesStr.toIntOrNull()
+        val isTimeEdited = orbHoursStr != defaultOrbH || orbMinutesStr != defaultOrbM
+        val hEdit = if (isTimeEdited) orbHoursStr.toIntOrNull() else null
+        val mEdit = if (isTimeEdited) orbMinutesStr.toIntOrNull() else null
 
-        onUpdateSettings(
-            mapOf(
-                "max" to newMax,
-                "intervalMin" to newInterval,
-                "useChunk" to newChunk,
-                "useChunkClear" to (newChunk == null),
-                "orbMode" to orbMode,
-                "orbEditHours" to hEdit,
-                "orbEditMinutes" to mEdit
+        val isMaxChanged = newMax != entity.max
+        val isIntervalChanged = newInterval != entity.intervalMin
+        val isChunkChanged = newChunk != entity.useChunk
+        val isOrbModeChanged = orbMode != (entity.orbMode ?: "down")
+
+        if (isMaxChanged || isIntervalChanged || isChunkChanged || isOrbModeChanged || isTimeEdited) {
+            onUpdateSettings(
+                mapOf(
+                    "max" to newMax,
+                    "intervalMin" to newInterval,
+                    "useChunk" to newChunk,
+                    "useChunkClear" to (newChunk == null),
+                    "orbMode" to orbMode,
+                    "orbEditHours" to hEdit,
+                    "orbEditMinutes" to mEdit
+                )
             )
-        )
+        }
     }
 
     FastDialog(onDismissRequest = {
         commitChanges()
         onDismiss()
     }) {
-        Surface(
-            shape = RoundedCornerShape(12.dp),
-            color = Color(0xFF1B1D22),
-            border = BorderStroke(1.dp, Color(255, 255, 255, 25)),
-            modifier = Modifier.width(280.dp)
+        ToastDialogContainer(
+            groupName = groupName,
+            borderColor = Color(0xFFB48CFF).copy(alpha = 0.70f)
         ) {
-            Column(
-                modifier = Modifier.padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+            // Row 1: 最大 / 回復(時間)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Row 1: 最大 / 回復(時間)
+                ToastItemRow(
+                    label = "最大",
+                    value = maxStr,
+                    onValueChange = { maxStr = it },
+                    modifier = Modifier.weight(1f)
+                )
+                ToastItemRow(
+                    label = "回復(時間)",
+                    value = hoursInterval,
+                    onValueChange = { hoursInterval = it },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            // Row 2: 全回復 / 消費数
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    ToastItemRow(
-                        label = "最大",
-                        value = maxStr,
-                        onValueChange = { maxStr = it },
-                        modifier = Modifier.weight(1f)
-                    )
-                    ToastItemRow(
-                        label = "回復(時間)",
-                        value = hoursInterval,
-                        onValueChange = { hoursInterval = it },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                // Row 2: 全回復 / 消費数
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(34.dp)
-                            .background(Color(0xFF22252D), RoundedCornerShape(6.dp))
-                            .border(1.dp, Color(255, 255, 255, 18), RoundedCornerShape(6.dp))
-                            .padding(horizontal = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("全回復", fontSize = 12.sp, color = Color(0xFFC5C8D4), fontWeight = FontWeight.Medium)
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            ToastTimeInput(
-                                value = orbHoursStr,
-                                onValueChange = { orbHoursStr = it },
-                                modifier = Modifier.width(26.dp)
-                            )
-                            Text(":", color = Color.White, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 1.dp))
-                            ToastTimeInput(
-                                value = orbMinutesStr,
-                                onValueChange = { orbMinutesStr = it },
-                                modifier = Modifier.width(26.dp)
-                            )
-                        }
-                    }
-
-                    ToastItemRow(
-                        label = "消費数",
-                        value = chunkStr,
-                        onValueChange = { chunkStr = it },
-                        placeholder = "なし",
-                        allowEmpty = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                // Row 3: 方式ボタン (Improved contrast and clear color differentiation)
-                val isOrbDown = orbMode == "down"
-                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(32.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(if (isOrbDown) Color(0x1F38BDF8) else Color(0x1FA78BFA))
-                        .border(
-                            1.dp,
-                            if (isOrbDown) Color(0x6638BDF8) else Color(0x66A78BFA),
-                            RoundedCornerShape(6.dp)
-                        )
-                        .pointerDownTap { 
-                            orbMode = if (isOrbDown) "up" else "down"
-                        },
-                    contentAlignment = Alignment.Center
+                        .weight(1f)
+                        .height(34.dp)
+                        .background(Color(0xFF22252D), RoundedCornerShape(6.dp))
+                        .border(1.dp, Color(255, 255, 255, 18), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(
-                        text = if (isOrbDown) "方式：▼ 残り時間 (減算)" else "方式：▲ 経過時間 (蓄積)",
-                        color = if (isOrbDown) Color(0xFF38BDF8) else Color(0xFFA78BFA),
-                        fontSize = 11.5.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text("全回復", fontSize = 12.sp, color = Color(0xFFC5C8D4), fontWeight = FontWeight.Medium)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        ToastTimeInput(
+                            value = orbHoursStr,
+                            onValueChange = { orbHoursStr = it },
+                            modifier = Modifier.width(26.dp)
+                        )
+                        Text(":", color = Color.White, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 1.dp))
+                        ToastTimeInput(
+                            value = orbMinutesStr,
+                            onValueChange = { orbMinutesStr = it },
+                            modifier = Modifier.width(26.dp)
+                        )
+                    }
                 }
 
-                // Row 4: ⋯ 折りたたみアクション
-                FoldableToastFooter(onDelete = onDelete)
+                ToastItemRow(
+                    label = "消費数",
+                    value = chunkStr,
+                    onValueChange = { chunkStr = it },
+                    placeholder = "なし",
+                    allowEmpty = true,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            // Row 3: 方式ボタン (Improved contrast and clear color differentiation)
+            val isOrbDown = orbMode == "down"
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(32.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(if (isOrbDown) Color(0x1F38BDF8) else Color(0x1FA78BFA))
+                    .border(
+                        1.dp,
+                        if (isOrbDown) Color(0x6638BDF8) else Color(0x66A78BFA),
+                        RoundedCornerShape(6.dp)
+                    )
+                    .pointerDownTap { 
+                        orbMode = if (isOrbDown) "up" else "down"
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = if (isOrbDown) "方式：▼ 残り時間 (減算)" else "方式：▲ 経過時間 (蓄積)",
+                    color = if (isOrbDown) Color(0xFF38BDF8) else Color(0xFFA78BFA),
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
     }
@@ -3192,9 +3246,10 @@ fun OrbToastDialog(
 @Composable
 fun IdleExpedToastDialog(
     entity: ItemEntity,
+    groupName: String = "",
     onDismiss: () -> Unit,
     onUpdateSettings: (Map<String, Any?>) -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit = {}
 ) {
     var countMode by remember(entity.id) { mutableStateOf(entity.countMode ?: "down") }
     var setHoursStr by remember(entity.id) { mutableStateOf((entity.durationMin / 60).toString()) }
@@ -3214,136 +3269,138 @@ fun IdleExpedToastDialog(
         }
         curMin.toInt()
     }
-    var curHoursStr by remember(entity.id, initialIdleMinutes) { mutableStateOf((initialIdleMinutes / 60).toString()) }
-    var curMinutesStr by remember(entity.id, initialIdleMinutes) { mutableStateOf((initialIdleMinutes % 60).toString()) }
+    val defaultIdleH = (initialIdleMinutes / 60).toString()
+    val defaultIdleM = (initialIdleMinutes % 60).toString()
+    var curHoursStr by remember(entity.id, initialIdleMinutes) { mutableStateOf(defaultIdleH) }
+    var curMinutesStr by remember(entity.id, initialIdleMinutes) { mutableStateOf(defaultIdleM) }
 
     val commitChanges = {
         val hSet = setHoursStr.toIntOrNull() ?: (entity.durationMin / 60)
         val mSet = setMinutesStr.toIntOrNull() ?: (entity.durationMin % 60)
         val totalDurMin = Math.max(1, hSet * 60 + mSet)
 
-        val hCur = curHoursStr.toIntOrNull()
-        val mCur = curMinutesStr.toIntOrNull()
+        val isTimeEdited = curHoursStr != defaultIdleH || curMinutesStr != defaultIdleM
+        val hCur = if (isTimeEdited) curHoursStr.toIntOrNull() else null
+        val mCur = if (isTimeEdited) curMinutesStr.toIntOrNull() else null
 
-        onUpdateSettings(
-            mapOf(
-                "durationMin" to totalDurMin,
-                "countMode" to countMode,
-                "idleEditHours" to hCur,
-                "idleEditMinutes" to mCur
+        val isDurChanged = totalDurMin != entity.durationMin
+        val isModeChanged = countMode != (entity.countMode ?: "down")
+
+        if (isDurChanged || isModeChanged || isTimeEdited) {
+            onUpdateSettings(
+                mapOf(
+                    "durationMin" to totalDurMin,
+                    "countMode" to countMode,
+                    "idleEditHours" to hCur,
+                    "idleEditMinutes" to mCur
+                )
             )
-        )
+        }
+    }
+
+    val typeColor = remember(entity.type) {
+        if (entity.type == "idle") Color(0xFFFF9F68) else Color(0xFF70D6B0)
     }
 
     FastDialog(onDismissRequest = {
         commitChanges()
         onDismiss()
     }) {
-        Surface(
-            shape = RoundedCornerShape(12.dp),
-            color = Color(0xFF1B1D22),
-            border = BorderStroke(1.dp, Color(255, 255, 255, 25)),
-            modifier = Modifier.width(280.dp)
+        ToastDialogContainer(
+            groupName = groupName,
+            borderColor = typeColor.copy(alpha = 0.70f)
         ) {
-            Column(
-                modifier = Modifier.padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+            // Row 1: 方式 (height 34.dp with high-contrast color distinguishing down/up)
+            val isCountDown = countMode == "down"
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(34.dp)
+                    .background(Color(0xFF22252D), RoundedCornerShape(6.dp))
+                    .border(1.dp, Color(255, 255, 255, 18), RoundedCornerShape(6.dp))
+                    .padding(horizontal = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // Row 1: 方式 (height 34.dp with high-contrast color distinguishing down/up)
-                val isCountDown = countMode == "down"
-                Row(
+                Text("方式", fontSize = 12.sp, color = Color(0xFFC5C8D4), fontWeight = FontWeight.Medium)
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(34.dp)
-                        .background(Color(0xFF22252D), RoundedCornerShape(6.dp))
-                        .border(1.dp, Color(255, 255, 255, 18), RoundedCornerShape(6.dp))
-                        .padding(horizontal = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                        .clip(RoundedCornerShape(4.dp))
+                        .border(
+                            1.dp,
+                            if (isCountDown) Color(0x6638BDF8) else Color(0x6634D399),
+                            RoundedCornerShape(4.dp)
+                        )
+                        .background(if (isCountDown) Color(0x1F38BDF8) else Color(0x1F34D399))
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                        .pointerDownTap { 
+                            countMode = if (isCountDown) "up" else "down"
+                        }
                 ) {
-                    Text("方式", fontSize = 12.sp, color = Color(0xFFC5C8D4), fontWeight = FontWeight.Medium)
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .border(
-                                1.dp,
-                                if (isCountDown) Color(0x6638BDF8) else Color(0x6634D399),
-                                RoundedCornerShape(4.dp)
-                            )
-                            .background(if (isCountDown) Color(0x1F38BDF8) else Color(0x1F34D399))
-                            .padding(horizontal = 8.dp, vertical = 3.dp)
-                            .pointerDownTap { 
-                                countMode = if (isCountDown) "up" else "down"
-                            }
-                    ) {
-                        Text(
-                            text = if (isCountDown) "▼ カウントダウン" else "▲ カウントアップ",
-                            color = if (isCountDown) Color(0xFF38BDF8) else Color(0xFF34D399),
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                    Text(
+                        text = if (isCountDown) "▼ カウントダウン" else "▲ カウントアップ",
+                        color = if (isCountDown) Color(0xFF38BDF8) else Color(0xFF34D399),
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
+            }
 
-                // Row 2: 設定時間 (height 34.dp)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(34.dp)
-                        .background(Color(0xFF22252D), RoundedCornerShape(6.dp))
-                        .border(1.dp, Color(255, 255, 255, 18), RoundedCornerShape(6.dp))
-                        .padding(horizontal = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text("設定", fontSize = 12.sp, color = Color(0xFFC5C8D4), fontWeight = FontWeight.Medium)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        ToastTimeInput(
-                            value = setHoursStr,
-                            onValueChange = { setHoursStr = it },
-                            modifier = Modifier.width(32.dp)
-                        )
-                        Text("h", color = Color(0xFF8E96A5), fontSize = 11.sp, modifier = Modifier.padding(horizontal = 3.dp))
-                        ToastTimeInput(
-                            value = setMinutesStr,
-                            onValueChange = { setMinutesStr = it },
-                            modifier = Modifier.width(32.dp)
-                        )
-                        Text("m", color = Color(0xFF8E96A5), fontSize = 11.sp, modifier = Modifier.padding(start = 3.dp))
-                    }
+            // Row 2: 設定時間 (height 34.dp)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(34.dp)
+                    .background(Color(0xFF22252D), RoundedCornerShape(6.dp))
+                    .border(1.dp, Color(255, 255, 255, 18), RoundedCornerShape(6.dp))
+                    .padding(horizontal = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("設定", fontSize = 12.sp, color = Color(0xFFC5C8D4), fontWeight = FontWeight.Medium)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    ToastTimeInput(
+                        value = setHoursStr,
+                        onValueChange = { setHoursStr = it },
+                        modifier = Modifier.width(32.dp)
+                    )
+                    Text("h", color = Color(0xFF8E96A5), fontSize = 11.sp, modifier = Modifier.padding(horizontal = 3.dp))
+                    ToastTimeInput(
+                        value = setMinutesStr,
+                        onValueChange = { setMinutesStr = it },
+                        modifier = Modifier.width(32.dp)
+                    )
+                    Text("m", color = Color(0xFF8E96A5), fontSize = 11.sp, modifier = Modifier.padding(start = 3.dp))
                 }
+            }
 
-                // Row 3: 残り / 経過 (height 34.dp)
-                val progressLabel = if (countMode == "up") "経過" else "残り"
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(34.dp)
-                        .background(Color(0xFF22252D), RoundedCornerShape(6.dp))
-                        .border(1.dp, Color(255, 255, 255, 18), RoundedCornerShape(6.dp))
-                        .padding(horizontal = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(progressLabel, fontSize = 12.sp, color = Color(0xFFC5C8D4), fontWeight = FontWeight.Medium)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        ToastTimeInput(
-                            value = curHoursStr,
-                            onValueChange = { curHoursStr = it },
-                            modifier = Modifier.width(32.dp)
-                        )
-                        Text("h", color = Color(0xFF8E96A5), fontSize = 11.sp, modifier = Modifier.padding(horizontal = 3.dp))
-                        ToastTimeInput(
-                            value = curMinutesStr,
-                            onValueChange = { curMinutesStr = it },
-                            modifier = Modifier.width(32.dp)
-                        )
-                        Text("m", color = Color(0xFF8E96A5), fontSize = 11.sp, modifier = Modifier.padding(start = 3.dp))
-                    }
+            // Row 3: 残り / 経過 (height 34.dp)
+            val progressLabel = if (countMode == "up") "経過" else "残り"
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(34.dp)
+                    .background(Color(0xFF22252D), RoundedCornerShape(6.dp))
+                    .border(1.dp, Color(255, 255, 255, 18), RoundedCornerShape(6.dp))
+                    .padding(horizontal = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(progressLabel, fontSize = 12.sp, color = Color(0xFFC5C8D4), fontWeight = FontWeight.Medium)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    ToastTimeInput(
+                        value = curHoursStr,
+                        onValueChange = { curHoursStr = it },
+                        modifier = Modifier.width(32.dp)
+                    )
+                    Text("h", color = Color(0xFF8E96A5), fontSize = 11.sp, modifier = Modifier.padding(horizontal = 3.dp))
+                    ToastTimeInput(
+                        value = curMinutesStr,
+                        onValueChange = { curMinutesStr = it },
+                        modifier = Modifier.width(32.dp)
+                    )
+                    Text("m", color = Color(0xFF8E96A5), fontSize = 11.sp, modifier = Modifier.padding(start = 3.dp))
                 }
-
-                // Row 4: ⋯ 折りたたみアクション
-                FoldableToastFooter(onDelete = onDelete)
             }
         }
     }
@@ -3368,7 +3425,7 @@ fun BackupToastDialog(
         Surface(
             shape = RoundedCornerShape(14.dp),
             color = Color(0xFF1B1D22),
-            border = BorderStroke(1.dp, Color(255, 255, 255, 15)),
+            border = BorderStroke(1.2.dp, Color(0xFF8C7CFF).copy(alpha = 0.70f)),
             modifier = Modifier.width(280.dp)
         ) {
             Column(
@@ -3383,24 +3440,34 @@ fun BackupToastDialog(
                     fontWeight = FontWeight.Bold
                 )
 
-                if (statusMessage != null) {
-                    Text(
-                        text = statusMessage ?: "",
-                        color = if (isError) Color(0xFFFF6B6B) else Color(0xFF5CD68A),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                // Fixed-height status area to prevent dialog stretching / jumping when message appears
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(18.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (statusMessage != null) {
+                        Text(
+                            text = statusMessage ?: "",
+                            color = if (isError) Color(0xFFFF6B6B) else Color(0xFF5CD68A),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
 
                 if (!showPasteInput) {
-                    // Option 1: Copy to clipboard
+                    // Option 1: Copy to clipboard (Emerald green accent tone)
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(42.dp)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFF22252D))
-                            .border(BorderStroke(1.dp, Color(255, 255, 255, 12)), RoundedCornerShape(8.dp))
+                            .background(Color(0xFF1E2829))
+                            .border(BorderStroke(1.2.dp, Color(0xFF34D399).copy(alpha = 0.65f)), RoundedCornerShape(8.dp))
                             .pointerDownTap {
                                 onCopyBackup()
                                 statusMessage = "クリップボードにコピーしました"
@@ -3410,20 +3477,20 @@ fun BackupToastDialog(
                     ) {
                         Text(
                             text = "データをコピー",
-                            color = Color(0xFFECEEF2),
+                            color = Color(0xFF6EE7B7),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
 
-                    // Option 2: Paste from clipboard directly or open input
+                    // Option 2: Paste from clipboard directly or open input (Purple/Indigo accent tone)
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(42.dp)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFF22252D))
-                            .border(BorderStroke(1.dp, Color(255, 255, 255, 12)), RoundedCornerShape(8.dp))
+                            .background(Color(0xFF232238))
+                            .border(BorderStroke(1.2.dp, Color(0xFF9B8BFF).copy(alpha = 0.65f)), RoundedCornerShape(8.dp))
                             .pointerDownTap {
                                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
                                 val clipData = clipboard?.primaryClip
@@ -3442,7 +3509,7 @@ fun BackupToastDialog(
                     ) {
                         Text(
                             text = "データを復元 (ペースト)",
-                            color = Color(0xFFECEEF2),
+                            color = Color(0xFFC4B5FD),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold
                         )

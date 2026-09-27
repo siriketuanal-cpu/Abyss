@@ -185,8 +185,7 @@ function askRemoveItem(id){
   showConfirmToast(
     extra
     + `<div class="toast-actions">`
-    + '<button type="button" class="del" data-act="yes">削除</button>'
-    + '<button type="button" class="done" data-act="done">完了</button>'
+    + '<button type="button" class="done" data-act="done" style="grid-column:1/-1;">完了</button>'
     + '</div>',
     (act, btn)=>{
       if (act === 'yes') removeItem(id);
