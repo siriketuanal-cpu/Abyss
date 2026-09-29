@@ -70,16 +70,20 @@ import com.example.abysstimer.data.ItemEntity
 import com.example.abysstimer.data.TimerRepository
 import com.example.abysstimer.ui.*
 
-// Extension to trigger action instantly on pointerdown
+// Extension to trigger action instantly on pointerdown and consume event
 fun Modifier.pointerDownTap(
     enabled: Boolean = true,
     onTap: () -> Unit
 ): Modifier = if (!enabled) this else this.pointerInput(onTap) {
-    detectTapGestures(
-        onPress = {
-            onTap()
+    awaitPointerEventScope {
+        while (true) {
+            val event = awaitPointerEvent(PointerEventPass.Main)
+            if (event.type == PointerEventType.Press && !event.changes.any { it.isConsumed }) {
+                event.changes.forEach { it.consume() }
+                onTap()
+            }
         }
-    )
+    }
 }
 
 // Low-level pointer tap: intercepts and consumes press immediately at Initial pass
@@ -100,15 +104,23 @@ fun Modifier.instantPointerTap(
 }
 
 class MainActivity : ComponentActivity() {
+    private val viewModel: TimerViewModel by viewModels {
+        val database = AppDatabase.getDatabase(applicationContext)
+        val repository = TimerRepository(database.itemDao())
+        val initialItems = TimerRepository.inMemoryCache ?: runCatching {
+            kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.IO) {
+                repository.getAllItems()
+            }
+        }.getOrDefault(emptyList())
+        TimerViewModelFactory(repository, initialItems)
+    }
+
+    private var isFirstResume = true
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         window.decorView.setBackgroundColor(android.graphics.Color.parseColor("#0B0B14"))
-
-        val database = AppDatabase.getDatabase(applicationContext)
-        val repository = TimerRepository(database.itemDao())
-        val factory = TimerViewModelFactory(repository)
-        val viewModel: TimerViewModel by viewModels { factory }
 
         setContent {
             AbyssTimerTheme {
@@ -119,6 +131,15 @@ class MainActivity : ComponentActivity() {
                     AbyssTimerApp(viewModel = viewModel)
                 }
             }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (isFirstResume) {
+            isFirstResume = false
+        } else {
+            viewModel.refreshNow()
         }
     }
 }
@@ -159,7 +180,7 @@ fun TimerLabels(ui: TimerUiState) {
                 text = ui.fullAtText,
                 fontSize = 10.5.sp,
                 fontWeight = if (ui.isFull) FontWeight.ExtraBold else FontWeight.Bold,
-                color = if (ui.isFull) Color(0xFFFF6B6B) else Color(0xFF9B8BFF),
+                color = if (ui.isFull) Color(0xFFFF6B6B) else Color(0xFFC4B5FD),
                 style = androidx.compose.ui.text.TextStyle(
                     platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false)
                 )
@@ -170,7 +191,7 @@ fun TimerLabels(ui: TimerUiState) {
             text = ui.fullAtText,
             fontSize = 11.5.sp,
             fontWeight = if (ui.isFull) FontWeight.ExtraBold else FontWeight.Bold,
-            color = if (ui.isFull) Color(0xFFFF6B6B) else Color(0xFF9B8BFF),
+            color = if (ui.isFull) Color(0xFFFF6B6B) else Color(0xFFC4B5FD),
             style = androidx.compose.ui.text.TextStyle(
                 platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false)
             )
@@ -201,7 +222,7 @@ fun AbyssTimerTheme(content: @Composable () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AbyssTimerApp(viewModel: TimerViewModel) {
-    val uiItems by viewModel.uiItemsFlow.collectAsStateWithLifecycle()
+    val visibleItems by viewModel.visibleUiItemsFlow.collectAsStateWithLifecycle()
     val isInitialized by viewModel.isInitialized.collectAsStateWithLifecycle()
     val customColors by viewModel.customColorsFlow.collectAsStateWithLifecycle()
     val pendingChunkId by viewModel.pendingChunkUseId.collectAsStateWithLifecycle()
@@ -219,20 +240,6 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
     val coroutineScope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
-    val lifecycleOwner = LocalLifecycleOwner.current
-
-    // Lifecycle instant refresh: Millisecond-precise calculation the instant user returns to app
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.refreshNow()
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-        }
-    }
 
     // Predictive Back Handling: Cancel delete mode, moving mode or close dialogs
     BackHandler(enabled = isDeleteMode || itemToDelete != null || movingItemId != null || showAddDialog || showBackupDialog || activeSetupType != null || itemToEdit != null) {
@@ -255,9 +262,6 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
         }
     }
 
-    // Global focus tracking for defensive tap behavior
-    var isAnyFocused by remember { mutableStateOf(false) }
-
     val openEditDialog = remember(viewModel) {
         { entity: ItemEntity ->
             viewModel.cancelPendingStates()
@@ -265,26 +269,62 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
         }
     }
 
-    LaunchedEffect(itemToEdit, showAddDialog, activeSetupType, showBackupDialog, isDeleteMode) {
-        if (itemToEdit != null || showAddDialog || activeSetupType != null || showBackupDialog || isDeleteMode) {
+    val onItemClickAction = remember(viewModel) {
+        { entity: ItemEntity ->
+            if (isDeleteMode) {
+                itemToDelete = entity
+            } else {
+                when (entity.type) {
+                    "header" -> {
+                        viewModel.cancelPendingStates()
+                        viewModel.toggleHeaderCollapsed(entity.id)
+                    }
+                    "rule" -> {
+                        // Rule has no tap action other than edit/delete
+                    }
+                    else -> {
+                        viewModel.onCardShortTap(entity)
+                    }
+                }
+            }
+        }
+    }
+
+    val onItemEditAction = remember(openEditDialog) {
+        { entity: ItemEntity ->
+            if (isDeleteMode) {
+                itemToDelete = entity
+            } else {
+                openEditDialog(entity)
+            }
+        }
+    }
+
+    val onQuickEditGroup = remember(viewModel) {
+        { entity: ItemEntity, field: String, newVal: Int ->
+            viewModel.cancelPendingStates()
+            if (field == "cur") {
+                viewModel.updateCurrentValue(entity.id, newVal)
+            } else {
+                viewModel.updateMaxValue(entity.id, newVal)
+            }
+        }
+    }
+
+    val onFocusChangedAction = remember(viewModel) {
+        { focused: Boolean ->
+            if (focused) viewModel.cancelPendingStates()
+        }
+    }
+
+    LaunchedEffect(showAddDialog, activeSetupType, showBackupDialog, isDeleteMode) {
+        if (showAddDialog || activeSetupType != null || showBackupDialog || isDeleteMode) {
             viewModel.cancelPendingStates()
         }
     }
 
-    CompositionLocalProvider(LocalFocusTracker provides { isAnyFocused = it }) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            Scaffold(
-                modifier = Modifier.pointerInput(isAnyFocused) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            val event = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
-                            if (isAnyFocused && event.type == androidx.compose.ui.input.pointer.PointerEventType.Press) {
-                                focusManager.clearFocus()
-                                event.changes.forEach { it.consume() }
-                            }
-                        }
-                    }
-                },
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
             topBar = {
                 // Fixed Header Area (32dp height)
                 Box(
@@ -381,31 +421,14 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
                     }
             ) {
                 // List content (Grid) - Renders instantly on the very first frame
-                if (uiItems.isEmpty()) {
+                if (visibleItems.isEmpty()) {
                     // 空の時は余計なプレースホルダーを出さず、通常背景のみ（右上の＋で追加可能）
                     Box(modifier = Modifier.fillMaxSize())
                 } else {
-                    val visibleItems = remember(uiItems) {
-                        val list = ArrayList<TimerUiState>(uiItems.size)
-                        var skipUntilNextHeader = false
-                        for (ui in uiItems) {
-                            if (ui.entity.type == "header") {
-                                skipUntilNextHeader = ui.entity.collapsed && !ui.entity.foldLock
-                                list.add(ui)
-                            } else {
-                                if (!skipUntilNextHeader) {
-                                    list.add(ui)
-                                }
-                            }
-                        }
-                        list
-                    }
-
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(4),
                         modifier = Modifier
-                            .fillMaxSize()
-                            .imePadding(),
+                            .fillMaxSize(),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                         contentPadding = PaddingValues(
@@ -450,34 +473,15 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
                                         ui = ui,
                                         collapsedCount = ui.collapsedCount,
                                         isMoveMode = movingItemId != null,
-                                        onToggleCollapse = {
-                                            if (isDeleteMode) {
-                                                itemToDelete = ui.entity
-                                            } else {
-                                                viewModel.cancelPendingStates()
-                                                viewModel.toggleHeaderCollapsed(ui.entity.id)
-                                            }
-                                        },
-                                        onEdit = {
-                                            if (isDeleteMode) {
-                                                itemToDelete = ui.entity
-                                            } else {
-                                                openEditDialog(ui.entity)
-                                            }
-                                        }
+                                        onToggleCollapse = { onItemClickAction(ui.entity) },
+                                        onEdit = { onItemEditAction(ui.entity) }
                                     )
                                 }
                                 "rule" -> {
                                     RuleCard(
                                         ui = ui,
                                         isMoveMode = movingItemId != null,
-                                        onEdit = {
-                                            if (isDeleteMode) {
-                                                itemToDelete = ui.entity
-                                            } else {
-                                                openEditDialog(ui.entity)
-                                            }
-                                        }
+                                        onEdit = { onItemEditAction(ui.entity) }
                                     )
                                 }
                                 "group" -> {
@@ -486,35 +490,10 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
                                         isMovingSource = isMovingSource,
                                         isMoveMode = movingItemId != null,
                                         pendingChunkId = pendingChunkId,
-                                        onCardTap = { child ->
-                                            if (isDeleteMode) {
-                                                itemToDelete = child
-                                            } else {
-                                                viewModel.onCardShortTap(child)
-                                            }
-                                        },
-                                        onEditChild = { child ->
-                                            if (isDeleteMode) {
-                                                itemToDelete = child
-                                            } else {
-                                                openEditDialog(child)
-                                            }
-                                        },
-                                        onEditGroup = {
-                                            if (isDeleteMode) {
-                                                itemToDelete = ui.entity
-                                            } else {
-                                                openEditDialog(ui.entity)
-                                            }
-                                        },
-                                        onQuickEditValue = { entity, field, newVal ->
-                                            viewModel.cancelPendingStates()
-                                            if (field == "cur") {
-                                                viewModel.updateCurrentValue(entity.id, newVal)
-                                            } else {
-                                                viewModel.updateMaxValue(entity.id, newVal)
-                                            }
-                                        },
+                                        onCardTap = onItemClickAction,
+                                        onEditChild = onItemEditAction,
+                                        onEditGroup = { onItemEditAction(ui.entity) },
+                                        onQuickEditValue = onQuickEditGroup,
                                         onAddChild = {
                                             if (isDeleteMode) {
                                                 itemToDelete = ui.entity
@@ -524,10 +503,7 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
                                                 showAddDialog = true
                                             }
                                         },
-                                        onFocusChanged = { focused ->
-                                            if (focused) viewModel.cancelPendingStates()
-                                            isAnyFocused = focused
-                                        }
+                                        onFocusChanged = onFocusChangedAction
                                     )
                                 }
                                 else -> {
@@ -535,32 +511,12 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
                                         ui = ui,
                                         isGroupChild = false,
                                         isClaimPreview = ui.isClaimPreview,
-                                        onTap = {
-                                            if (isDeleteMode) {
-                                                itemToDelete = ui.entity
-                                            } else {
-                                                viewModel.onCardShortTap(ui.entity)
-                                            }
-                                        },
-                                        onEdit = {
-                                            if (isDeleteMode) {
-                                                itemToDelete = ui.entity
-                                            } else {
-                                                openEditDialog(ui.entity)
-                                            }
-                                        },
+                                        onTap = { onItemClickAction(ui.entity) },
+                                        onEdit = { onItemEditAction(ui.entity) },
                                         onQuickEditValue = { field, newVal ->
-                                            viewModel.cancelPendingStates()
-                                            if (field == "cur") {
-                                                viewModel.updateCurrentValue(ui.entity.id, newVal)
-                                            } else {
-                                                viewModel.updateMaxValue(ui.entity.id, newVal)
-                                            }
+                                            onQuickEditGroup(ui.entity, field, newVal)
                                         },
-                                        onFocusChanged = { focused ->
-                                            if (focused) viewModel.cancelPendingStates()
-                                            isAnyFocused = focused
-                                        }
+                                        onFocusChanged = onFocusChangedAction
                                     )
                                 }
                             }
@@ -746,7 +702,6 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
     }
     }
 }
-}
 
 // --- Individual Card Composables ---
 
@@ -877,9 +832,7 @@ fun GroupCard(
     onAddChild: () -> Unit,
     onFocusChanged: (Boolean) -> Unit = {}
 ) {
-    val groupColor = remember(ui.entity.color) {
-        ui.entity.color?.let { Color(android.graphics.Color.parseColor(it)) } ?: Color(0xFF555B68)
-    }
+    val groupColor = ui.parsedColor
 
     val borderColor = if (isMovingSource) Color(0xFF4DA3FF) else groupColor
     val borderWidth = if (isMovingSource) 2.dp else 1.2.dp
@@ -996,7 +949,6 @@ fun TimerCard(
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
-    val focusTracker = LocalFocusTracker.current
 
     var isCurFocused by remember(ui.entity.id) { mutableStateOf(false) }
     var localCurText by remember(ui.entity.id) { mutableStateOf("") }
@@ -1038,7 +990,8 @@ fun TimerCard(
             Box(
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .size(28.dp)
+                    .width(30.dp)
+                    .height(20.dp)
                     .instantPointerTap { onEdit() }
             ) {
                 Box(
@@ -1066,6 +1019,19 @@ fun TimerCard(
 
                     // Absolute positioned Symmetrically aligned numbers (X / Y) at Bottom-Center with zero-delay native BasicTextField
                     val curFocusRequester = remember { FocusRequester() }
+                    var hasFocusedOnce by remember(ui.entity.id) { mutableStateOf(false) }
+
+                    LaunchedEffect(isCurFocused) {
+                        if (isCurFocused) {
+                            hasFocusedOnce = false
+                            try {
+                                curFocusRequester.requestFocus()
+                                keyboardController?.show()
+                            } catch (e: Exception) {}
+                        } else {
+                            hasFocusedOnce = false
+                        }
+                    }
 
                     Row(
                         modifier = Modifier
@@ -1078,24 +1044,29 @@ fun TimerCard(
                     ) {
                         // Current value container (weight 1f, symmetrical right-aligned)
                         // Tap target precisely covers current digits down to left edge as requested
+                        // Consumes tap at Initial pass to completely bypass card surface deduction action
+                        val curColor = if (ui.isFull) {
+                            Color(0xFFFF6B6B) // Red when full (MAX)
+                        } else if (ui.isWarn) {
+                            Color(0xFFFFAB5C) // Orange when less than 2 hours remaining
+                        } else {
+                            Color(0xFFECEEF2) // Normal white
+                        }
+
                         Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(22.dp)
-                                .pointerDownTap(enabled = !isCurFocused) {
-                                    isCurFocused = true
+                                .instantPointerTap(enabled = !isCurFocused) {
                                     localCurText = ""
-                                    try {
-                                        curFocusRequester.requestFocus()
-                                        keyboardController?.show()
-                                    } catch (e: Exception) {}
+                                    isCurFocused = true
                                 },
                             contentAlignment = Alignment.CenterEnd
                         ) {
                             if (!isCurFocused) {
                                 Text(
                                     text = "${ui.calculatedCurrent}",
-                                    color = if (ui.isWarn) Color(0xFFFF6B6B) else Color(0xFFECEEF2),
+                                    color = curColor,
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Bold,
                                     textAlign = TextAlign.End,
@@ -1115,7 +1086,7 @@ fun TimerCard(
                                         }
                                     },
                                     textStyle = androidx.compose.ui.text.TextStyle(
-                                        color = if (ui.isWarn) Color(0xFFFF6B6B) else Color(0xFFECEEF2),
+                                        color = curColor,
                                         fontSize = 18.sp,
                                         fontWeight = FontWeight.Bold,
                                         textAlign = TextAlign.End,
@@ -1125,7 +1096,8 @@ fun TimerCard(
                                     ),
                                     keyboardOptions = KeyboardOptions(
                                         keyboardType = KeyboardType.Number,
-                                        imeAction = ImeAction.Done
+                                        imeAction = ImeAction.Done,
+                                        autoCorrect = false
                                     ),
                                     keyboardActions = KeyboardActions(
                                         onDone = {
@@ -1139,19 +1111,17 @@ fun TimerCard(
                                         .fillMaxSize()
                                         .focusRequester(curFocusRequester)
                                         .onFocusChanged { focusState ->
-                                            focusTracker(focusState.isFocused)
                                             if (focusState.isFocused) {
+                                                hasFocusedOnce = true
                                                 keyboardController?.show()
-                                            } else {
-                                                if (isCurFocused) {
-                                                    isCurFocused = false
-                                                    keyboardController?.hide()
-                                                    val parsed = localCurText.toIntOrNull()
-                                                    if (parsed != null) {
-                                                        onQuickEditValue?.invoke("cur", parsed)
-                                                    }
-                                                    localCurText = ""
+                                            } else if (hasFocusedOnce && isCurFocused) {
+                                                isCurFocused = false
+                                                keyboardController?.hide()
+                                                val parsed = localCurText.toIntOrNull()
+                                                if (parsed != null) {
+                                                    onQuickEditValue?.invoke("cur", parsed)
                                                 }
+                                                localCurText = ""
                                             }
                                         },
                                     decorationBox = { innerTextField ->
@@ -1163,13 +1133,13 @@ fun TimerCard(
                             }
                         }
 
-                        // Slash "/" centered
+                        // Slash "/" centered with balanced font size & subtle thickness
                         Text(
                             text = "/",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF7F8DA3),
-                            modifier = Modifier.padding(horizontal = 2.dp),
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFFA0AFC4),
+                            modifier = Modifier.padding(horizontal = 3.dp),
                             style = androidx.compose.ui.text.TextStyle(
                                 platformStyle = androidx.compose.ui.text.PlatformTextStyle(
                                     includeFontPadding = false
@@ -1177,7 +1147,7 @@ fun TimerCard(
                             )
                         )
 
-                        // Max value (symmetrical left-aligned, text only)
+                        // Max value (symmetrical left-aligned, bright airy mint green with high readability on dark background)
                         Box(
                             modifier = Modifier
                                 .weight(1f)
@@ -1188,7 +1158,7 @@ fun TimerCard(
                                 text = "${ui.entity.max}",
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF4FA3FF),
+                                color = Color(0xFFA6F4E0),
                                 style = androidx.compose.ui.text.TextStyle(
                                     platformStyle = androidx.compose.ui.text.PlatformTextStyle(
                                         includeFontPadding = false
@@ -1211,7 +1181,7 @@ fun TimerCard(
                             text = ui.fullAtText,
                             fontSize = 11.5.sp,
                             fontWeight = if (ui.isFull) FontWeight.ExtraBold else FontWeight.Bold,
-                            color = if (ui.isFull) Color(0xFFFF6B6B) else Color(0xFF9B8BFF),
+                            color = if (ui.isFull) Color(0xFFFF6B6B) else Color(0xFFC4B5FD),
                             style = androidx.compose.ui.text.TextStyle(
                                 platformStyle = androidx.compose.ui.text.PlatformTextStyle(
                                     includeFontPadding = false
@@ -1220,16 +1190,19 @@ fun TimerCard(
                         )
                     }
 
-                    // Main display label in the bottom center
+                    // Main display label in the bottom center (offset slightly upward to align visual center with stamina digits)
+                    val isClaimState = ui.entity.state == "claim"
+                    val isSpecialText = isClaimState || ui.isFull
+                    val bottomPadding = if (isSpecialText) 7.5.dp else 5.dp
+
                     Box(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
-                            .padding(bottom = 5.dp, start = 6.dp, end = 6.dp)
+                            .padding(bottom = bottomPadding, start = 6.dp, end = 6.dp)
                             .fillMaxWidth()
                             .height(22.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        val isClaimState = ui.entity.state == "claim"
                         val labelText = if (isClaimState) {
                             if (ui.entity.type == "exped") "再出発" else "受取"
                         } else if (ui.isFull) {
@@ -1249,14 +1222,14 @@ fun TimerCard(
                         }
 
                         val labelSize = if (isClaimState) {
-                            13.5.sp
+                            18.sp
                         } else if (ui.isFull) {
-                            if (ui.entity.type == "exped") 13.5.sp else 15.5.sp
+                            18.sp
                         } else {
                             19.sp
                         }
 
-                        val labelTracking = if (isClaimState || ui.isFull) 0.04.em else 0.em
+                        val labelTracking = if (isSpecialText) 0.02.em else 0.em
 
                         Text(
                             text = labelText,

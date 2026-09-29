@@ -21,6 +21,8 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.FontFamily
@@ -52,11 +54,15 @@ fun Modifier.pointerDownTap(
     enabled: Boolean = true,
     onTap: () -> Unit
 ): Modifier = if (!enabled) this else this.pointerInput(onTap) {
-    detectTapGestures(
-        onPress = {
-            onTap()
+    awaitPointerEventScope {
+        while (true) {
+            val event = awaitPointerEvent(PointerEventPass.Main)
+            if (event.type == PointerEventType.Press && !event.changes.any { it.isConsumed }) {
+                event.changes.forEach { it.consume() }
+                onTap()
+            }
         }
-    )
+    }
 }
 
 @Composable
@@ -68,7 +74,6 @@ fun FastDialog(
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val currentOnDismiss by rememberUpdatedState(onDismissRequest)
-    var isAnyFocusedInDialog by remember { mutableStateOf(false) }
 
     // Direct back handling for instant overlay dismissal
     BackHandler(enabled = true) {
@@ -77,34 +82,30 @@ fun FastDialog(
         currentOnDismiss()
     }
 
-    CompositionLocalProvider(LocalFocusTracker provides { isAnyFocusedInDialog = it }) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Transparent)
+            .pointerDownTap {
+                keyboardController?.hide()
+                focusManager.clearFocus(force = true)
+                currentOnDismiss()
+            },
+        contentAlignment = androidx.compose.ui.BiasAlignment(0f, -0.2f)
+    ) {
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Transparent)
-                .imePadding()
-                .pointerInput(Unit) {
-                    detectTapGestures(
-                        onPress = {
-                            keyboardController?.hide()
-                            focusManager.clearFocus(force = true)
-                            currentOnDismiss()
+            modifier = Modifier.pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Main)
+                        if (event.type == PointerEventType.Press) {
+                            event.changes.forEach { it.consume() }
                         }
-                    )
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            Box(
-                modifier = Modifier.pointerInput(Unit) {
-                    detectTapGestures(
-                        onPress = {
-                            // Consumes touch event on dialog card background so taps inside do not dismiss overlay
-                        }
-                    )
+                    }
                 }
-            ) {
-                content()
             }
+        ) {
+            content()
         }
     }
 }
@@ -379,7 +380,8 @@ private fun WebSetupInput(
         ),
         keyboardOptions = KeyboardOptions(
             keyboardType = KeyboardType.Number,
-            imeAction = ImeAction.Done
+            imeAction = ImeAction.Done,
+            autoCorrect = false
         ),
         keyboardActions = KeyboardActions(
             onDone = {
@@ -938,7 +940,9 @@ fun GroupToastDialog(
                         }
                         Button(
                             onClick = {
-                                onSaveName(nameStr)
+                                if (nameStr != entity.name) {
+                                    onSaveName(nameStr)
+                                }
                                 isEditingName = false
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF53459A)),
@@ -1175,7 +1179,9 @@ fun HeaderToastDialog(
                         }
                         Button(
                             onClick = {
-                                onSaveName(nameStr)
+                                if (nameStr != entity.name) {
+                                    onSaveName(nameStr)
+                                }
                                 isEditingName = false
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF53459A)),
@@ -2596,7 +2602,6 @@ fun ToastItemRow(
 ) {
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
-    val focusTracker = LocalFocusTracker.current
     var isFocused by remember { mutableStateOf(false) }
     var localText by remember(value) { mutableStateOf(value) }
     var originalValue by remember { mutableStateOf(value) }
@@ -2633,7 +2638,8 @@ fun ToastItemRow(
             ),
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Number,
-                imeAction = ImeAction.Done
+                imeAction = ImeAction.Done,
+                autoCorrect = false
             ),
             keyboardActions = KeyboardActions(
                 onDone = {
@@ -2649,25 +2655,19 @@ fun ToastItemRow(
                 .background(Color(0xFF0E0F14), RoundedCornerShape(4.dp))
                 .border(1.dp, Color(255, 255, 255, 30), RoundedCornerShape(4.dp))
                 .onFocusChanged { focusState ->
-                    focusTracker(focusState.isFocused)
                     if (focusState.isFocused) {
                         if (!isFocused) {
                             isFocused = true
                             originalValue = if (localText.isNotEmpty()) localText else value
                             localText = ""
-                            keyboardController?.show()
                         }
                     } else {
                         if (isFocused) {
                             isFocused = false
                             if (localText.isEmpty()) {
-                                if (allowEmpty) {
-                                    localText = ""
-                                    onValueChange("")
-                                } else if (originalValue.isNotEmpty()) {
-                                    localText = originalValue
-                                    onValueChange(originalValue)
-                                }
+                                // 未入力（空欄）のまま枠外タップ等でフォーカスが外れた場合は元の値に復帰
+                                localText = originalValue
+                                onValueChange(originalValue)
                             } else {
                                 onValueChange(localText)
                             }
@@ -2697,7 +2697,6 @@ fun ToastTimeInput(
 ) {
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
-    val focusTracker = LocalFocusTracker.current
     var isFocused by remember { mutableStateOf(false) }
     var localText by remember(value) { mutableStateOf(value) }
     var originalValue by remember { mutableStateOf(value) }
@@ -2724,7 +2723,8 @@ fun ToastTimeInput(
         ),
         keyboardOptions = KeyboardOptions(
             keyboardType = KeyboardType.Number,
-            imeAction = ImeAction.Done
+            imeAction = ImeAction.Done,
+            autoCorrect = false
         ),
         keyboardActions = KeyboardActions(
             onDone = {
@@ -2739,25 +2739,18 @@ fun ToastTimeInput(
             .background(Color(0xFF0E0F14), RoundedCornerShape(4.dp))
             .border(1.dp, Color(255, 255, 255, 30), RoundedCornerShape(4.dp))
             .onFocusChanged { focusState ->
-                focusTracker(focusState.isFocused)
                 if (focusState.isFocused) {
                     if (!isFocused) {
                         isFocused = true
                         originalValue = if (localText.isNotEmpty()) localText else value
                         localText = ""
-                        keyboardController?.show()
                     }
                 } else {
                     if (isFocused) {
                         isFocused = false
                         if (localText.isEmpty()) {
-                            if (allowEmpty) {
-                                localText = ""
-                                onValueChange("")
-                            } else if (originalValue.isNotEmpty()) {
-                                localText = originalValue
-                                onValueChange(originalValue)
-                            }
+                            localText = originalValue
+                            onValueChange(originalValue)
                         } else {
                             onValueChange(localText)
                         }
@@ -2982,26 +2975,30 @@ fun StaminaToastDialog(
     var intervalStr by remember(entity.id) { mutableStateOf(entity.intervalMin.toString()) }
     var maxStr by remember(entity.id) { mutableStateOf(entity.max.toString()) }
     var chunkStr by remember(entity.id) { mutableStateOf(entity.useChunk?.toString() ?: "") }
+    var isDirty by remember(entity.id) { mutableStateOf(false) }
     var isConfirmingDelete by remember { mutableStateOf(false) }
 
     val commitChanges = {
-        val newInterval = intervalStr.toIntOrNull() ?: entity.intervalMin
-        val newMax = maxStr.toIntOrNull() ?: entity.max
-        val newChunk = chunkStr.toIntOrNull()
+        if (isDirty) {
+            val newInterval = intervalStr.toIntOrNull() ?: entity.intervalMin
+            val newMax = maxStr.toIntOrNull() ?: entity.max
+            val rawChunk = chunkStr.toIntOrNull()
+            val newChunk = if (rawChunk == null || rawChunk <= 0) null else rawChunk
 
-        val isIntervalChanged = newInterval != entity.intervalMin
-        val isMaxChanged = newMax != entity.max
-        val isChunkChanged = newChunk != entity.useChunk
+            val isIntervalChanged = newInterval != entity.intervalMin
+            val isMaxChanged = newMax != entity.max
+            val isChunkChanged = newChunk != entity.useChunk
 
-        if (isIntervalChanged || isMaxChanged || isChunkChanged) {
-            onUpdateSettings(
-                mapOf(
-                    "intervalMin" to newInterval,
-                    "max" to newMax,
-                    "useChunk" to newChunk,
-                    "useChunkClear" to (newChunk == null)
+            if (isIntervalChanged || isMaxChanged || isChunkChanged) {
+                onUpdateSettings(
+                    mapOf(
+                        "intervalMin" to newInterval,
+                        "max" to newMax,
+                        "useChunk" to newChunk,
+                        "useChunkClear" to (newChunk == null)
+                    )
                 )
-            )
+            }
         }
     }
 
@@ -3021,13 +3018,19 @@ fun StaminaToastDialog(
                 ToastItemRow(
                     label = "回復(分)",
                     value = intervalStr,
-                    onValueChange = { intervalStr = it },
+                    onValueChange = {
+                        intervalStr = it
+                        isDirty = true
+                    },
                     modifier = Modifier.weight(1f)
                 )
                 ToastItemRow(
                     label = "最大",
                     value = maxStr,
-                    onValueChange = { maxStr = it },
+                    onValueChange = {
+                        maxStr = it
+                        isDirty = true
+                    },
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -3036,7 +3039,10 @@ fun StaminaToastDialog(
             ToastItemRow(
                 label = "使い切り",
                 value = chunkStr,
-                onValueChange = { chunkStr = it },
+                onValueChange = {
+                    chunkStr = it
+                    isDirty = true
+                },
                 placeholder = "なし",
                 allowEmpty = true,
                 modifier = Modifier.fillMaxWidth()
@@ -3058,6 +3064,7 @@ fun StaminaToastDialog(
                                 val curMax = maxStr.toIntOrNull() ?: entity.max
                                 val nextMax = Math.min(999, curMax + delta)
                                 maxStr = nextMax.toString()
+                                isDirty = true
                             },
                         contentAlignment = Alignment.Center
                     ) {
@@ -3116,33 +3123,37 @@ fun OrbToastDialog(
     val defaultOrbM = "%02d".format(initialOrbMinutes % 60)
     var orbHoursStr by remember(entity.id, initialOrbMinutes) { mutableStateOf(defaultOrbH) }
     var orbMinutesStr by remember(entity.id, initialOrbMinutes) { mutableStateOf(defaultOrbM) }
+    var isDirty by remember(entity.id) { mutableStateOf(false) }
 
     val commitChanges = {
-        val newMax = maxStr.toIntOrNull() ?: entity.max
-        val hInter = hoursInterval.toIntOrNull() ?: 6
-        val newInterval = hInter * 60
-        val newChunk = chunkStr.toIntOrNull()
-        val isTimeEdited = orbHoursStr != defaultOrbH || orbMinutesStr != defaultOrbM
-        val hEdit = if (isTimeEdited) orbHoursStr.toIntOrNull() else null
-        val mEdit = if (isTimeEdited) orbMinutesStr.toIntOrNull() else null
+        if (isDirty) {
+            val newMax = maxStr.toIntOrNull() ?: entity.max
+            val hInter = hoursInterval.toIntOrNull() ?: 6
+            val newInterval = hInter * 60
+            val rawChunk = chunkStr.toIntOrNull()
+            val newChunk = if (rawChunk == null || rawChunk <= 0) null else rawChunk
+            val isTimeEdited = orbHoursStr != defaultOrbH || orbMinutesStr != defaultOrbM
+            val hEdit = if (isTimeEdited) orbHoursStr.toIntOrNull() else null
+            val mEdit = if (isTimeEdited) orbMinutesStr.toIntOrNull() else null
 
-        val isMaxChanged = newMax != entity.max
-        val isIntervalChanged = newInterval != entity.intervalMin
-        val isChunkChanged = newChunk != entity.useChunk
-        val isOrbModeChanged = orbMode != (entity.orbMode ?: "down")
+            val isMaxChanged = newMax != entity.max
+            val isIntervalChanged = newInterval != entity.intervalMin
+            val isChunkChanged = newChunk != entity.useChunk
+            val isOrbModeChanged = orbMode != (entity.orbMode ?: "down")
 
-        if (isMaxChanged || isIntervalChanged || isChunkChanged || isOrbModeChanged || isTimeEdited) {
-            onUpdateSettings(
-                mapOf(
-                    "max" to newMax,
-                    "intervalMin" to newInterval,
-                    "useChunk" to newChunk,
-                    "useChunkClear" to (newChunk == null),
-                    "orbMode" to orbMode,
-                    "orbEditHours" to hEdit,
-                    "orbEditMinutes" to mEdit
+            if (isMaxChanged || isIntervalChanged || isChunkChanged || isOrbModeChanged || isTimeEdited) {
+                onUpdateSettings(
+                    mapOf(
+                        "max" to newMax,
+                        "intervalMin" to newInterval,
+                        "useChunk" to newChunk,
+                        "useChunkClear" to (newChunk == null),
+                        "orbMode" to orbMode,
+                        "orbEditHours" to hEdit,
+                        "orbEditMinutes" to mEdit
+                    )
                 )
-            )
+            }
         }
     }
 
@@ -3162,13 +3173,19 @@ fun OrbToastDialog(
                 ToastItemRow(
                     label = "最大",
                     value = maxStr,
-                    onValueChange = { maxStr = it },
+                    onValueChange = {
+                        maxStr = it
+                        isDirty = true
+                    },
                     modifier = Modifier.weight(1f)
                 )
                 ToastItemRow(
                     label = "回復(時間)",
                     value = hoursInterval,
-                    onValueChange = { hoursInterval = it },
+                    onValueChange = {
+                        hoursInterval = it
+                        isDirty = true
+                    },
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -3192,13 +3209,19 @@ fun OrbToastDialog(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         ToastTimeInput(
                             value = orbHoursStr,
-                            onValueChange = { orbHoursStr = it },
+                            onValueChange = {
+                                orbHoursStr = it
+                                isDirty = true
+                            },
                             modifier = Modifier.width(26.dp)
                         )
                         Text(":", color = Color.White, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 1.dp))
                         ToastTimeInput(
                             value = orbMinutesStr,
-                            onValueChange = { orbMinutesStr = it },
+                            onValueChange = {
+                                orbMinutesStr = it
+                                isDirty = true
+                            },
                             modifier = Modifier.width(26.dp)
                         )
                     }
@@ -3207,7 +3230,10 @@ fun OrbToastDialog(
                 ToastItemRow(
                     label = "消費数",
                     value = chunkStr,
-                    onValueChange = { chunkStr = it },
+                    onValueChange = {
+                        chunkStr = it
+                        isDirty = true
+                    },
                     placeholder = "なし",
                     allowEmpty = true,
                     modifier = Modifier.weight(1f)
@@ -3229,6 +3255,7 @@ fun OrbToastDialog(
                     )
                     .pointerDownTap { 
                         orbMode = if (isOrbDown) "up" else "down"
+                        isDirty = true
                     },
                 contentAlignment = Alignment.Center
             ) {
@@ -3273,28 +3300,31 @@ fun IdleExpedToastDialog(
     val defaultIdleM = (initialIdleMinutes % 60).toString()
     var curHoursStr by remember(entity.id, initialIdleMinutes) { mutableStateOf(defaultIdleH) }
     var curMinutesStr by remember(entity.id, initialIdleMinutes) { mutableStateOf(defaultIdleM) }
+    var isDirty by remember(entity.id) { mutableStateOf(false) }
 
     val commitChanges = {
-        val hSet = setHoursStr.toIntOrNull() ?: (entity.durationMin / 60)
-        val mSet = setMinutesStr.toIntOrNull() ?: (entity.durationMin % 60)
-        val totalDurMin = Math.max(1, hSet * 60 + mSet)
+        if (isDirty) {
+            val hSet = setHoursStr.toIntOrNull() ?: (entity.durationMin / 60)
+            val mSet = setMinutesStr.toIntOrNull() ?: (entity.durationMin % 60)
+            val totalDurMin = Math.max(1, hSet * 60 + mSet)
 
-        val isTimeEdited = curHoursStr != defaultIdleH || curMinutesStr != defaultIdleM
-        val hCur = if (isTimeEdited) curHoursStr.toIntOrNull() else null
-        val mCur = if (isTimeEdited) curMinutesStr.toIntOrNull() else null
+            val isTimeEdited = curHoursStr != defaultIdleH || curMinutesStr != defaultIdleM
+            val hCur = if (isTimeEdited) curHoursStr.toIntOrNull() else null
+            val mCur = if (isTimeEdited) curMinutesStr.toIntOrNull() else null
 
-        val isDurChanged = totalDurMin != entity.durationMin
-        val isModeChanged = countMode != (entity.countMode ?: "down")
+            val isDurChanged = totalDurMin != entity.durationMin
+            val isModeChanged = countMode != (entity.countMode ?: "down")
 
-        if (isDurChanged || isModeChanged || isTimeEdited) {
-            onUpdateSettings(
-                mapOf(
-                    "durationMin" to totalDurMin,
-                    "countMode" to countMode,
-                    "idleEditHours" to hCur,
-                    "idleEditMinutes" to mCur
+            if (isDurChanged || isModeChanged || isTimeEdited) {
+                onUpdateSettings(
+                    mapOf(
+                        "durationMin" to totalDurMin,
+                        "countMode" to countMode,
+                        "idleEditHours" to hCur,
+                        "idleEditMinutes" to mCur
+                    )
                 )
-            )
+            }
         }
     }
 
@@ -3335,6 +3365,7 @@ fun IdleExpedToastDialog(
                         .padding(horizontal = 8.dp, vertical = 3.dp)
                         .pointerDownTap { 
                             countMode = if (isCountDown) "up" else "down"
+                            isDirty = true
                         }
                 ) {
                     Text(
@@ -3361,13 +3392,19 @@ fun IdleExpedToastDialog(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     ToastTimeInput(
                         value = setHoursStr,
-                        onValueChange = { setHoursStr = it },
+                        onValueChange = {
+                            setHoursStr = it
+                            isDirty = true
+                        },
                         modifier = Modifier.width(32.dp)
                     )
                     Text("h", color = Color(0xFF8E96A5), fontSize = 11.sp, modifier = Modifier.padding(horizontal = 3.dp))
                     ToastTimeInput(
                         value = setMinutesStr,
-                        onValueChange = { setMinutesStr = it },
+                        onValueChange = {
+                            setMinutesStr = it
+                            isDirty = true
+                        },
                         modifier = Modifier.width(32.dp)
                     )
                     Text("m", color = Color(0xFF8E96A5), fontSize = 11.sp, modifier = Modifier.padding(start = 3.dp))
@@ -3390,13 +3427,19 @@ fun IdleExpedToastDialog(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     ToastTimeInput(
                         value = curHoursStr,
-                        onValueChange = { curHoursStr = it },
+                        onValueChange = {
+                            curHoursStr = it
+                            isDirty = true
+                        },
                         modifier = Modifier.width(32.dp)
                     )
                     Text("h", color = Color(0xFF8E96A5), fontSize = 11.sp, modifier = Modifier.padding(horizontal = 3.dp))
                     ToastTimeInput(
                         value = curMinutesStr,
-                        onValueChange = { curMinutesStr = it },
+                        onValueChange = {
+                            curMinutesStr = it
+                            isDirty = true
+                        },
                         modifier = Modifier.width(32.dp)
                     )
                     Text("m", color = Color(0xFF8E96A5), fontSize = 11.sp, modifier = Modifier.padding(start = 3.dp))

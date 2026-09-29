@@ -34,14 +34,350 @@ data class TimerUiState(
     val parsedColor: Color = Color.Unspecified
 )
 
+@Immutable
+data class UiSnapshot(
+    val allItems: List<TimerUiState> = emptyList(),
+    val visibleItems: List<TimerUiState> = emptyList()
+)
+
+@Immutable
+data class TimerCoreState(
+    val items: List<ItemEntity> = emptyList(),
+    val pendingChunkId: String? = null
+)
+
 class TimerViewModel(
     private val repository: TimerRepository,
     initialItems: List<ItemEntity> = emptyList()
 ) : ViewModel() {
 
-    // Local in-memory state pre-seeded synchronously (0ms latency, zero black screen)
-    private val _dbItems = MutableStateFlow<List<ItemEntity>>(initialItems)
-    val pendingChunkUseId = MutableStateFlow<String?>(null)
+    // --- High-Performance Skippable UI Cache & Parser (Initialized first to prevent NPE) ---
+    private val colorCache = java.util.concurrent.ConcurrentHashMap<String, Color>()
+    private var lastDbList: List<ItemEntity>? = null
+    private var cachedTopLevels: List<ItemEntity> = emptyList()
+    private var cachedChildrenMap: Map<String, List<ItemEntity>> = emptyMap()
+    private var cachedCollapsedCountMap: Map<String, Int> = emptyMap()
+    private val cachedUiStateMap = HashMap<String, TimerUiState>()
+    private var lastSnapshot = UiSnapshot(emptyList(), emptyList())
+
+    private fun parseItemColor(colorHex: String?, type: String): Color {
+        if (!colorHex.isNullOrEmpty()) {
+            val cached = colorCache[colorHex]
+            if (cached != null) return cached
+            try {
+                val parsed = Color(android.graphics.Color.parseColor(colorHex))
+                colorCache[colorHex] = parsed
+                return parsed
+            } catch (e: Exception) {
+                // fallback to type defaults
+            }
+        }
+        return when (type) {
+            "stam" -> Color(0xFF5AA9FF)
+            "orb" -> Color(0xFFA78BFA)
+            "idle" -> Color(0xFFF0A85A)
+            "exped" -> Color(0xFF34D399)
+            "header" -> Color(0xFF9B8BFF)
+            "rule" -> Color(0xFF52617A)
+            "group" -> Color(0xFF555B68)
+            else -> Color.White
+        }
+    }
+
+    private fun getOrCreateItemUi(
+        it: ItemEntity,
+        now: Long,
+        pendingId: String?,
+        collapsedCount: Int,
+        children: List<TimerUiState> = emptyList()
+    ): TimerUiState {
+        val parsedCol = parseItemColor(it.color, it.type)
+        val prev = cachedUiStateMap[it.id]
+
+        return when (it.type) {
+            "header" -> {
+                if (prev != null && prev.entity == it && prev.collapsedCount == collapsedCount && prev.parsedColor == parsedCol) {
+                    prev
+                } else {
+                    val state = TimerUiState(entity = it, collapsedCount = collapsedCount, parsedColor = parsedCol)
+                    cachedUiStateMap[it.id] = state
+                    state
+                }
+            }
+            "rule" -> {
+                if (prev != null && prev.entity == it && prev.parsedColor == parsedCol) {
+                    prev
+                } else {
+                    val state = TimerUiState(entity = it, parsedColor = parsedCol)
+                    cachedUiStateMap[it.id] = state
+                    state
+                }
+            }
+            "group" -> {
+                if (prev != null && prev.entity == it && prev.children === children && prev.parsedColor == parsedCol) {
+                    prev
+                } else {
+                    val state = TimerUiState(entity = it, children = children, parsedColor = parsedCol)
+                    cachedUiStateMap[it.id] = state
+                    state
+                }
+            }
+            "stam" -> {
+                val waitChunk = pendingId == it.id
+                val info = TimerEngine.calculateStamInfo(it, now)
+                val shownCurrent = if (waitChunk) TimerEngine.remainingAfterUse(info.cur, it.useChunk ?: 1, it.type) else info.cur
+                val fullAt = if (info.isFull) info.fullAt else now + info.remainMs
+                val fullAtText = TimerEngine.formatHM(fullAt)
+                val isWarn = !info.isFull && (info.remainMs > 0 && info.remainMs < 7200000L)
+
+                if (prev != null &&
+                    prev.entity == it &&
+                    prev.calculatedCurrent == shownCurrent &&
+                    prev.remainMs == info.remainMs &&
+                    prev.isFull == info.isFull &&
+                    prev.fullAtText == fullAtText &&
+                    prev.isWarn == isWarn &&
+                    prev.isClaimPreview == waitChunk &&
+                    prev.parsedColor == parsedCol
+                ) {
+                    prev
+                } else {
+                    val state = TimerUiState(
+                        entity = it,
+                        calculatedCurrent = shownCurrent,
+                        remainMs = info.remainMs,
+                        isFull = info.isFull,
+                        fullAtText = fullAtText,
+                        isWarn = isWarn,
+                        isClaimPreview = waitChunk,
+                        parsedColor = parsedCol
+                    )
+                    cachedUiStateMap[it.id] = state
+                    state
+                }
+            }
+            "orb" -> {
+                val waitChunk = pendingId == it.id
+                val info = TimerEngine.calculateOrbInfo(it, now)
+                val shownCurrent = if (waitChunk) TimerEngine.remainingAfterUse(info.cur, it.useChunk ?: 1, it.type) else info.cur
+                val fullAt = if (info.isFull) info.fullAt else now + info.remainMs
+                val fullAtText = TimerEngine.formatHM(fullAt)
+                val nextInSec = Math.max(0, info.nextInMs)
+                val nextCdText = TimerEngine.formatCountdown(nextInSec)
+                val isWarn = !info.isFull && (info.remainMs > 0 && info.remainMs < 7200000L)
+
+                if (prev != null &&
+                    prev.entity == it &&
+                    prev.calculatedCurrent == shownCurrent &&
+                    prev.remainMs == info.remainMs &&
+                    prev.isFull == info.isFull &&
+                    prev.fullAtText == fullAtText &&
+                    prev.orbNextInMs == info.nextInMs &&
+                    prev.orbNextCdText == nextCdText &&
+                    prev.isWarn == isWarn &&
+                    prev.isClaimPreview == waitChunk &&
+                    prev.parsedColor == parsedCol
+                ) {
+                    prev
+                } else {
+                    val state = TimerUiState(
+                        entity = it,
+                        calculatedCurrent = shownCurrent,
+                        remainMs = info.remainMs,
+                        isFull = info.isFull,
+                        fullAtText = fullAtText,
+                        orbNextInMs = info.nextInMs,
+                        orbNextCdText = nextCdText,
+                        isWarn = isWarn,
+                        isClaimPreview = waitChunk,
+                        parsedColor = parsedCol
+                    )
+                    cachedUiStateMap[it.id] = state
+                    state
+                }
+            }
+            "idle", "exped" -> {
+                val info = TimerEngine.calculateIdleInfo(it, now)
+                val isUp = it.countMode == "up"
+                val runningLabel = if (isUp) TimerEngine.formatElapsed(info.elapsed) else TimerEngine.formatCountdown(info.remainMs)
+                val fullText = if (it.type == "exped") "帰還" else "MAX"
+                val displayLabel = if (it.state == "claim") {
+                    if (it.type == "exped") "再出発" else "受取"
+                } else {
+                    if (info.isFull) fullText else runningLabel
+                }
+                val fullAtText = TimerEngine.formatHM(it.start + (it.durationMin.coerceAtLeast(1) * 60000L))
+                val isWarn = !info.isFull && (info.remainMs > 0 && info.remainMs < 7200000L)
+                val isClaim = it.state == "claim"
+
+                if (prev != null &&
+                    prev.entity == it &&
+                    prev.remainMs == info.remainMs &&
+                    prev.isFull == info.isFull &&
+                    prev.fullAtText == fullAtText &&
+                    prev.idleElapsedMs == info.elapsed &&
+                    prev.idleRemainMs == info.remainMs &&
+                    prev.idleDisplayLabel == displayLabel &&
+                    prev.isWarn == isWarn &&
+                    prev.isClaimPreview == isClaim &&
+                    prev.parsedColor == parsedCol
+                ) {
+                    prev
+                } else {
+                    val state = TimerUiState(
+                        entity = it,
+                        calculatedCurrent = 0,
+                        remainMs = info.remainMs,
+                        isFull = info.isFull,
+                        fullAtText = fullAtText,
+                        idleElapsedMs = info.elapsed,
+                        idleRemainMs = info.remainMs,
+                        idleDisplayLabel = displayLabel,
+                        isWarn = isWarn,
+                        isClaimPreview = isClaim,
+                        parsedColor = parsedCol
+                    )
+                    cachedUiStateMap[it.id] = state
+                    state
+                }
+            }
+            else -> {
+                if (prev != null && prev.entity == it && prev.parsedColor == parsedCol) {
+                    prev
+                } else {
+                    val state = TimerUiState(entity = it, parsedColor = parsedCol)
+                    cachedUiStateMap[it.id] = state
+                    state
+                }
+            }
+        }
+    }
+
+    private fun calculateUiSnapshot(dbList: List<ItemEntity>, pendingId: String?, now: Long): UiSnapshot {
+        if (dbList.isEmpty()) {
+            lastSnapshot = UiSnapshot(emptyList(), emptyList())
+            return lastSnapshot
+        }
+
+        // Cache DB hierarchy, sort, and collapsed counts if dbList has not changed
+        if (dbList !== lastDbList) {
+            val topLevels = ArrayList<ItemEntity>()
+            val childrenMap = HashMap<String, ArrayList<ItemEntity>>()
+            
+            for (item in dbList) {
+                val pid = item.parentId
+                if (pid == null) {
+                    topLevels.add(item)
+                } else {
+                    childrenMap.getOrPut(pid) { ArrayList() }.add(item)
+                }
+            }
+            
+            topLevels.sortBy { it.position }
+            val sortedChildren = HashMap<String, List<ItemEntity>>(childrenMap.size)
+            for ((k, v) in childrenMap) {
+                v.sortBy { it.position }
+                sortedChildren[k] = v
+            }
+            
+            val collapsedCounts = HashMap<String, Int>()
+            var i = 0
+            while (i < topLevels.size) {
+                val top = topLevels[i]
+                if (top.type == "header" && top.collapsed && !top.foldLock) {
+                    var count = 0
+                    var j = i + 1
+                    while (j < topLevels.size && topLevels[j].type != "header") {
+                        if (topLevels[j].type != "rule") {
+                            count++
+                        }
+                        j++
+                    }
+                    collapsedCounts[top.id] = count
+                }
+                i++
+            }
+            
+            cachedTopLevels = topLevels
+            cachedChildrenMap = sortedChildren
+            cachedCollapsedCountMap = collapsedCounts
+            lastDbList = dbList
+
+            val currentIds = HashSet<String>(dbList.size)
+            for (item in dbList) {
+                currentIds.add(item.id)
+            }
+            val keyIterator = cachedUiStateMap.keys.iterator()
+            while (keyIterator.hasNext()) {
+                if (!currentIds.contains(keyIterator.next())) {
+                    keyIterator.remove()
+                }
+            }
+        }
+
+        val allList = ArrayList<TimerUiState>(cachedTopLevels.size)
+        val visibleList = ArrayList<TimerUiState>(cachedTopLevels.size)
+        var skipUntilNextHeader = false
+
+        for (top in cachedTopLevels) {
+            val childrenEntities = cachedChildrenMap[top.id]
+            val childrenUi: List<TimerUiState> = if (childrenEntities.isNullOrEmpty()) {
+                emptyList()
+            } else {
+                val childList = ArrayList<TimerUiState>(childrenEntities.size)
+                for (ch in childrenEntities) {
+                    childList.add(getOrCreateItemUi(ch, now, pendingId, 0))
+                }
+                val prevChildren = cachedUiStateMap[top.id]?.children
+                if (prevChildren != null && prevChildren.size == childList.size &&
+                    prevChildren.indices.all { idx -> prevChildren[idx] === childList[idx] }) {
+                    prevChildren
+                } else {
+                    childList
+                }
+            }
+
+            val topCollapsedCount = cachedCollapsedCountMap[top.id] ?: 0
+            val topUi = getOrCreateItemUi(top, now, pendingId, topCollapsedCount, childrenUi)
+
+            allList.add(topUi)
+
+            if (topUi.entity.type == "header") {
+                skipUntilNextHeader = topUi.entity.collapsed && !topUi.entity.foldLock
+                visibleList.add(topUi)
+            } else if (!skipUntilNextHeader) {
+                visibleList.add(topUi)
+            }
+        }
+
+        val allMatches = lastSnapshot.allItems.size == allList.size &&
+                lastSnapshot.allItems.indices.all { idx -> lastSnapshot.allItems[idx] === allList[idx] }
+        val visibleMatches = lastSnapshot.visibleItems.size == visibleList.size &&
+                lastSnapshot.visibleItems.indices.all { idx -> lastSnapshot.visibleItems[idx] === visibleList[idx] }
+
+        val finalAll = if (allMatches) lastSnapshot.allItems else allList
+        val finalVisible = if (visibleMatches) lastSnapshot.visibleItems else visibleList
+
+        val snapshot = if (allMatches && visibleMatches) lastSnapshot else UiSnapshot(finalAll, finalVisible)
+        lastSnapshot = snapshot
+        return snapshot
+    }
+
+    private fun calculateUiStates(dbList: List<ItemEntity>, pendingId: String?, now: Long): List<TimerUiState> {
+        return calculateUiSnapshot(dbList, pendingId, now).allItems
+    }
+
+    // Unified Core State: items and pending preview managed atomically to avoid race conditions and double-emissions
+    private val _coreState = MutableStateFlow(TimerCoreState(initialItems, null))
+
+    // Backward-compatible reader so existing code reading _dbItems.value works seamlessly
+    private val _dbItems = object {
+        val value: List<ItemEntity> get() = _coreState.value.items
+    }
+
+    val pendingChunkUseId: StateFlow<String?> = _coreState
+        .map { it.pendingChunkId }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
     
     private val _isInitialized = MutableStateFlow(true)
     val isInitialized = _isInitialized.asStateFlow()
@@ -67,25 +403,26 @@ class TimerViewModel(
         }
     }
 
-    // Pre-calculate initial UI items synchronously so First Frame is populated immediately
-    private val initialUiList = calculateUiStates(initialItems, null, System.currentTimeMillis())
+    // Pre-calculate initial UI snapshot synchronously so First Frame is populated immediately
+    private val initialSnapshot = calculateUiSnapshot(initialItems, null, System.currentTimeMillis())
 
-    // Unified Reactive UI State - lazily kept in memory, initialized with preloaded items
-    val uiItemsFlow: StateFlow<List<TimerUiState>> = combine(
-        _dbItems, 
-        pendingChunkUseId, 
+    // Direct single-stage Reactive UI State - zero chained StateFlow coroutines, atomic updates
+    val visibleUiItemsFlow: StateFlow<List<TimerUiState>> = combine(
+        _coreState, 
         merge(_refreshTrigger, tickerFlow)
-    ) { dbItems, pendingId, now ->
-        calculateUiStates(dbItems, pendingId, now)
-    }.stateIn(viewModelScope, SharingStarted.Lazily, initialUiList)
+    ) { core, now ->
+        calculateUiSnapshot(core.items, core.pendingChunkId, now).visibleItems
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), initialSnapshot.visibleItems)
+
+    val uiItemsFlow: StateFlow<List<TimerUiState>> = visibleUiItemsFlow
 
     init {
         // Collect Room live changes for background reactive updates
         viewModelScope.launch {
             launch {
                 repository.allItemsFlow.collect { items ->
-                    if (_dbItems.value != items) {
-                        _dbItems.value = items
+                    if (_coreState.value.items != items) {
+                        _coreState.value = _coreState.value.copy(items = items)
                     }
                 }
             }
@@ -156,150 +493,6 @@ class TimerViewModel(
         }
     }
 
-    private fun calculateUiStates(dbList: List<ItemEntity>, pendingId: String?, now: Long): List<TimerUiState> {
-        if (dbList.isEmpty()) return emptyList()
-
-        val topLevels = mutableListOf<ItemEntity>()
-        val childrenMap = mutableMapOf<String, MutableList<ItemEntity>>()
-        
-        for (item in dbList) {
-            val pid = item.parentId
-            if (pid == null) {
-                topLevels.add(item)
-            } else {
-                childrenMap.getOrPut(pid) { mutableListOf() }.add(item)
-            }
-        }
-        
-        topLevels.sortBy { it.position }
-        
-        val result = topLevels.map { top ->
-            val children = childrenMap[top.id]?.sortedBy { it.position }?.map { ch ->
-                calculateSingleItemUi(ch, now, pendingId)
-            } ?: emptyList()
-            calculateSingleItemUi(top, now, pendingId).copy(children = children)
-        }
-
-        // Forward single pass to assign exact collapsedCount for each header
-        val finalResult = ArrayList<TimerUiState>(result.size)
-        var i = 0
-        while (i < result.size) {
-            val item = result[i]
-            if (item.entity.type == "header" && item.entity.collapsed && !item.entity.foldLock) {
-                var count = 0
-                var j = i + 1
-                while (j < result.size && result[j].entity.type != "header") {
-                    if (result[j].entity.type != "rule") {
-                        count++
-                    }
-                    j++
-                }
-                finalResult.add(item.copy(collapsedCount = count))
-            } else {
-                finalResult.add(item)
-            }
-            i++
-        }
-
-        return finalResult
-    }
-
-    private fun parseItemColor(colorHex: String?, type: String): Color {
-        if (!colorHex.isNullOrEmpty()) {
-            try {
-                return Color(android.graphics.Color.parseColor(colorHex))
-            } catch (e: Exception) {
-                // fallback to type defaults
-            }
-        }
-        return when (type) {
-            "stam" -> Color(0xFF5AA9FF)
-            "orb" -> Color(0xFFA78BFA)
-            "idle" -> Color(0xFFF0A85A)
-            "exped" -> Color(0xFF34D399)
-            "header" -> Color(0xFF9B8BFF)
-            "rule" -> Color(0xFF52617A)
-            else -> Color.White
-        }
-    }
-
-    private fun calculateSingleItemUi(it: ItemEntity, now: Long, pendingId: String?): TimerUiState {
-        val waitChunk = pendingId == it.id
-        val parsedCol = parseItemColor(it.color, it.type)
-
-        return when (it.type) {
-            "stam" -> {
-                val info = TimerEngine.calculateStamInfo(it, now)
-                val shownCurrent = if (waitChunk) TimerEngine.remainingAfterUse(info.cur, it.useChunk ?: 1, it.type) else info.cur
-                val fullAt = if (info.isFull) info.fullAt else now + info.remainMs
-                val fullAtText = TimerEngine.formatHM(fullAt)
-
-                TimerUiState(
-                    entity = it,
-                    calculatedCurrent = shownCurrent,
-                    remainMs = info.remainMs,
-                    isFull = info.isFull,
-                    fullAtText = fullAtText,
-                    isWarn = !info.isFull && (info.remainMs > 0 && info.remainMs < 7200000L),
-                    isClaimPreview = waitChunk,
-                    parsedColor = parsedCol
-                )
-            }
-            "orb" -> {
-                val info = TimerEngine.calculateOrbInfo(it, now)
-                val shownCurrent = if (waitChunk) TimerEngine.remainingAfterUse(info.cur, it.useChunk ?: 1, it.type) else info.cur
-                val fullAt = if (info.isFull) info.fullAt else now + info.remainMs
-                val fullAtText = TimerEngine.formatHM(fullAt)
-                val nextInSec = Math.max(0, info.nextInMs)
-                val nextCdText = TimerEngine.formatCountdown(nextInSec)
-
-                TimerUiState(
-                    entity = it,
-                    calculatedCurrent = shownCurrent,
-                    remainMs = info.remainMs,
-                    isFull = info.isFull,
-                    fullAtText = fullAtText,
-                    orbNextInMs = info.nextInMs,
-                    orbNextCdText = nextCdText,
-                    isWarn = !info.isFull && (info.remainMs > 0 && info.remainMs < 7200000L),
-                    isClaimPreview = waitChunk,
-                    parsedColor = parsedCol
-                )
-            }
-            "idle", "exped" -> {
-                val info = TimerEngine.calculateIdleInfo(it, now)
-                val isUp = it.countMode == "up"
-                val runningLabel = if (isUp) TimerEngine.formatElapsed(info.elapsed) else TimerEngine.formatCountdown(info.remainMs)
-                val fullText = if (it.type == "exped") "帰還" else "MAX"
-
-                val displayLabel = if (it.state == "claim") {
-                    if (it.type == "exped") "再出発" else "受取"
-                } else {
-                    if (info.isFull) fullText else runningLabel
-                }
-
-                val fullAtText = TimerEngine.formatHM(it.start + (it.durationMin.coerceAtLeast(1) * 60000L))
-
-                TimerUiState(
-                    entity = it,
-                    calculatedCurrent = 0,
-                    remainMs = info.remainMs,
-                    isFull = info.isFull,
-                    fullAtText = fullAtText,
-                    idleElapsedMs = info.elapsed,
-                    idleRemainMs = info.remainMs,
-                    idleDisplayLabel = displayLabel,
-                    isWarn = !info.isFull && (info.remainMs > 0 && info.remainMs < 7200000L),
-                    isClaimPreview = it.state == "claim",
-                    parsedColor = parsedCol
-                )
-            }
-            else -> {
-                TimerUiState(entity = it, parsedColor = parsedCol)
-            }
-        }
-    }
-
     // --- In-Memory Synchronous Update Helpers with Debounced Disk Persistence ---
 
     private val pendingUpdates = java.util.concurrent.ConcurrentHashMap<String, ItemEntity>()
@@ -318,16 +511,16 @@ class TimerViewModel(
     }
 
     private fun updateDbItemInMemoryAndPersist(updated: ItemEntity) {
-        val currentList = _dbItems.value
-        _dbItems.value = currentList.map { if (it.id == updated.id) updated else it }
+        val currentList = _coreState.value.items
+        _coreState.value = _coreState.value.copy(items = currentList.map { if (it.id == updated.id) updated else it })
         pendingUpdates[updated.id] = updated
         scheduleDebouncedPersist()
     }
 
     private fun updateDbItemsInMemoryAndPersist(updatedList: List<ItemEntity>) {
         val updatedMap = updatedList.associateBy { it.id }
-        val currentList = _dbItems.value
-        _dbItems.value = currentList.map { updatedMap[it.id] ?: it }
+        val currentList = _coreState.value.items
+        _coreState.value = _coreState.value.copy(items = currentList.map { updatedMap[it.id] ?: it })
         for (item in updatedList) {
             pendingUpdates[item.id] = item
         }
@@ -336,16 +529,16 @@ class TimerViewModel(
 
     private fun deleteDbItemInMemoryAndPersist(item: ItemEntity) {
         pendingUpdates.remove(item.id)
-        val currentList = _dbItems.value
-        _dbItems.value = currentList.filter { it.id != item.id && it.parentId != item.id }
+        val currentList = _coreState.value.items
+        _coreState.value = _coreState.value.copy(items = currentList.filter { it.id != item.id && it.parentId != item.id })
         viewModelScope.launch {
             repository.deleteItem(item)
         }
     }
 
     private fun insertDbItemInMemoryAndPersist(newItem: ItemEntity) {
-        val currentList = _dbItems.value
-        _dbItems.value = currentList + newItem
+        val currentList = _coreState.value.items
+        _coreState.value = _coreState.value.copy(items = currentList + newItem)
         viewModelScope.launch {
             repository.insertItem(newItem)
         }
@@ -353,74 +546,134 @@ class TimerViewModel(
 
     // --- Action Handlers ---
 
+    private var lastConfirmTimestamp = 0L
+
     fun onCardShortTap(it: ItemEntity) {
         val now = System.currentTimeMillis()
-        if (it.type == "stam" || it.type == "orb") {
-            revertOtherClaimStates(it.id)
-            if (it.useChunk == null || it.useChunk <= 0) return
+        if (now - lastConfirmTimestamp < 150L) return
 
-            if (pendingChunkUseId.value == it.id) {
-                // Confirm deduction
-                val info = if (it.type == "stam") {
-                    val res = TimerEngine.calculateStamInfo(it, now)
+        // Always resolve latest entity from state to prevent stale data
+        val target = _coreState.value.items.find { item -> item.id == it.id } ?: it
+
+        if (target.type == "stam" || target.type == "orb") {
+            if (target.useChunk == null || target.useChunk <= 0) return
+
+            val currentCore = _coreState.value
+            val isPendingThis = currentCore.pendingChunkId == target.id
+
+            if (isPendingThis) {
+                // Confirm deduction: Calculate new current and preserved start
+                val info = if (target.type == "stam") {
+                    val res = TimerEngine.calculateStamInfo(target, now)
                     StamInfo(cur = res.cur, remainMs = res.remainMs, isFull = res.isFull, fullAt = res.fullAt)
                 } else {
-                    val res = TimerEngine.calculateOrbInfo(it, now)
+                    val res = TimerEngine.calculateOrbInfo(target, now)
                     StamInfo(cur = res.cur, remainMs = res.remainMs, isFull = res.isFull, fullAt = res.fullAt)
                 }
 
-                val nextCur = TimerEngine.remainingAfterUse(info.cur, it.useChunk, it.type)
-                val preservedStart = TimerEngine.preservePhaseStart(it, now)
+                val nextCur = TimerEngine.remainingAfterUse(info.cur, target.useChunk, target.type)
+                val preservedStart = TimerEngine.preservePhaseStart(target, now)
 
-                val updated = it.copy(
+                val updated = target.copy(
                     current = nextCur,
-                    start = if (nextCur >= it.max) now else preservedStart
+                    start = if (nextCur >= target.max) now else preservedStart
                 )
-                pendingChunkUseId.value = null
-                updateDbItemInMemoryAndPersist(updated)
+
+                // Atomic single-step update: clear pending preview AND apply deduction simultaneously (100% flicker-free)
+                val newItems = currentCore.items.map { if (it.id == updated.id) updated else it }
+                _coreState.value = TimerCoreState(items = newItems, pendingChunkId = null)
+                lastConfirmTimestamp = now
+
+                pendingUpdates[updated.id] = updated
+                scheduleDebouncedPersist()
             } else {
-                pendingChunkUseId.value = it.id
+                // Enter preview mode for this item (and clear any idle/exped claim states in same pass)
+                val revertList = currentCore.items.filter { item ->
+                    (item.type == "idle" || item.type == "exped") && item.state == "claim"
+                }.map { it.copy(state = "running") }
+
+                val newItems = if (revertList.isNotEmpty()) {
+                    val map = revertList.associateBy { it.id }
+                    currentCore.items.map { map[it.id] ?: it }
+                } else {
+                    currentCore.items
+                }
+
+                _coreState.value = TimerCoreState(items = newItems, pendingChunkId = target.id)
+                if (revertList.isNotEmpty()) {
+                    for (item in revertList) pendingUpdates[item.id] = item
+                    scheduleDebouncedPersist()
+                }
             }
-        } else if (it.type == "idle" || it.type == "exped") {
-            pendingChunkUseId.value = null
-            revertOtherClaimStates(it.id)
-            if (it.state == "claim") {
-                // Restart running timer
-                val updated = it.copy(
-                    state = "running",
-                    start = now
-                )
-                updateDbItemInMemoryAndPersist(updated)
+        } else if (target.type == "idle" || target.type == "exped") {
+            val currentCore = _coreState.value
+            val otherReverts = currentCore.items.filter { item ->
+                item.id != target.id && (item.type == "idle" || item.type == "exped") && item.state == "claim"
+            }.map { item -> item.copy(state = "running") }
+
+            val updatedThis = if (target.state == "claim") {
+                target.copy(state = "running", start = now)
             } else {
-                // Set to claim early
-                val updated = it.copy(
-                    state = "claim"
-                )
-                updateDbItemInMemoryAndPersist(updated)
+                target.copy(state = "claim")
             }
+
+            val allUpdates = (otherReverts + updatedThis).associateBy { it.id }
+            val newItems = currentCore.items.map { allUpdates[it.id] ?: it }
+
+            _coreState.value = TimerCoreState(items = newItems, pendingChunkId = null)
+            for (item in allUpdates.values) {
+                pendingUpdates[item.id] = item
+            }
+            scheduleDebouncedPersist()
         }
     }
 
     private fun revertOtherClaimStates(exceptId: String? = null) {
-        val items = _dbItems.value
-        val revertList = items.filter { item ->
+        val currentCore = _coreState.value
+        val hasClaimToRevert = currentCore.items.any { item ->
+            item.id != exceptId && (item.type == "idle" || item.type == "exped") && item.state == "claim"
+        }
+        if (!hasClaimToRevert) return
+
+        val revertList = currentCore.items.filter { item ->
             item.id != exceptId && (item.type == "idle" || item.type == "exped") && item.state == "claim"
         }.map { it.copy(state = "running") }
 
-        if (revertList.isNotEmpty()) {
-            updateDbItemsInMemoryAndPersist(revertList)
-        }
+        val map = revertList.associateBy { it.id }
+        val newItems = currentCore.items.map { map[it.id] ?: it }
+        _coreState.value = currentCore.copy(items = newItems)
+        for (item in revertList) pendingUpdates[item.id] = item
+        scheduleDebouncedPersist()
     }
 
     fun cancelPendingStates() {
-        pendingChunkUseId.value = null
-        val items = _dbItems.value
-        val revertList = items.filter { item ->
-            (item.type == "idle" || item.type == "exped") && item.state == "claim"
-        }.map { it.copy(state = "running") }
+        val currentCore = _coreState.value
+        val hasPendingChunk = currentCore.pendingChunkId != null
+        val hasClaimToRevert = currentCore.items.any { (it.type == "idle" || it.type == "exped") && it.state == "claim" }
 
+        // Fast-path: 0 allocations and 0ms return if nothing is pending or waiting for claim revert
+        if (!hasPendingChunk && !hasClaimToRevert) return
+
+        val items = currentCore.items
+        val revertList = if (hasClaimToRevert) {
+            items.filter { item ->
+                (item.type == "idle" || item.type == "exped") && item.state == "claim"
+            }.map { it.copy(state = "running") }
+        } else {
+            emptyList()
+        }
+
+        val newItems = if (revertList.isNotEmpty()) {
+            val map = revertList.associateBy { it.id }
+            items.map { map[it.id] ?: it }
+        } else {
+            items
+        }
+
+        _coreState.value = TimerCoreState(items = newItems, pendingChunkId = null)
         if (revertList.isNotEmpty()) {
-            updateDbItemsInMemoryAndPersist(revertList)
+            for (item in revertList) pendingUpdates[item.id] = item
+            scheduleDebouncedPersist()
         }
     }
 
@@ -440,10 +693,15 @@ class TimerViewModel(
         val now = System.currentTimeMillis()
         val item = _dbItems.value.find { it.id == id } ?: return
         val clamped = newCurrent.coerceIn(0, item.max.coerceAtLeast(1))
+        val isPreviouslyFull = when (item.type) {
+            "stam" -> TimerEngine.calculateStamInfo(item, now).isFull
+            "orb" -> TimerEngine.calculateOrbInfo(item, now).isFull
+            else -> item.current >= item.max
+        }
         val preservedStart = TimerEngine.preservePhaseStart(item, now)
         val updated = item.copy(
             current = clamped,
-            start = if (clamped >= item.max) now else preservedStart
+            start = if (isPreviouslyFull || clamped >= item.max) now else preservedStart
         )
         updateDbItemInMemoryAndPersist(updated)
     }
@@ -888,7 +1146,7 @@ class TimerViewModel(
         }
 
         val allNew = (dbList.map { item -> updatedTopLevels.find { it.id == item.id } ?: item } + newGroup + newChildren)
-        _dbItems.value = allNew
+        _coreState.value = _coreState.value.copy(items = allNew)
         viewModelScope.launch {
             // Atomic batch update & insert transaction
             repository.batchUpdateAndInsert(

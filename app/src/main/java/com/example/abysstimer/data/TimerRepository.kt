@@ -5,27 +5,38 @@ import kotlinx.coroutines.flow.first
 
 class TimerRepository(private val itemDao: ItemDao) {
 
+    companion object {
+        @Volatile
+        var inMemoryCache: List<ItemEntity>? = null
+    }
+
     val allItemsFlow: Flow<List<ItemEntity>> = itemDao.getAllItemsFlow()
     val allCustomColorsFlow: Flow<List<CustomColorEntity>> = itemDao.getAllCustomColorsFlow()
 
     suspend fun getAllItems(): List<ItemEntity> {
-        return itemDao.getAllItems()
+        val items = itemDao.getAllItems()
+        inMemoryCache = items
+        return items
     }
 
     suspend fun insertItem(item: ItemEntity) {
         itemDao.insertItem(item)
+        inMemoryCache = null
     }
 
     suspend fun insertItems(items: List<ItemEntity>) {
         itemDao.insertItems(items)
+        inMemoryCache = null
     }
 
     suspend fun updateItem(item: ItemEntity) {
         itemDao.updateItem(item)
+        inMemoryCache = null
     }
 
     suspend fun updateItems(items: List<ItemEntity>) {
         itemDao.updateItems(items)
+        inMemoryCache = null
     }
 
     suspend fun batchUpdateAndInsert(
@@ -33,6 +44,7 @@ class TimerRepository(private val itemDao: ItemDao) {
         itemsToInsert: List<ItemEntity> = emptyList()
     ) {
         itemDao.batchUpdateAndInsert(itemsToUpdate, itemsToInsert)
+        inMemoryCache = null
     }
 
     suspend fun deleteItem(item: ItemEntity) {
@@ -41,10 +53,12 @@ class TimerRepository(private val itemDao: ItemDao) {
             // Also delete all children belonging to this group
             itemDao.deleteChildrenOf(item.id)
         }
+        inMemoryCache = null
     }
 
     suspend fun deleteItemById(id: String) {
         itemDao.deleteItemById(id)
+        inMemoryCache = null
     }
 
     suspend fun initializeDefaultColorsIfEmpty() {
@@ -69,5 +83,6 @@ class TimerRepository(private val itemDao: ItemDao) {
 
     suspend fun replaceAllItems(items: List<ItemEntity>) {
         itemDao.replaceAllItems(items)
+        inMemoryCache = null
     }
 }
