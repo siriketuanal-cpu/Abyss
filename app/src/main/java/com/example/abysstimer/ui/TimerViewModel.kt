@@ -399,7 +399,7 @@ class TimerViewModel(
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
     
     val customColorsFlow: StateFlow<List<CustomColorEntity>> = repository.allCustomColorsFlow
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     @Volatile
     private var lastCalculationTime: Long = System.currentTimeMillis()
@@ -408,12 +408,7 @@ class TimerViewModel(
     private val _refreshTrigger = MutableStateFlow(System.currentTimeMillis())
 
     fun refreshNow() {
-        val now = System.currentTimeMillis()
-        // 直前の計算から1000ms（1秒）以内の場合、秒・分単位のタイマー表示は変わらないため重複再計算をスキップ
-        if (now - lastCalculationTime < 1000L) {
-            return
-        }
-        _refreshTrigger.value = now
+        _refreshTrigger.value = System.currentTimeMillis()
     }
 
     // Lifecycle-aware ticker flow: emits only on each exact minute boundary
@@ -439,7 +434,7 @@ class TimerViewModel(
         calculateUiSnapshot(items, pendingId, System.currentTimeMillis())
     }
     .flowOn(Dispatchers.Default)
-    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), initialSnapshot)
+    .stateIn(viewModelScope, SharingStarted.Eagerly, initialSnapshot)
 
     fun getItemEntity(id: String): ItemEntity? = _coreState.value.items.find { it.id == id }
 
