@@ -2,8 +2,10 @@ package com.example.abysstimer.data
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import androidx.compose.runtime.Immutable
 
 @Entity(tableName = "items")
+@Immutable
 data class ItemEntity(
     @PrimaryKey val id: String,
     val type: String, // "stam", "orb", "idle", "exped", "group", "header", "rule"

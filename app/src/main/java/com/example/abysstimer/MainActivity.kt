@@ -1,10 +1,18 @@
-@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@file:OptIn(
+    androidx.compose.foundation.ExperimentalFoundationApi::class,
+    androidx.compose.foundation.layout.ExperimentalLayoutApi::class
+)
 package com.example.abysstimer
+
+import com.example.abysstimer.ui.theme.ColonFontFamily
 
 import android.os.Bundle
 import android.os.Vibrator
 import android.os.VibrationEffect
+import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
+import android.view.inputmethod.InputMethodManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.BackHandler
@@ -25,15 +33,22 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -45,11 +60,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.foundation.text.selection.LocalTextSelectionColors
+import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -70,52 +90,50 @@ import com.example.abysstimer.data.ItemEntity
 import com.example.abysstimer.data.TimerRepository
 import com.example.abysstimer.ui.*
 
-// Extension to trigger action instantly on pointerdown and consume event
-fun Modifier.pointerDownTap(
-    enabled: Boolean = true,
-    onTap: () -> Unit
-): Modifier = if (!enabled) this else this.pointerInput(onTap) {
-    awaitPointerEventScope {
-        while (true) {
-            val event = awaitPointerEvent(PointerEventPass.Main)
-            if (event.type == PointerEventType.Press && !event.changes.any { it.isConsumed }) {
-                event.changes.forEach { it.consume() }
-                onTap()
-            }
-        }
-    }
-}
+// Zero-allocation static singleton for transparent text handles
+private val TransparentTextSelectionColors = TextSelectionColors(
+    handleColor = Color.Transparent,
+    backgroundColor = Color.Transparent
+)
 
-// Low-level pointer tap: intercepts and consumes press immediately at Initial pass
-// completely bypassing gesture disambiguation delays and preventing parent container interference
-fun Modifier.instantPointerTap(
-    enabled: Boolean = true,
-    onTap: () -> Unit
-): Modifier = if (!enabled) this else this.pointerInput(onTap) {
-    awaitPointerEventScope {
-        while (true) {
-            val event = awaitPointerEvent(PointerEventPass.Initial)
-            if (event.type == PointerEventType.Press) {
-                event.changes.forEach { it.consume() }
-                onTap()
-            }
+private val GroupCardShape = RoundedCornerShape(8.dp)
+private val TimerCardShape = RoundedCornerShape(10.dp)
+
+private val ColorClaimBorder = Color(0xFF5CD68A)
+private val ColorPreviewBorder = Color(0xFFFFD166)
+private val ColorFullBorder = Color(0xFFFFAB5C)
+private val ColorFullText = Color(0xFFFF6B6B)
+private val ColorWarnText = Color(0xFFFFAB5C)
+private val ColorNormalText = Color(0xFFECEEF2)
+private val JapaneseTextOffsetModifier = Modifier.offset(y = (-1).dp)
+private val BadgeShape = RoundedCornerShape(8.dp)
+private val BadgeBgColor = Color(255, 255, 255, 18)
+
+// Direct OS InputMethodManager hide ensuring soft keyboard is dismissed instantly with zero race conditions
+fun hideKeyboardDirectly(context: Context) {
+    var ctx: Context? = context
+    var activity: Activity? = null
+    while (ctx is ContextWrapper) {
+        if (ctx is Activity) {
+            activity = ctx
+            break
         }
+        ctx = ctx.baseContext
     }
+    val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+    val view = activity?.currentFocus ?: activity?.window?.decorView
+    if (view != null && imm != null) {
+        imm.hideSoftInputFromWindow(view.windowToken, 0)
+    }
+    activity?.currentFocus?.clearFocus()
 }
 
 class MainActivity : ComponentActivity() {
     private val viewModel: TimerViewModel by viewModels {
         val database = AppDatabase.getDatabase(applicationContext)
         val repository = TimerRepository(database.itemDao())
-        val initialItems = TimerRepository.inMemoryCache ?: runCatching {
-            kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.IO) {
-                repository.getAllItems()
-            }
-        }.getOrDefault(emptyList())
-        TimerViewModelFactory(repository, initialItems)
+        TimerViewModelFactory(repository, TimerRepository.inMemoryCache ?: emptyList())
     }
-
-    private var isFirstResume = true
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -136,68 +154,17 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (isFirstResume) {
-            isFirstResume = false
-        } else {
-            viewModel.refreshNow()
-        }
+        viewModel.onAppForegrounded()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        viewModel.onAppBackgrounded()
     }
 }
 
 // --- Composable Themes ---
-@Composable
-fun TimerLabels(ui: TimerUiState) {
-    if (ui.entity.type == "orb" && !ui.isFull) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.End
-            ) {
-                Text(
-                    text = "次",
-                    fontSize = 9.5.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color(0xFFA78BFA),
-                    modifier = Modifier.padding(end = 2.dp),
-                    style = androidx.compose.ui.text.TextStyle(
-                        platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false)
-                    )
-                )
-                Text(
-                    text = ui.orbNextCdText,
-                    fontSize = 10.5.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFFECEEF2),
-                    style = androidx.compose.ui.text.TextStyle(
-                        platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false)
-                    )
-                )
-            }
-            Text(
-                text = ui.fullAtText,
-                fontSize = 10.5.sp,
-                fontWeight = if (ui.isFull) FontWeight.ExtraBold else FontWeight.Bold,
-                color = if (ui.isFull) Color(0xFFFF6B6B) else Color(0xFFC4B5FD),
-                style = androidx.compose.ui.text.TextStyle(
-                    platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false)
-                )
-            )
-        }
-    } else {
-        Text(
-            text = ui.fullAtText,
-            fontSize = 11.5.sp,
-            fontWeight = if (ui.isFull) FontWeight.ExtraBold else FontWeight.Bold,
-            color = if (ui.isFull) Color(0xFFFF6B6B) else Color(0xFFC4B5FD),
-            style = androidx.compose.ui.text.TextStyle(
-                platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false)
-            )
-        )
-    }
-}
+
 @Composable
 fun AbyssTimerTheme(content: @Composable () -> Unit) {
     val darkColorScheme = darkColorScheme(
@@ -222,10 +189,10 @@ fun AbyssTimerTheme(content: @Composable () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AbyssTimerApp(viewModel: TimerViewModel) {
-    val visibleItems by viewModel.visibleUiItemsFlow.collectAsStateWithLifecycle()
-    val isInitialized by viewModel.isInitialized.collectAsStateWithLifecycle()
+    val uiSnapshot by viewModel.uiSnapshotFlow.collectAsStateWithLifecycle()
+    val allItems = uiSnapshot.allItems
+    val visibleItems = uiSnapshot.visibleItems
     val customColors by viewModel.customColorsFlow.collectAsStateWithLifecycle()
-    val pendingChunkId by viewModel.pendingChunkUseId.collectAsStateWithLifecycle()
 
     var showAddDialog by remember { mutableStateOf(false) }
     var showBackupDialog by remember { mutableStateOf(false) }
@@ -236,14 +203,37 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
     var isDeleteMode by remember { mutableStateOf(false) }
     var itemToDelete by remember { mutableStateOf<ItemEntity?>(null) }
 
+    val keypadState = remember { KeypadEditingState() }
+
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
-    val keyboardController = LocalSoftwareKeyboardController.current
+    val isImeVisible = WindowInsets.isImeVisible
 
-    // Predictive Back Handling: Cancel delete mode, moving mode or close dialogs
-    BackHandler(enabled = isDeleteMode || itemToDelete != null || movingItemId != null || showAddDialog || showBackupDialog || activeSetupType != null || itemToEdit != null) {
+    // Unified single-path keypad commit & dismissal handler
+    val commitAndDismissKeypad = remember(keypadState) {
+        {
+            keypadState.commit()
+        }
+    }
+
+    // Optimize BackHandler enabled check to be a stable derived state
+    val isBackHandlerEnabled by remember(keypadState, isImeVisible, isDeleteMode, itemToDelete, movingItemId, showAddDialog, showBackupDialog, activeSetupType, itemToEdit) {
+        derivedStateOf {
+            keypadState.isEditing || isImeVisible || isDeleteMode || itemToDelete != null || movingItemId != null || showAddDialog || showBackupDialog || activeSetupType != null || itemToEdit != null
+        }
+    }
+
+    // Predictive Back Handling: Dismiss keypad, cancel editing, delete mode, moving mode or close dialogs
+    BackHandler(enabled = isBackHandlerEnabled) {
         when {
+            keypadState.isEditing -> {
+                commitAndDismissKeypad()
+            }
+            isImeVisible -> {
+                hideKeyboardDirectly(context)
+                focusManager.clearFocus(force = true)
+            }
             itemToDelete != null -> itemToDelete = null
             isDeleteMode -> isDeleteMode = false
             movingItemId != null -> movingItemId = null
@@ -262,25 +252,36 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
         }
     }
 
-    val openEditDialog = remember(viewModel) {
+    val customColorHexes = remember(customColors) { customColors.map { it.hexColor } }
+
+    val openEditDialog: (ItemEntity) -> Unit = remember(viewModel, commitAndDismissKeypad, keypadState) {
         { entity: ItemEntity ->
-            viewModel.cancelPendingStates()
-            itemToEdit = entity
+            if (keypadState.isEditing) {
+                commitAndDismissKeypad()
+            } else if (viewModel.cancelPendingStates()) {
+                // プレビュー表示中だった場合はプレビューを閉じるのみ（ダイアログは開かない）
+            } else {
+                itemToEdit = entity
+            }
         }
     }
 
-    val onItemClickAction = remember(viewModel) {
+    val onItemClickAction: (ItemEntity) -> Unit = remember(viewModel, commitAndDismissKeypad, keypadState) {
         { entity: ItemEntity ->
-            if (isDeleteMode) {
+            if (keypadState.isEditing) {
+                // ガード動作: 編集中の場合は値を確定して閉じるのみ（タップしたカードのアクションは実行しない）
+                commitAndDismissKeypad()
+            } else if (isDeleteMode) {
                 itemToDelete = entity
             } else {
                 when (entity.type) {
                     "header" -> {
-                        viewModel.cancelPendingStates()
-                        viewModel.toggleHeaderCollapsed(entity.id)
+                        if (!viewModel.cancelPendingStates()) {
+                            viewModel.toggleHeaderCollapsed(entity.id)
+                        }
                     }
                     "rule" -> {
-                        // Rule has no tap action other than edit/delete
+                        viewModel.cancelPendingStates()
                     }
                     else -> {
                         viewModel.onCardShortTap(entity)
@@ -290,7 +291,7 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
         }
     }
 
-    val onItemEditAction = remember(openEditDialog) {
+    val onItemEditAction: (ItemEntity) -> Unit = remember(openEditDialog) {
         { entity: ItemEntity ->
             if (isDeleteMode) {
                 itemToDelete = entity
@@ -300,20 +301,70 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
         }
     }
 
-    val onQuickEditGroup = remember(viewModel) {
-        { entity: ItemEntity, field: String, newVal: Int ->
-            viewModel.cancelPendingStates()
-            if (field == "cur") {
-                viewModel.updateCurrentValue(entity.id, newVal)
+    val onFocusChangedAction: (Boolean) -> Unit = remember(viewModel) {
+        { focused: Boolean ->
+            if (focused) viewModel.cancelPendingStates()
+        }
+    }
+
+    // Zero-overhead stable Keypad callbacks (completely eliminates StaminaKeypad recomposition during keypresses)
+    val onKeypadDigit: (String) -> Unit = remember(keypadState) {
+        { d: String -> keypadState.appendDigit(d) }
+    }
+    val onKeypadClear: () -> Unit = remember(keypadState) {
+        { keypadState.clear() }
+    }
+    val onKeypadDone: () -> Unit = commitAndDismissKeypad
+    val onKeypadDismiss: () -> Unit = commitAndDismissKeypad
+
+    val onStartEditingAction: (String) -> Unit = remember(viewModel, keypadState, commitAndDismissKeypad) {
+        { id: String ->
+            if (keypadState.isEditing) {
+                // 既にテンキーが開いている場合は閉じるのみ（別の入力へ直接飛ばない）
+                commitAndDismissKeypad()
+            } else if (viewModel.cancelPendingStates()) {
+                // プレビュー表示中（放置受取や使い切り確認）だった場合はプレビューを閉じるのみ（テンキーは開かない）
             } else {
-                viewModel.updateMaxValue(entity.id, newVal)
+                val initialVal = viewModel.getItemEntity(id)?.let {
+                    TimerEngine.calculateStamInfo(it, System.currentTimeMillis()).cur.toString()
+                } ?: ""
+                keypadState.start(
+                    id = id,
+                    field = "cur",
+                    initialText = initialVal,
+                    maxDigits = 3,
+                    onValueChange = null,
+                    onCommit = { textVal ->
+                        val parsed = textVal.toIntOrNull()
+                        if (parsed != null) {
+                            viewModel.updateCurrentValue(id, parsed)
+                        }
+                    }
+                )
             }
         }
     }
 
-    val onFocusChangedAction = remember(viewModel) {
-        { focused: Boolean ->
-            if (focused) viewModel.cancelPendingStates()
+    val onFinishEditingAction: (String) -> Unit = remember(keypadState) {
+        { id: String ->
+            if (keypadState.activeId == id) {
+                keypadState.finish()
+            }
+        }
+    }
+
+    val onAddChildGroupAction: (ItemEntity) -> Unit = remember(viewModel, commitAndDismissKeypad, keypadState) {
+        { groupEntity: ItemEntity ->
+            if (keypadState.isEditing) {
+                commitAndDismissKeypad()
+            } else if (viewModel.cancelPendingStates()) {
+                // プレビューを閉じるのみ
+            } else if (isDeleteMode) {
+                itemToDelete = groupEntity
+            } else {
+                activeSetupGroupId = groupEntity.id
+                showAddDialog = true
+            }
         }
     }
 
@@ -323,133 +374,110 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Scaffold(
-            topBar = {
-                // Fixed Header Area (32dp height)
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .statusBarsPadding()
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                        .height(32.dp)
-                ) {
-                    // Invisible 32dp Touch Area on Top-Left for Emergency Backup / Restore
-                    Box(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .align(Alignment.CenterStart)
-                            .pointerDownTap {
-                                if (!isDeleteMode) {
-                                    viewModel.cancelPendingStates()
-                                    showBackupDialog = true
-                                }
-                            }
-                    )
-
-                    // Delete mode center hint
-                    if (isDeleteMode) {
-                        Text(
-                            text = "削除する枠をタップ",
-                            color = Color(0xFFFF6B6B),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.align(Alignment.Center)
-                        )
-                    }
-
-                    // 32dp Circle Add Button / Delete Mode Toggle
-                    Box(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .align(Alignment.CenterEnd)
-                            .border(
-                                width = 1.dp,
-                                color = if (isDeleteMode) Color(0xFFFF5252) else Color(255, 255, 255, 25),
-                                shape = CircleShape
-                            )
-                            .background(
-                                color = if (isDeleteMode) Color(0xFF451818) else Color(255, 255, 255, 12),
-                                shape = CircleShape
-                            )
-                            .pointerInput(isDeleteMode) {
-                                detectTapGestures(
-                                    onTap = {
-                                        if (isDeleteMode) {
-                                            isDeleteMode = false
-                                        } else {
-                                            viewModel.cancelPendingStates()
-                                            activeSetupGroupId = null
-                                            showAddDialog = true
-                                        }
-                                    },
-                                    onLongPress = {
-                                        // Start delete mode (NO vibration)
-                                        viewModel.cancelPendingStates()
-                                        isDeleteMode = !isDeleteMode
-                                    }
-                                )
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = if (isDeleteMode) Icons.Default.Close else Icons.Default.Add,
-                            contentDescription = if (isDeleteMode) "削除モード解除" else "枠を追加",
-                            tint = if (isDeleteMode) Color(0xFFFF6B6B) else Color(0xFFECEEF2),
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-            },
-            containerColor = Color(0xFF0B0B14)
-        ) { paddingValues ->
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF0B0B14))
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Fixed Header Area (32dp height + Status bar)
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 10.dp)
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onPress = {
-                                keyboardController?.hide()
-                                focusManager.clearFocus(force = true)
-                                // Only cancel if we are NOT in move or delete mode
-                                if (movingItemId == null && !isDeleteMode) {
-                                    viewModel.cancelPendingStates()
-                                }
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                    .height(32.dp)
+            ) {
+                // Invisible 32dp Touch Area on Top-Left for Emergency Backup / Restore
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .align(Alignment.CenterStart)
+                        .pointerDownTap {
+                            if (!isDeleteMode) {
+                                viewModel.cancelPendingStates()
+                                showBackupDialog = true
                             }
+                        }
+                )
+
+                // Delete mode center hint
+                if (isDeleteMode) {
+                    Text(
+                        text = "削除する枠をタップ",
+                        color = Color(0xFFFF6B6B),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
+
+                // 32dp Circle Add Button / Delete Mode Toggle
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .align(Alignment.CenterEnd)
+                        .border(
+                            width = 1.dp,
+                            color = if (isDeleteMode) Color(0xFFFF5252) else Color(255, 255, 255, 25),
+                            shape = CircleShape
                         )
+                        .background(
+                            color = if (isDeleteMode) Color(0xFF451818) else Color(255, 255, 255, 12),
+                            shape = CircleShape
+                        )
+                        .pointerInput(isDeleteMode) {
+                            detectTapGestures(
+                                onTap = {
+                                    if (isDeleteMode) {
+                                        isDeleteMode = false
+                                    } else {
+                                        viewModel.cancelPendingStates()
+                                        activeSetupGroupId = null
+                                        showAddDialog = true
+                                    }
+                                },
+                                onLongPress = {
+                                    viewModel.cancelPendingStates()
+                                    isDeleteMode = !isDeleteMode
+                                }
+                            )
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (isDeleteMode) Icons.Default.Close else Icons.Default.Add,
+                        contentDescription = if (isDeleteMode) "削除モード解除" else "枠を追加",
+                        tint = if (isDeleteMode) Color(0xFFFF6B6B) else Color(0xFFECEEF2),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp)
+                    .pointerDownTap {
+                        viewModel.cancelPendingStates()
                     }
             ) {
-                // List content (Grid) - Renders instantly on the very first frame
-                if (visibleItems.isEmpty()) {
-                    // 空の時は余計なプレースホルダーを出さず、通常背景のみ（右上の＋で追加可能）
-                    Box(modifier = Modifier.fillMaxSize())
-                } else {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(4),
-                        modifier = Modifier
-                            .fillMaxSize(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                        contentPadding = PaddingValues(
-                            top = paddingValues.calculateTopPadding(),
-                            bottom = paddingValues.calculateBottomPadding() + 80.dp
-                        )
-                    ) {
+                // List content (Grid) - Stable persistent container renders instantly without node replacement
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(4),
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    contentPadding = PaddingValues(
+                        top = 0.dp,
+                        bottom = 120.dp
+                    )
+                ) {
                         items(
                             items = visibleItems,
                             key = { it.entity.id },
-                            span = { ui ->
-                                val spanVal = when (ui.entity.type) {
-                                    "header", "rule" -> 4
-                                    "group" -> {
-                                        val count = ui.children.size
-                                        if (ui.entity.layout == "2x2" && count > 2) 2 else Math.min(4, Math.max(1, count))
-                                    }
-                                    else -> 1
-                                }
-                                GridItemSpan(spanVal)
-                            },
+                            span = { ui -> GridItemSpan(ui.gridSpan) },
                             contentType = { it.entity.type }
                         ) { ui ->
                         val isMovingSource = movingItemId == ui.entity.id
@@ -473,15 +501,15 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
                                         ui = ui,
                                         collapsedCount = ui.collapsedCount,
                                         isMoveMode = movingItemId != null,
-                                        onToggleCollapse = { onItemClickAction(ui.entity) },
-                                        onEdit = { onItemEditAction(ui.entity) }
+                                        onToggleCollapse = onItemClickAction,
+                                        onEdit = onItemEditAction
                                     )
                                 }
                                 "rule" -> {
                                     RuleCard(
                                         ui = ui,
                                         isMoveMode = movingItemId != null,
-                                        onEdit = { onItemEditAction(ui.entity) }
+                                        onEdit = onItemEditAction
                                     )
                                 }
                                 "group" -> {
@@ -489,20 +517,13 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
                                         ui = ui,
                                         isMovingSource = isMovingSource,
                                         isMoveMode = movingItemId != null,
-                                        pendingChunkId = pendingChunkId,
+                                        keypadState = keypadState, // Pass state holder
+                                        onStartEditing = onStartEditingAction,
+                                        onFinishEditing = onFinishEditingAction,
                                         onCardTap = onItemClickAction,
                                         onEditChild = onItemEditAction,
-                                        onEditGroup = { onItemEditAction(ui.entity) },
-                                        onQuickEditValue = onQuickEditGroup,
-                                        onAddChild = {
-                                            if (isDeleteMode) {
-                                                itemToDelete = ui.entity
-                                            } else {
-                                                viewModel.cancelPendingStates()
-                                                activeSetupGroupId = ui.entity.id
-                                                showAddDialog = true
-                                            }
-                                        },
+                                        onEditGroup = onItemEditAction,
+                                        onAddChild = onAddChildGroupAction,
                                         onFocusChanged = onFocusChangedAction
                                     )
                                 }
@@ -511,11 +532,11 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
                                         ui = ui,
                                         isGroupChild = false,
                                         isClaimPreview = ui.isClaimPreview,
-                                        onTap = { onItemClickAction(ui.entity) },
-                                        onEdit = { onItemEditAction(ui.entity) },
-                                        onQuickEditValue = { field, newVal ->
-                                            onQuickEditGroup(ui.entity, field, newVal)
-                                        },
+                                        keypadState = keypadState, // Pass state holder
+                                        onStartEditing = onStartEditingAction,
+                                        onFinishEditing = onFinishEditingAction,
+                                        onTap = onItemClickAction,
+                                        onEdit = onItemEditAction,
                                         onFocusChanged = onFocusChangedAction
                                     )
                                 }
@@ -540,150 +561,39 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
                 }
             }
         }
-    }
 
-    // --- Dialogs & Panels ---
-
-    if (showAddDialog) {
-        AddPanelDialog(
-            isGroupMode = activeSetupGroupId != null,
-            onDismiss = {
-                showAddDialog = false
-                activeSetupGroupId = null
-            },
-            onSelectType = { type ->
-                showAddDialog = false
-                if (type == "group") {
-                    viewModel.addGroup()
-                } else {
-                    activeSetupType = type
-                }
-            }
-        )
-    }
-
-    activeSetupType?.let { type ->
-        SetupDialog(
-            type = type,
-            onDismiss = {
-                activeSetupType = null
-                activeSetupGroupId = null
-            },
-            onConfirm = { map ->
-                if (activeSetupGroupId != null) {
-                    viewModel.addChildToGroup(
-                        groupId = activeSetupGroupId!!,
-                        type = type,
-                        intervalMin = map["intervalMin"] as? Int ?: 5,
-                        max = map["max"] as? Int ?: 100,
-                        useChunk = map["useChunk"] as? Int,
-                        durationMin = map["durationMin"] as? Int ?: 0,
-                        countMode = map["countMode"] as? String ?: "down",
-                        orbMode = map["orbMode"] as? String ?: "down"
-                    )
-                } else {
-                    viewModel.addItem(
-                        type = type,
-                        intervalMin = map["intervalMin"] as? Int ?: 5,
-                        max = map["max"] as? Int ?: 100,
-                        useChunk = map["useChunk"] as? Int,
-                        durationMin = map["durationMin"] as? Int ?: 0,
-                        countMode = map["countMode"] as? String ?: "down",
-                        orbMode = map["orbMode"] as? String ?: "down",
-                        color = map["color"] as? String
-                    )
-                }
-                activeSetupType = null
-                activeSetupGroupId = null
-            }
-        )
-    }
-
-    itemToEdit?.let { entity ->
-        val parentGroupName = remember(entity.parentId) {
-            viewModel.getGroupNameForChild(entity.parentId)
+    // --- Isolated Dialog Layer ---
+    // Prevent main app recompositions from trickling down to dialogs unnecessarily
+    DialogLayer(
+        viewModel = viewModel,
+        keypadState = keypadState, // Passed
+        showAddDialog = showAddDialog,
+        onDismissAddDialog = {
+            showAddDialog = false
+            activeSetupGroupId = null
+        },
+        activeSetupGroupId = activeSetupGroupId,
+        activeSetupType = activeSetupType,
+        onSetSetupType = { activeSetupType = it },
+        onResetSetup = {
+            activeSetupType = null
+            activeSetupGroupId = null
+        },
+        itemToEdit = itemToEdit,
+        onDismissEditDialog = { itemToEdit = null },
+        showBackupDialog = showBackupDialog,
+        onDismissBackupDialog = { showBackupDialog = false },
+        customColorHexes = customColorHexes,
+        onStartMove = { id ->
+            viewModel.cancelPendingStates()
+            movingItemId = id
+        },
+        onTriggerAddChild = { groupId ->
+            viewModel.cancelPendingStates()
+            activeSetupGroupId = groupId
+            showAddDialog = true
         }
-        EditItemDialog(
-            entity = entity,
-            customColors = customColors.map { it.hexColor },
-            groupName = parentGroupName,
-            onDismiss = { itemToEdit = null },
-            onSaveName = {
-                viewModel.updateItemName(entity.id, it)
-                itemToEdit = null
-            },
-            onSaveColor = {
-                viewModel.updateItemColor(entity.id, it)
-                itemToEdit = null
-            },
-            onSaveCustomColors = { viewModel.saveCustomColors(it) },
-            onUpdateSettings = { map ->
-                viewModel.updateItemSettings(
-                    id = entity.id,
-                    intervalMin = map["intervalMin"] as? Int,
-                    max = map["max"] as? Int,
-                    useChunk = map["useChunk"] as? Int,
-                    useChunkClear = (map["useChunkClear"] as? Boolean) ?: (map.containsKey("useChunk") && map["useChunk"] == null),
-                    durationMin = map["durationMin"] as? Int,
-                    countMode = map["countMode"] as? String,
-                    orbMode = map["orbMode"] as? String,
-                    layout = map["layout"] as? String,
-                    foldLock = map["foldLock"] as? Boolean,
-                    orbEditHours = map["orbEditHours"] as? Int,
-                    orbEditMinutes = map["orbEditMinutes"] as? Int,
-                    idleEditHours = map["idleEditHours"] as? Int,
-                    idleEditMinutes = map["idleEditMinutes"] as? Int
-                )
-                itemToEdit = null
-            },
-            onDelete = {
-                viewModel.deleteItem(entity.id)
-                itemToEdit = null
-            },
-            onMoveUp = { /* Unused: viewModel.moveItemUp(entity.parentId ?: entity.id) */ },
-            onMoveDown = { /* Unused: viewModel.moveItemDown(entity.parentId ?: entity.id) */ },
-            onStartMove = {
-                viewModel.cancelPendingStates()
-                movingItemId = entity.parentId ?: entity.id
-            },
-            onCloneGroup = {
-                viewModel.cancelPendingStates()
-                viewModel.cloneGroup(entity.id)
-                itemToEdit = null
-            },
-            onAddChildTimer = {
-                viewModel.cancelPendingStates()
-                activeSetupGroupId = entity.id
-                showAddDialog = true
-                itemToEdit = null
-            },
-            onAddGroupBelow = {
-                viewModel.cancelPendingStates()
-                viewModel.addGroup()
-                itemToEdit = null
-            }
-        )
-    }
-
-    if (showBackupDialog) {
-        BackupToastDialog(
-            onDismiss = { showBackupDialog = false },
-            onCopyBackup = {
-                val json = viewModel.exportBackupJson()
-                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
-                val clip = android.content.ClipData.newPlainText("AbyssTimerBackup", json)
-                clipboard?.setPrimaryClip(clip)
-            },
-            onPasteBackup = { jsonStr ->
-                coroutineScope.launch {
-                    val ok = viewModel.importBackupJson(jsonStr)
-                    if (ok) {
-                        showBackupDialog = false
-                    }
-                }
-            }
-        )
-    }
+    )
 
     itemToDelete?.let { entity ->
         DeleteConfirmDialog(
@@ -700,6 +610,167 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
             }
         )
     }
+
+    // Overlay Keypad (Isolated container so keypad toggles do not recompose root AbyssTimerApp)
+    KeypadOverlayHost(
+        keypadState = keypadState,
+        onDigit = onKeypadDigit,
+        onClear = onKeypadClear,
+        onDone = onKeypadDone,
+        onDismiss = onKeypadDismiss
+    )
+    }
+}
+
+@Composable
+private fun DialogLayer(
+    viewModel: TimerViewModel,
+    keypadState: KeypadEditingState, // Added
+    showAddDialog: Boolean,
+    onDismissAddDialog: () -> Unit,
+    activeSetupGroupId: String?,
+    activeSetupType: String?,
+    onSetSetupType: (String?) -> Unit,
+    onResetSetup: () -> Unit,
+    itemToEdit: ItemEntity?,
+    onDismissEditDialog: () -> Unit,
+    showBackupDialog: Boolean,
+    onDismissBackupDialog: () -> Unit,
+    customColorHexes: List<String>,
+    onStartMove: (String?) -> Unit,
+    onTriggerAddChild: (String) -> Unit
+) {
+    val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    if (showAddDialog) {
+        AddPanelDialog(
+            isGroupMode = activeSetupGroupId != null,
+            onDismiss = onDismissAddDialog,
+            onSelectType = { type ->
+                onDismissAddDialog()
+                if (type == "group") {
+                    viewModel.addGroup()
+                } else {
+                    onSetSetupType(type)
+                }
+            }
+        )
+    }
+
+    activeSetupType?.let { type ->
+        SetupDialog(
+            type = type,
+            onDismiss = onResetSetup,
+            onConfirm = { params ->
+                if (activeSetupGroupId != null) {
+                    viewModel.addChildToGroup(
+                        groupId = activeSetupGroupId,
+                        type = type,
+                        intervalMin = params.intervalMin,
+                        max = params.max,
+                        useChunk = params.useChunk,
+                        durationMin = params.durationMin,
+                        countMode = params.countMode,
+                        orbMode = params.orbMode
+                    )
+                } else {
+                    viewModel.addItem(
+                        type = type,
+                        intervalMin = params.intervalMin,
+                        max = params.max,
+                        useChunk = params.useChunk,
+                        durationMin = params.durationMin,
+                        countMode = params.countMode,
+                        orbMode = params.orbMode,
+                        color = params.color
+                    )
+                }
+                onResetSetup()
+            },
+            onRequestKeypad = { field, initial, onCommit ->
+                keypadState.start("setup", field, initial, onCommit)
+            },
+            isKeypadActive = { field ->
+                keypadState.isFieldActive("setup", field)
+            }
+        )
+    }
+
+    itemToEdit?.let { entity ->
+        val parentGroupName = remember(entity.parentId) {
+            viewModel.getGroupNameForChild(entity.parentId)
+        }
+        EditItemDialog(
+            entity = entity,
+            customColors = customColorHexes,
+            groupName = parentGroupName,
+            onDismiss = onDismissEditDialog,
+            onSaveName = {
+                viewModel.updateItemName(entity.id, it)
+                onDismissEditDialog()
+            },
+            onSaveColor = {
+                viewModel.updateItemColor(entity.id, it)
+                onDismissEditDialog()
+            },
+            onSaveCustomColors = { viewModel.saveCustomColors(it) },
+            onUpdateSettings = { settings ->
+                viewModel.updateItemSettings(
+                    id = entity.id,
+                    settings = settings
+                )
+                onDismissEditDialog()
+            },
+            onDelete = {
+                viewModel.deleteItem(entity.id)
+                onDismissEditDialog()
+            },
+            onMoveUp = {},
+            onMoveDown = {},
+            onStartMove = {
+                onDismissEditDialog()
+                onStartMove(entity.parentId ?: entity.id)
+            },
+            onCloneGroup = {
+                viewModel.cloneGroup(entity.id)
+                onDismissEditDialog()
+            },
+            onAddChildTimer = {
+                onDismissEditDialog()
+                onTriggerAddChild(entity.id)
+            },
+            onAddGroupBelow = {
+                viewModel.addGroup()
+                onDismissEditDialog()
+            },
+            onRequestKeypad = { field, initial, onCommit ->
+                keypadState.start(entity.id, field, initial, onCommit)
+            },
+            isKeypadActive = { field ->
+                keypadState.isFieldActive(entity.id, field)
+            }
+        )
+    }
+
+    if (showBackupDialog) {
+        BackupToastDialog(
+            onDismiss = onDismissBackupDialog,
+            onCopyBackup = {
+                val json = viewModel.exportBackupJson()
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+                val clip = android.content.ClipData.newPlainText("AbyssTimerBackup", json)
+                clipboard?.setPrimaryClip(clip)
+            },
+            onPasteBackup = { jsonStr ->
+                coroutineScope.launch {
+                    val ok = viewModel.importBackupJson(jsonStr)
+                    if (ok) {
+                        onDismissBackupDialog()
+                    }
+                }
+            }
+        )
     }
 }
 
@@ -710,20 +781,21 @@ fun HeaderCard(
     ui: TimerUiState,
     collapsedCount: Int,
     isMoveMode: Boolean = false,
-    onToggleCollapse: () -> Unit,
-    onEdit: () -> Unit
+    onToggleCollapse: (ItemEntity) -> Unit,
+    onEdit: (ItemEntity) -> Unit
 ) {
     val headerColor = ui.parsedColor
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .pointerDownTap { onToggleCollapse() }
+            .pointerDownTap { onToggleCollapse(ui.entity) }
             .padding(top = 2.dp, bottom = 0.dp, start = 2.dp, end = 2.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .height(24.dp)
                 .padding(bottom = 1.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
@@ -739,22 +811,19 @@ fun HeaderCard(
                     color = if (ui.entity.name.isEmpty()) Color(0xFF8A8EA3) else headerColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    style = androidx.compose.ui.text.TextStyle(
-                        platformStyle = androidx.compose.ui.text.PlatformTextStyle(
-                            includeFontPadding = false
-                        )
-                    )
+                    style = StandardNoPaddingStyle
                 )
                 if (collapsedCount > 0) {
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = "▸ ${collapsedCount}件",
-                        fontSize = 10.sp,
+                        fontSize = 9.5.sp,
                         color = Color(0xFF8A8EA3),
                         fontWeight = FontWeight.Bold,
+                        style = StandardNoPaddingStyle,
                         modifier = Modifier
-                            .background(Color(255, 255, 255, 18), RoundedCornerShape(10.dp))
-                            .padding(horizontal = 6.dp, vertical = 1.dp)
+                            .background(BadgeBgColor, BadgeShape)
+                            .padding(horizontal = 5.dp, vertical = 2.dp)
                     )
                 }
                 if (ui.entity.foldLock) {
@@ -772,7 +841,7 @@ fun HeaderCard(
             Box(
                 modifier = Modifier
                     .size(24.dp)
-                    .pointerDownTap { onEdit() },
+                    .pointerDownTap { onEdit(ui.entity) },
                 contentAlignment = Alignment.Center
             ) {
                 Box(
@@ -798,14 +867,14 @@ fun HeaderCard(
 fun RuleCard(
     ui: TimerUiState,
     isMoveMode: Boolean = false,
-    onEdit: () -> Unit
+    onEdit: (ItemEntity) -> Unit
 ) {
     val lineColor = ui.parsedColor
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .pointerDownTap { onEdit() }
+            .pointerDownTap { onEdit(ui.entity) }
             .padding(top = 1.dp, bottom = 1.dp, start = 2.dp, end = 2.dp),
         contentAlignment = Alignment.CenterEnd
     ) {
@@ -824,61 +893,81 @@ fun GroupCard(
     ui: TimerUiState,
     isMovingSource: Boolean = false,
     isMoveMode: Boolean = false,
-    pendingChunkId: String?,
+    keypadState: KeypadEditingState, // Pass the state holder instead of raw values
+    onStartEditing: (String) -> Unit = {},
+    onFinishEditing: (String) -> Unit = {},
     onCardTap: (ItemEntity) -> Unit,
     onEditChild: (ItemEntity) -> Unit,
-    onEditGroup: () -> Unit,
-    onQuickEditValue: (ItemEntity, String, Int) -> Unit,
-    onAddChild: () -> Unit,
+    onEditGroup: (ItemEntity) -> Unit,
+    onAddChild: (ItemEntity) -> Unit,
     onFocusChanged: (Boolean) -> Unit = {}
 ) {
     val groupColor = ui.parsedColor
+    val isEmpty = ui.children.isEmpty()
+    val isMultiChild = ui.children.size > 1
+    
+    // Header colors: increased visibility and rich gradient (minimum 35% opacity to avoid washed out lines)
+    val leftLineBrush = remember(groupColor) {
+        Brush.horizontalGradient(
+            0.0f to groupColor.copy(alpha = 0.35f),
+            1.0f to groupColor.copy(alpha = 1.0f)
+        )
+    }
+    val rightLineBrush = remember(groupColor) {
+        Brush.horizontalGradient(
+            0.0f to groupColor.copy(alpha = 1.0f),
+            1.0f to groupColor.copy(alpha = 0.35f)
+        )
+    }
 
-    val borderColor = if (isMovingSource) Color(0xFF4DA3FF) else groupColor
-    val borderWidth = if (isMovingSource) 2.dp else 1.2.dp
-    val groupShape = remember { RoundedCornerShape(8.dp) }
-    val borderStroke = remember(borderWidth, borderColor) {
-        BorderStroke(borderWidth, borderColor)
+    val actualBorder = remember(isMovingSource) {
+        if (isMovingSource) {
+            BorderStroke(2.dp, Color(0xFF4DA3FF))
+        } else {
+            null
+        }
     }
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 4.dp) // Headroom ensuring stacked account frames or lines never collide with name tag
+            .padding(top = 4.dp)
     ) {
-        // Outer Fieldset Box with clean native Surface border (no clipping artifacts)
         Surface(
-            shape = groupShape,
-            color = Color(0xFF0B0B14),
-            border = borderStroke,
+            shape = GroupCardShape,
+            color = Color.Transparent,
+            border = actualBorder,
             modifier = Modifier.fillMaxWidth()
         ) {
+            val topPadding = 12.dp
+            val bottomPadding = 2.dp
+            val horizPadding = 2.5.dp
+            
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 11.dp, bottom = 6.dp, start = 5.dp, end = 5.dp) // Clean breathing space below the name tag
+                    .padding(top = topPadding, bottom = bottomPadding, start = horizPadding, end = horizPadding)
             ) {
-                if (ui.children.isEmpty()) {
+                if (isEmpty) {
                     Surface(
                         shape = RoundedCornerShape(10.dp),
                         color = Color(0xFF15151F),
-                        border = BorderStroke(1.dp, Color(0xFF2A2A3A)),
+                        border = BorderStroke(1.2.dp, groupColor.copy(alpha = 0.70f)),
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp)
-                            .pointerDownTap { onAddChild() }
+                            .pointerDownTap { onAddChild(ui.entity) }
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Text(
                                 text = "＋",
-                                color = Color(0xFF6E7387),
+                                color = groupColor.copy(alpha = 0.75f),
                                 fontSize = 22.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
                     }
                 } else {
-                    // Render exactly the child timers in the account frame
                     val is2x2Layout = ui.entity.layout == "2x2" && ui.children.size > 2
                     val rows = remember(ui.children, is2x2Layout) {
                         if (is2x2Layout) ui.children.chunked(2) else listOf(ui.children)
@@ -896,14 +985,17 @@ fun GroupCard(
                                             ui = slotUi,
                                             isGroupChild = true,
                                             isClaimPreview = slotUi.isClaimPreview,
-                                            onTap = { onCardTap(slotUi.entity) },
-                                            onEdit = { onEditChild(slotUi.entity) },
-                                            onQuickEditValue = { field, newVal ->
-                                                onQuickEditValue(slotUi.entity, field, newVal)
-                                            },
+                                            keypadState = keypadState, // Pass state holder
+                                            onStartEditing = onStartEditing,
+                                            onFinishEditing = onFinishEditing,
+                                            onTap = onCardTap,
+                                            onEdit = onEditChild,
                                             onFocusChanged = onFocusChanged
                                         )
                                     }
+                                }
+                                if (is2x2Layout && rowSlots.size == 1) {
+                                    Spacer(modifier = Modifier.weight(1f))
                                 }
                             }
                         }
@@ -912,27 +1004,80 @@ fun GroupCard(
             }
         }
 
-        // Top-Center Title Legend (Fieldset style) - Raised smoothly so it cleanly clears internal timers
-        Box(
+        // Header Overlay: Flawless symmetrical centering & Straight horizontal baseline gradient lines
+        Row(
             modifier = Modifier
+                .fillMaxWidth()
                 .align(Alignment.TopCenter)
-                .offset(y = (-9).dp)
-                .background(Color(0xFF0B0B14), RoundedCornerShape(4.dp))
-                .padding(horizontal = 6.dp, vertical = 0.dp)
-                .height(18.dp)
-                .pointerDownTap { onEditGroup() },
-            contentAlignment = Alignment.Center
+                .offset(y = (-9).dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = ui.entity.name.ifEmpty { "アカウント" },
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (ui.entity.name.isEmpty()) Color(0xFF8A8EA3) else Color(0xFFE8EAEF),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
-            )
-        }
+                val strokeW = 1.8.dp
+
+                if (isMultiChild) {
+                    // Left Straight Baseline Gradient Line
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(18.dp)
+                            .drawBehind {
+                                val strokePx = strokeW.toPx()
+                                val lineY = 13.5.dp.toPx() // Positioned at the bottom baseline of the name tag, close to timers
+                                drawLine(
+                                    brush = leftLineBrush,
+                                    start = Offset(0f, lineY),
+                                    end = Offset(size.width, lineY),
+                                    strokeWidth = strokePx,
+                                    cap = StrokeCap.Round
+                                )
+                            }
+                    )
+                } else {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+
+                // Center Name Tag (Always mathematically 100% centered between the weights)
+                Box(
+                    modifier = Modifier
+                        .background(Color(0xFF0B0B14), RoundedCornerShape(4.dp))
+                        .padding(horizontal = 6.dp, vertical = 0.dp)
+                        .height(18.dp)
+                        .pointerDownTap { onEditGroup(ui.entity) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = ui.entity.name.ifEmpty { "アカウント" },
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (ui.entity.name.isEmpty()) Color(0xFF8A8EA3) else Color(0xFFE8EAEF),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
+                    )
+                }
+
+                if (isMultiChild) {
+                    // Right Straight Baseline Gradient Line
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(18.dp)
+                            .drawBehind {
+                                val strokePx = strokeW.toPx()
+                                val lineY = 13.5.dp.toPx() // Positioned at the bottom baseline of the name tag, close to timers
+                                drawLine(
+                                    brush = rightLineBrush,
+                                    start = Offset(0f, lineY),
+                                    end = Offset(size.width, lineY),
+                                    strokeWidth = strokePx,
+                                    cap = StrokeCap.Round
+                                )
+                            }
+                    )
+                } else {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+            }
     }
 }
 
@@ -941,17 +1086,30 @@ fun TimerCard(
     ui: TimerUiState,
     isGroupChild: Boolean,
     isClaimPreview: Boolean,
-    onTap: () -> Unit,
-    onEdit: () -> Unit,
-    onQuickEditValue: ((String, Int) -> Unit)? = null,
+    keypadState: KeypadEditingState, // Pass the state holder
+    onStartEditing: (String) -> Unit = {},
+    onFinishEditing: (String) -> Unit = {},
+    onTap: (ItemEntity) -> Unit,
+    onEdit: (ItemEntity) -> Unit,
     onFocusChanged: (Boolean) -> Unit = {}
 ) {
-    val context = LocalContext.current
-    val focusManager = LocalFocusManager.current
-    val keyboardController = LocalSoftwareKeyboardController.current
+    val currentOnTap by rememberUpdatedState(onTap)
+    val currentOnEdit by rememberUpdatedState(onEdit)
+    val currentOnStartEditing by rememberUpdatedState(onStartEditing)
+    val currentEntity by rememberUpdatedState(ui.entity)
 
-    var isCurFocused by remember(ui.entity.id) { mutableStateOf(false) }
-    var localCurText by remember(ui.entity.id) { mutableStateOf("") }
+    val onCardTapAction = remember { { currentOnTap(currentEntity) } }
+    val onEditAction = remember { { currentOnEdit(currentEntity) } }
+    val onStartEditAction = remember { { currentOnStartEditing(currentEntity.id) } }
+
+    // Isolate text observation: ONLY this card observes keypadState.text if it is the active one.
+    // This prevents the entire grid from recomposing when typing.
+    val editingText by remember(ui.entity.id) {
+        derivedStateOf {
+            if (keypadState.activeId == ui.entity.id && keypadState.fieldTag == "cur") keypadState.text else null
+        }
+    }
+    val isCurEditing = editingText != null
 
     val typeColor = ui.parsedColor
 
@@ -961,29 +1119,28 @@ fun TimerCard(
     val isIdleExpedClaim = (ui.entity.type == "idle" || ui.entity.type == "exped") && ui.entity.state == "claim"
 
     val borderStrokeColor = if (isClaimPreview) {
-        Color(0xFFFFD166) // Stamina/Orb chunk preview border (#ffd166)
+        ColorPreviewBorder
     } else if (isIdleExpedClaim) {
-        Color(0xFF5CD68A) // Recieve/Restart green border (var(--ok) -> #5cd68a)
+        ColorClaimBorder
     } else if (ui.isFull) {
-        Color(0xFFFFAB5C) // Full indicator orange border (var(--orange) -> #ffab5c)
+        ColorFullBorder
     } else {
         typeColor
     }
 
     val borderWidth = if (isClaimPreview || isIdleExpedClaim) 2.dp else 1.2.dp
-    val cardShape = remember { RoundedCornerShape(10.dp) }
     val borderStroke = remember(borderWidth, borderStrokeColor) {
         BorderStroke(borderWidth, borderStrokeColor)
     }
 
     Surface(
-        shape = cardShape,
+        shape = TimerCardShape,
         color = containerColor,
         border = borderStroke,
         modifier = Modifier
             .fillMaxWidth()
             .height(56.dp)
-            .pointerDownTap(enabled = !isCurFocused, onTap = onTap)
+            .pointerDownTap(enabled = true, onTap = onCardTapAction)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             // 1. Menu Indicator Dot (Refined subtle solid color dot, naturally nestled in top-left corner without intruding on numbers or clock)
@@ -992,7 +1149,7 @@ fun TimerCard(
                     .align(Alignment.TopStart)
                     .width(30.dp)
                     .height(20.dp)
-                    .instantPointerTap { onEdit() }
+                    .instantPointerTap { onEditAction() }
             ) {
                 Box(
                     modifier = Modifier
@@ -1017,22 +1174,7 @@ fun TimerCard(
                         TimerLabels(ui = ui)
                     }
 
-                    // Absolute positioned Symmetrically aligned numbers (X / Y) at Bottom-Center with zero-delay native BasicTextField
-                    val curFocusRequester = remember { FocusRequester() }
-                    var hasFocusedOnce by remember(ui.entity.id) { mutableStateOf(false) }
-
-                    LaunchedEffect(isCurFocused) {
-                        if (isCurFocused) {
-                            hasFocusedOnce = false
-                            try {
-                                curFocusRequester.requestFocus()
-                                keyboardController?.show()
-                            } catch (e: Exception) {}
-                        } else {
-                            hasFocusedOnce = false
-                        }
-                    }
-
+                    // Absolute positioned Symmetrically aligned numbers (X / Y) at Bottom-Center with zero-delay pure Text rendering
                     Row(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
@@ -1043,8 +1185,6 @@ fun TimerCard(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // Current value container (weight 1f, symmetrical right-aligned)
-                        // Tap target precisely covers current digits down to left edge as requested
-                        // Consumes tap at Initial pass to completely bypass card surface deduction action
                         val curColor = if (ui.isFull) {
                             Color(0xFFFF6B6B) // Red when full (MAX)
                         } else if (ui.isWarn) {
@@ -1056,81 +1196,34 @@ fun TimerCard(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(22.dp)
-                                .instantPointerTap(enabled = !isCurFocused) {
-                                    localCurText = ""
-                                    isCurFocused = true
+                                .fillMaxHeight()
+                                .instantPointerTap {
+                                    onStartEditAction()
                                 },
                             contentAlignment = Alignment.CenterEnd
                         ) {
-                            if (!isCurFocused) {
-                                Text(
-                                    text = "${ui.calculatedCurrent}",
-                                    color = curColor,
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    textAlign = TextAlign.End,
-                                    style = androidx.compose.ui.text.TextStyle(
-                                        platformStyle = androidx.compose.ui.text.PlatformTextStyle(
-                                            includeFontPadding = false
-                                        )
+                            val displayText = if (isCurEditing) {
+                                if (!editingText.isNullOrEmpty()) editingText ?: "_" else "_"
+                            } else {
+                                "${ui.calculatedCurrent}"
+                            }
+                            val textColor = if (isCurEditing) {
+                                Color(0xFFFFD166) // 編集中はゴールドで光る
+                            } else {
+                                curColor
+                            }
+                            Text(
+                                text = displayText,
+                                color = textColor,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.End,
+                                style = TextStyle(
+                                    platformStyle = PlatformTextStyle(
+                                        includeFontPadding = false
                                     )
                                 )
-                            } else {
-                                BasicTextField(
-                                    value = localCurText,
-                                    onValueChange = { newVal ->
-                                        val filtered = newVal.filter { it.isDigit() }
-                                        if (filtered.length <= 3) {
-                                            localCurText = filtered
-                                        }
-                                    },
-                                    textStyle = androidx.compose.ui.text.TextStyle(
-                                        color = curColor,
-                                        fontSize = 18.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        textAlign = TextAlign.End,
-                                        platformStyle = androidx.compose.ui.text.PlatformTextStyle(
-                                            includeFontPadding = false
-                                        )
-                                    ),
-                                    keyboardOptions = KeyboardOptions(
-                                        keyboardType = KeyboardType.Number,
-                                        imeAction = ImeAction.Done,
-                                        autoCorrect = false
-                                    ),
-                                    keyboardActions = KeyboardActions(
-                                        onDone = {
-                                            keyboardController?.hide()
-                                            focusManager.clearFocus(force = true)
-                                        }
-                                    ),
-                                    singleLine = true,
-                                    cursorBrush = SolidColor(Color.Transparent),
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .focusRequester(curFocusRequester)
-                                        .onFocusChanged { focusState ->
-                                            if (focusState.isFocused) {
-                                                hasFocusedOnce = true
-                                                keyboardController?.show()
-                                            } else if (hasFocusedOnce && isCurFocused) {
-                                                isCurFocused = false
-                                                keyboardController?.hide()
-                                                val parsed = localCurText.toIntOrNull()
-                                                if (parsed != null) {
-                                                    onQuickEditValue?.invoke("cur", parsed)
-                                                }
-                                                localCurText = ""
-                                            }
-                                        },
-                                    decorationBox = { innerTextField ->
-                                        Box(contentAlignment = Alignment.CenterEnd, modifier = Modifier.fillMaxSize()) {
-                                            innerTextField()
-                                        }
-                                    }
-                                )
-                            }
+                            )
                         }
 
                         // Slash "/" centered with balanced font size & subtle thickness
@@ -1177,72 +1270,62 @@ fun TimerCard(
                             .height(18.dp),
                         contentAlignment = Alignment.CenterEnd
                     ) {
-                        Text(
+                        SpacedTimerText(
                             text = ui.fullAtText,
                             fontSize = 11.5.sp,
                             fontWeight = if (ui.isFull) FontWeight.ExtraBold else FontWeight.Bold,
                             color = if (ui.isFull) Color(0xFFFF6B6B) else Color(0xFFC4B5FD),
-                            style = androidx.compose.ui.text.TextStyle(
-                                platformStyle = androidx.compose.ui.text.PlatformTextStyle(
-                                    includeFontPadding = false
-                                )
-                            )
+                            colonPadding = 1.dp
                         )
                     }
 
-                    // Main display label in the bottom center (offset slightly upward to align visual center with stamina digits)
+                    // Main display label in the bottom center (aligned identically to stamina digits with pure Row centering)
                     val isClaimState = ui.entity.state == "claim"
-                    val isSpecialText = isClaimState || ui.isFull
-                    val bottomPadding = if (isSpecialText) 7.5.dp else 5.dp
 
-                    Box(
+                    Row(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
-                            .padding(bottom = bottomPadding, start = 6.dp, end = 6.dp)
+                            .padding(bottom = 5.dp, start = 4.dp, end = 4.dp)
                             .fillMaxWidth()
                             .height(22.dp),
-                        contentAlignment = Alignment.Center
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        val labelText = if (isClaimState) {
-                            if (ui.entity.type == "exped") "再出発" else "受取"
-                        } else if (ui.isFull) {
-                            if (ui.entity.type == "exped") "帰還" else "MAX"
-                        } else {
-                            ui.idleDisplayLabel
-                        }
+                        val labelText = ui.idleDisplayLabel
 
                         val labelColor = if (isClaimState) {
-                            Color(0xFF5CD68A)
+                            ColorClaimBorder
                         } else if (ui.isFull) {
-                            Color(0xFFFF6B6B)
+                            ColorFullText
                         } else if (ui.isWarn) {
-                            Color(0xFFFFAB5C)
+                            ColorWarnText
                         } else {
-                            Color(0xFFECEEF2)
+                            ColorNormalText
                         }
 
-                        val labelSize = if (isClaimState) {
-                            18.sp
+                        val isJapaneseText = isClaimState || (ui.isFull && ui.entity.type == "exped")
+                        val labelSize = if (isJapaneseText) {
+                            16.sp
                         } else if (ui.isFull) {
-                            18.sp
+                            17.sp
                         } else {
-                            19.sp
+                            18.sp
                         }
 
-                        val labelTracking = if (isSpecialText) 0.02.em else 0.em
+                        val labelModifier = if (isJapaneseText) {
+                            JapaneseTextOffsetModifier
+                        } else {
+                            Modifier
+                        }
 
-                        Text(
+                        SpacedTimerText(
                             text = labelText,
                             fontSize = labelSize,
                             fontWeight = FontWeight.Bold,
                             color = labelColor,
-                            letterSpacing = labelTracking,
-                            textAlign = TextAlign.Center,
-                            style = androidx.compose.ui.text.TextStyle(
-                                platformStyle = androidx.compose.ui.text.PlatformTextStyle(
-                                    includeFontPadding = false
-                                )
-                            )
+                            colonPadding = 3.2.dp,
+                            useCenterColonGrid = true,
+                            modifier = labelModifier
                         )
                     }
                 }
@@ -1250,3 +1333,4 @@ fun TimerCard(
         }
     }
 }
+

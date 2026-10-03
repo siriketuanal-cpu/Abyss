@@ -13,6 +13,9 @@ data class StamInfo(val cur: Int, val remainMs: Long, val isFull: Boolean, val f
 data class OrbInfo(val cur: Int, val remainMs: Long, val nextInMs: Long, val isFull: Boolean, val fullAt: Long = 0)
 
 @Immutable
+data class RecoveryInfo(val cur: Int, val remainMs: Long, val nextInMs: Long, val isFull: Boolean, val fullAt: Long = 0)
+
+@Immutable
 data class IdleInfo(val elapsed: Long, val remainMs: Long, val isFull: Boolean, val fullAt: Long = 0)
 
 /**
@@ -21,10 +24,10 @@ data class IdleInfo(val elapsed: Long, val remainMs: Long, val isFull: Boolean, 
  */
 object TimerEngine {
 
-    fun calculateStamInfo(it: ItemEntity, now: Long): StamInfo {
+    fun calculateRecoveryInfo(it: ItemEntity, now: Long): RecoveryInfo {
         val maxSafe = it.max.coerceAtLeast(1)
         if (it.current >= maxSafe) {
-            return StamInfo(cur = maxSafe, remainMs = 0L, isFull = true, fullAt = it.start)
+            return RecoveryInfo(cur = maxSafe, remainMs = 0L, nextInMs = 0L, isFull = true, fullAt = it.start)
         }
         val intervalMs = it.intervalMin.coerceAtLeast(1) * 60000L
         val elapsed = (now - it.start).coerceAtLeast(0L)
@@ -32,31 +35,23 @@ object TimerEngine {
         val cur = (it.current + recovered).coerceAtMost(maxSafe)
         if (cur >= maxSafe) {
             val fullAt = it.start + (maxSafe - it.current).coerceAtLeast(0) * intervalMs
-            return StamInfo(cur = maxSafe, remainMs = 0L, isFull = true, fullAt = Math.min(now, fullAt))
+            return RecoveryInfo(cur = maxSafe, remainMs = 0L, nextInMs = 0L, isFull = true, fullAt = Math.min(now, fullAt))
         }
         val nextIn = intervalMs - (elapsed % intervalMs)
         val need = maxSafe - cur
         val remainMs = (need - 1) * intervalMs + nextIn
-        return StamInfo(cur = cur, remainMs = remainMs, isFull = false)
+        val fullAt = now + remainMs
+        return RecoveryInfo(cur = cur, remainMs = remainMs, nextInMs = nextIn, isFull = false, fullAt = fullAt)
+    }
+
+    fun calculateStamInfo(it: ItemEntity, now: Long): StamInfo {
+        val r = calculateRecoveryInfo(it, now)
+        return StamInfo(cur = r.cur, remainMs = r.remainMs, isFull = r.isFull, fullAt = r.fullAt)
     }
 
     fun calculateOrbInfo(it: ItemEntity, now: Long): OrbInfo {
-        val maxSafe = it.max.coerceAtLeast(1)
-        if (it.current >= maxSafe) {
-            return OrbInfo(cur = maxSafe, remainMs = 0L, nextInMs = 0L, isFull = true, fullAt = it.start)
-        }
-        val intervalMs = it.intervalMin.coerceAtLeast(1) * 60000L
-        val elapsed = (now - it.start).coerceAtLeast(0L)
-        val recovered = (elapsed / intervalMs).toInt()
-        val cur = (it.current + recovered).coerceAtMost(maxSafe)
-        if (cur >= maxSafe) {
-            val fullAt = it.start + (maxSafe - it.current).coerceAtLeast(0) * intervalMs
-            return OrbInfo(cur = maxSafe, remainMs = 0L, nextInMs = 0L, isFull = true, fullAt = Math.min(now, fullAt))
-        }
-        val nextInMs = intervalMs - (elapsed % intervalMs)
-        val need = maxSafe - cur
-        val remainMs = (need - 1) * intervalMs + nextInMs
-        return OrbInfo(cur = cur, remainMs = remainMs, nextInMs = nextInMs, isFull = false, fullAt = now + remainMs)
+        val r = calculateRecoveryInfo(it, now)
+        return OrbInfo(cur = r.cur, remainMs = r.remainMs, nextInMs = r.nextInMs, isFull = r.isFull, fullAt = r.fullAt)
     }
 
     fun calculateIdleInfo(it: ItemEntity, now: Long): IdleInfo {
@@ -119,5 +114,45 @@ object TimerEngine {
         val h = totalMin / 60
         val m = totalMin % 60
         return if (m < 10) "$h:0$m" else "$h:$m"
+    }
+
+    /**
+     * Re-indexes top-level items and grouped children so their `position` values
+     * are strictly contiguous 0, 1, 2... within their respective parent scopes.
+     * Prevents index gaps, out-of-order jumps, duplicate positions, and ensures
+     * orphan items are never silently dropped.
+     */
+    fun normalizeItemPositions(items: List<ItemEntity>): List<ItemEntity> {
+        if (items.isEmpty()) return emptyList()
+
+        val topLevels = items.filter { it.parentId == null }.sortedBy { it.position }
+        val childrenByParent = items.filter { it.parentId != null }.groupBy { it.parentId }
+
+        val normalized = ArrayList<ItemEntity>(items.size)
+        topLevels.forEachIndexed { topIdx, top ->
+            val normTop = if (top.position != topIdx) top.copy(position = topIdx) else top
+            normalized.add(normTop)
+            val children = childrenByParent[top.id]?.sortedBy { it.position }
+            if (children != null) {
+                children.forEachIndexed { childIdx, child ->
+                    val normChild = if (child.position != childIdx) child.copy(position = childIdx) else child
+                    normalized.add(normChild)
+                }
+            }
+        }
+
+        // Safety fallback: if there are orphan children whose parent doesn't exist, preserve them
+        if (normalized.size < items.size) {
+            val includedIds = HashSet<String>(normalized.size).apply {
+                for (it in normalized) add(it.id)
+            }
+            for (it in items) {
+                if (!includedIds.contains(it.id)) {
+                    normalized.add(it)
+                }
+            }
+        }
+
+        return normalized
     }
 }

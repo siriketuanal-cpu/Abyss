@@ -17,10 +17,10 @@ interface ItemDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertItems(items: List<ItemEntity>)
 
-    @Update
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun updateItem(item: ItemEntity)
 
-    @Update
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun updateItems(items: List<ItemEntity>)
 
     @Delete
@@ -42,12 +42,23 @@ interface ItemDao {
     }
 
     @Transaction
+    suspend fun deleteItemAndReorder(item: ItemEntity, changedItems: List<ItemEntity>) {
+        deleteItem(item)
+        if (item.type == "group") {
+            deleteChildrenOf(item.id)
+        }
+        if (changedItems.isNotEmpty()) {
+            insertItems(changedItems)
+        }
+    }
+
+    @Transaction
     suspend fun batchUpdateAndInsert(
         itemsToUpdate: List<ItemEntity>,
         itemsToInsert: List<ItemEntity> = emptyList()
     ) {
         if (itemsToUpdate.isNotEmpty()) {
-            updateItems(itemsToUpdate)
+            insertItems(itemsToUpdate)
         }
         if (itemsToInsert.isNotEmpty()) {
             insertItems(itemsToInsert)
