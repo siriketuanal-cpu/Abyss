@@ -315,12 +315,14 @@ fun GroupToastDialog(
 @Composable
 fun HeaderToastDialog(
     entity: ItemEntity,
+    isCompact: Boolean = false,
     customColors: List<String>,
     onDismiss: () -> Unit,
     onSaveName: (String) -> Unit,
     onSaveColor: (String) -> Unit,
     onSaveCustomColors: (List<String>) -> Unit,
     onToggleFoldLock: (Boolean) -> Unit,
+    onUpdateLayout: (String) -> Unit,
     onDelete: () -> Unit,
     onStartMove: () -> Unit,
     onAddGroupBelow: () -> Unit
@@ -354,6 +356,14 @@ fun HeaderToastDialog(
     }
     val dialogBorder = remember(headerColor) {
         BorderStroke(1.2.dp, headerColor.copy(alpha = 0.70f))
+    }
+
+    val maxCols = 6
+    val colOptions = remember { listOf(1, 2, 3, 4, 5, 6) }
+    var selectedCols by remember(entity.layout) {
+        mutableStateOf(
+            entity.layout?.filter { it.isDigit() }?.toIntOrNull()?.coerceIn(1, maxCols) ?: maxCols
+        )
     }
 
     FastDialog(onDismissRequest = onDismiss) {
@@ -406,7 +416,7 @@ fun HeaderToastDialog(
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(Color(0xFF22252D))
                                 .border(BorderStroke(1.dp, Color(255, 255, 255, 12)), RoundedCornerShape(8.dp))
-                                .pointerDownTap { showColorPicker = true },
+                            .pointerDownTap { showColorPicker = true },
                             contentAlignment = Alignment.Center
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -429,9 +439,9 @@ fun HeaderToastDialog(
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(Color(0xFF22252D))
                                 .border(BorderStroke(1.dp, Color(255, 255, 255, 12)), RoundedCornerShape(8.dp))
-                                .pointerDownTap {
-                                    onToggleFoldLock(!entity.foldLock)
-                                },
+                            .pointerDownTap {
+                                onToggleFoldLock(!entity.foldLock)
+                            },
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
@@ -440,6 +450,74 @@ fun HeaderToastDialog(
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold
                             )
+                        }
+                    }
+
+                    // 1行のタイマー設置数（通常表示: 1〜4枠 / コンパクト表示: 1〜6枠セレクター）
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF22252D))
+                            .border(BorderStroke(1.dp, Color(255, 255, 255, 12)), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "1行の枠設置数",
+                                color = Color(0xFFAAAAAA),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "${selectedCols}枠",
+                                color = headerColor,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            colOptions.forEach { colNum ->
+                                val isSelected = selectedCols == colNum
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(30.dp)
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(
+                                            if (isSelected) headerColor.copy(alpha = 0.35f) else Color(0xFF1B1D22)
+                                        )
+                                        .border(
+                                            BorderStroke(
+                                                if (isSelected) 1.5.dp else 1.dp,
+                                                if (isSelected) headerColor else Color(255, 255, 255, 15)
+                                            ),
+                                            RoundedCornerShape(6.dp)
+                                        )
+                                        .pointerDownTap {
+                                            if (selectedCols != colNum) {
+                                                selectedCols = colNum
+                                                onUpdateLayout("$colNum")
+                                            }
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "$colNum",
+                                        color = if (isSelected) Color.White else Color(0xFF888899),
+                                        fontSize = 12.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                }
+                            }
                         }
                     }
 

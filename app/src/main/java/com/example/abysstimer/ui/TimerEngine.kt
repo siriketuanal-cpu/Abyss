@@ -77,27 +77,18 @@ object TimerEngine {
         return now - phase
     }
 
+    private val cachedTimeZone = java.util.TimeZone.getDefault()
+
     fun formatHM(timestamp: Long): String {
-        return try {
-            val tz = java.util.TimeZone.getDefault()
-            val offset = tz.getOffset(timestamp)
-            val localMillis = timestamp + offset
-            val totalMinutes = Math.floorDiv(localMillis, 60000L)
-            val minuteOfDay = Math.floorMod(totalMinutes, 1440L).toInt()
-            val h = minuteOfDay / 60
-            val m = minuteOfDay % 60
-            val hStr = if (h < 10) "0$h" else "$h"
-            val mStr = if (m < 10) "0$m" else "$m"
-            "$hStr:$mStr"
-        } catch (e: Exception) {
-            val cal = java.util.Calendar.getInstance()
-            cal.timeInMillis = timestamp
-            val h = cal.get(java.util.Calendar.HOUR_OF_DAY)
-            val m = cal.get(java.util.Calendar.MINUTE)
-            val hStr = if (h < 10) "0$h" else "$h"
-            val mStr = if (m < 10) "0$m" else "$m"
-            "$hStr:$mStr"
-        }
+        val offset = cachedTimeZone.getOffset(timestamp)
+        val localMillis = timestamp + offset
+        val totalMinutes = localMillis / 60000L
+        val minuteOfDay = (totalMinutes % 1440L).toInt()
+        val h = minuteOfDay / 60
+        val m = minuteOfDay % 60
+        val hStr = if (h < 10) "0$h" else "$h"
+        val mStr = if (m < 10) "0$m" else "$m"
+        return "$hStr:$mStr"
     }
 
     fun formatCountdown(ms: Long): String {

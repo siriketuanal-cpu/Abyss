@@ -849,6 +849,7 @@ fun FullColorPickerDialog(
 @Composable
 fun EditItemDialog(
     entity: ItemEntity,
+    isCompact: Boolean = false,
     customColors: List<String>,
     groupName: String = "",
     onDismiss: () -> Unit,
@@ -888,6 +889,7 @@ fun EditItemDialog(
         "header" -> {
             HeaderToastDialog(
                 entity = entity,
+                isCompact = isCompact,
                 customColors = customColors,
                 onDismiss = onDismiss,
                 onSaveName = onSaveName,
@@ -895,6 +897,9 @@ fun EditItemDialog(
                 onSaveCustomColors = onSaveCustomColors,
                 onToggleFoldLock = { isLocked ->
                     onUpdateSettings(TimerSettingsUpdate(foldLock = isLocked))
+                },
+                onUpdateLayout = { newLayout ->
+                    onUpdateSettings(TimerSettingsUpdate(layout = newLayout))
                 },
                 onDelete = onDelete,
                 onStartMove = { onStartMove?.invoke() },

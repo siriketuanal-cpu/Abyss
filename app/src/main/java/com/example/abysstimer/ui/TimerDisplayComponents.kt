@@ -19,6 +19,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -67,21 +68,18 @@ fun SpacedTimerText(
     fontSize: TextUnit,
     fontWeight: FontWeight,
     color: Color,
-    colonPadding: Dp = 3.2.dp,
+    colonPadding: Dp = 2.5.dp,
     useCenterColonGrid: Boolean = false,
     colonFontFamily: FontFamily? = null,
     modifier: Modifier = Modifier
 ) {
     if (text.contains(':')) {
         val parts = text.split(':')
-        val minutePart = parts.getOrNull(0) ?: ""
-        val secondPart = parts.getOrNull(1) ?: ""
-
         val isLarge = fontSize.value >= 15f
         val dotSize = if (isLarge) 2.4.dp else 1.6.dp
         val dotSpacing = if (isLarge) 4.2.dp else 2.5.dp
 
-        if (useCenterColonGrid) {
+        if (useCenterColonGrid && parts.size == 2) {
             Row(
                 modifier = modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -92,10 +90,13 @@ fun SpacedTimerText(
                     contentAlignment = Alignment.CenterEnd
                 ) {
                     Text(
-                        text = minutePart,
+                        text = parts[0],
                         fontSize = fontSize,
                         fontWeight = fontWeight,
                         color = color,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Clip,
                         style = DigitTnumStyle
                     )
                 }
@@ -112,10 +113,13 @@ fun SpacedTimerText(
                     contentAlignment = Alignment.CenterStart
                 ) {
                     Text(
-                        text = secondPart,
+                        text = parts[1],
                         fontSize = fontSize,
                         fontWeight = fontWeight,
                         color = color,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Clip,
                         style = DigitTnumStyle
                     )
                 }
@@ -126,26 +130,26 @@ fun SpacedTimerText(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
-                Text(
-                    text = minutePart,
-                    fontSize = fontSize,
-                    fontWeight = fontWeight,
-                    color = color,
-                    style = DigitTnumStyle
-                )
-                TimerColon(
-                    color = color,
-                    dotSize = dotSize,
-                    dotSpacing = dotSpacing,
-                    modifier = Modifier.padding(horizontal = colonPadding)
-                )
-                Text(
-                    text = secondPart,
-                    fontSize = fontSize,
-                    fontWeight = fontWeight,
-                    color = color,
-                    style = DigitTnumStyle
-                )
+                parts.forEachIndexed { index, part ->
+                    if (index > 0) {
+                        TimerColon(
+                            color = color,
+                            dotSize = dotSize,
+                            dotSpacing = dotSpacing,
+                            modifier = Modifier.padding(horizontal = colonPadding)
+                        )
+                    }
+                    Text(
+                        text = part,
+                        fontSize = fontSize,
+                        fontWeight = fontWeight,
+                        color = color,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Clip,
+                        style = DigitTnumStyle
+                    )
+                }
             }
         }
     } else {
@@ -156,6 +160,9 @@ fun SpacedTimerText(
             color = color,
             modifier = modifier,
             textAlign = TextAlign.Center,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Clip,
             style = StandardNoPaddingStyle
         )
     }
@@ -165,11 +172,11 @@ fun SpacedTimerText(
  * Compact countdown / full-time label display for timer cards.
  */
 @Composable
-fun TimerLabels(ui: TimerUiState) {
+fun TimerLabels(ui: TimerUiState, isCompact: Boolean = false) {
     if (ui.entity.type == "orb" && !ui.isFull) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp)
+            horizontalArrangement = Arrangement.spacedBy(if (isCompact) 4.dp else 6.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -177,7 +184,7 @@ fun TimerLabels(ui: TimerUiState) {
             ) {
                 Text(
                     text = "次",
-                    fontSize = 9.5.sp,
+                    fontSize = if (isCompact) 9.5.sp else 10.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = Color(0xFFA78BFA),
                     modifier = Modifier.padding(end = 2.dp),
@@ -187,27 +194,27 @@ fun TimerLabels(ui: TimerUiState) {
                 )
                 SpacedTimerText(
                     text = ui.orbNextCdText,
-                    fontSize = 10.5.sp,
+                    fontSize = if (isCompact) 10.5.sp else 11.5.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFFECEEF2),
-                    colonPadding = 1.dp
+                    colonPadding = if (isCompact) 1.dp else 1.5.dp
                 )
             }
             SpacedTimerText(
                 text = ui.fullAtText,
-                fontSize = 10.5.sp,
+                fontSize = if (isCompact) 10.5.sp else 12.sp,
                 fontWeight = if (ui.isFull) FontWeight.ExtraBold else FontWeight.Bold,
                 color = if (ui.isFull) Color(0xFFFF6B6B) else Color(0xFFC4B5FD),
-                colonPadding = 1.dp
+                colonPadding = if (isCompact) 1.2.dp else 1.5.dp
             )
         }
     } else {
         SpacedTimerText(
             text = ui.fullAtText,
-            fontSize = 11.5.sp,
+            fontSize = if (isCompact) 10.5.sp else 12.sp,
             fontWeight = if (ui.isFull) FontWeight.ExtraBold else FontWeight.Bold,
             color = if (ui.isFull) Color(0xFFFF6B6B) else Color(0xFFC4B5FD),
-            colonPadding = 1.dp
+            colonPadding = if (isCompact) 1.2.dp else 1.5.dp
         )
     }
 }

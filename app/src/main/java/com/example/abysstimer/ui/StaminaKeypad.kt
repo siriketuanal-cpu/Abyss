@@ -12,11 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -165,7 +161,6 @@ private val PrecomputedKeypadGrid: List<List<KeypadKeySpec>> = KeypadRowsData.ma
     }
 }
 
-private val CloseIconVector = Icons.Default.Close
 private val KeypadTextStyle = TextStyle(
     platformStyle = PlatformTextStyle(includeFontPadding = false)
 )
@@ -178,13 +173,12 @@ fun StaminaKeypad(
     onDigit: (String) -> Unit,
     onClear: () -> Unit,
     onDone: () -> Unit,
-    onDismiss: () -> Unit,
+    onDismiss: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val currentOnDigit by rememberUpdatedState(onDigit)
     val currentOnClear by rememberUpdatedState(onClear)
     val currentOnDone by rememberUpdatedState(onDone)
-    val currentOnDismiss by rememberUpdatedState(onDismiss)
 
     Box(
         modifier = modifier
@@ -199,29 +193,18 @@ fun StaminaKeypad(
                 .fillMaxWidth()
                 .padding(bottom = 2.dp)
         ) {
-            // Ultra-slim close handle bar (24dp height)
+            // Sleek grab handle indicator (8dp height)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(24.dp)
-                    .padding(horizontal = 8.dp),
-                contentAlignment = Alignment.CenterEnd
+                    .height(8.dp),
+                contentAlignment = Alignment.Center
             ) {
                 Box(
                     modifier = Modifier
-                        .size(22.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF222433))
-                        .instantPointerTap { currentOnDismiss() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = CloseIconVector,
-                        contentDescription = "閉じる",
-                        tint = Color(0xFFA0AFC4),
-                        modifier = Modifier.size(13.dp)
-                    )
-                }
+                        .size(width = 32.dp, height = 3.dp)
+                        .background(Color(0xFF383B4F), RoundedCornerShape(1.5.dp))
+                )
             }
 
             // Keypad Grid (3 columns x 4 rows) - 0dp spacing for 100% active touch coverage

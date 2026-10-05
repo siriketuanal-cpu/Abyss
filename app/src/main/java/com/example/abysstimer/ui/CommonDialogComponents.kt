@@ -61,8 +61,10 @@ fun FastDialog(
                 .pointerDownTap { currentOnDismiss() }
         )
 
-        // Dialog Content - perfectly isolated, zero gesture lag
-        Box {
+        // Dialog Content - perfectly isolated, zero gesture lag, touches inside consumed
+        Box(
+            modifier = Modifier.pointerDownTap { /* Consume touch inside dialog */ }
+        ) {
             content()
         }
     }

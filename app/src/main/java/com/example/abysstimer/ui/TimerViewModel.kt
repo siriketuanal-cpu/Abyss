@@ -33,7 +33,8 @@ data class TimerUiState(
     val collapsedCount: Int = 0,
     val children: List<TimerUiState> = emptyList(),
     val parsedColor: Color = Color.Unspecified,
-    val gridSpan: Int = 1
+    val gridSpan: Int = 1,
+    val unitSpan: Int = gridSpan
 )
 
 @Immutable
@@ -41,6 +42,13 @@ data class UiSnapshot(
     val allItems: List<TimerUiState> = emptyList(),
     val visibleItems: List<TimerUiState> = emptyList()
 )
+
+fun parseHeaderColumns(layout: String?): Int {
+    val maxCols = 6
+    if (layout.isNullOrBlank()) return 5
+    val num = layout.filter { it.isDigit() }.toIntOrNull() ?: return 5
+    return num.coerceIn(1, maxCols)
+}
 
 @Immutable
 data class TimerCoreState(
@@ -59,8 +67,10 @@ class TimerViewModel(
     private var cachedTopLevels: List<ItemEntity> = emptyList()
     private var cachedChildrenMap: Map<String, List<ItemEntity>> = emptyMap()
     private var cachedCollapsedCountMap: Map<String, Int> = emptyMap()
-    private val cachedUiStateMap = HashMap<String, TimerUiState>()
+    private val cachedUiStateMap = java.util.concurrent.ConcurrentHashMap<String, TimerUiState>()
     private var lastSnapshot = UiSnapshot(emptyList(), emptyList())
+    private var lastTriggerTime: Long = 0L
+    private var lastPendingId: String? = null
 
     private fun parseItemColor(colorHex: String?, type: String): Color {
         if (!colorHex.isNullOrEmpty()) {
@@ -91,41 +101,48 @@ class TimerViewModel(
         now: Long,
         pendingId: String?,
         collapsedCount: Int,
-        children: List<TimerUiState> = emptyList()
+        children: List<TimerUiState> = emptyList(),
+        customSpan: Int = 1,
+        unitSpan: Int = customSpan
     ): TimerUiState {
         val parsedCol = parseItemColor(it.color, it.type)
         val prev = cachedUiStateMap[it.id]
+        val safeSpan = customSpan.coerceIn(1, 60)
+        val safeUnit = unitSpan.coerceIn(1, safeSpan)
 
         return when (it.type) {
             "header" -> {
-                if (prev != null && prev.entity == it && prev.collapsedCount == collapsedCount && prev.parsedColor == parsedCol && prev.gridSpan == 4) {
+                if (prev != null && prev.entity == it && prev.collapsedCount == collapsedCount && prev.parsedColor == parsedCol && prev.gridSpan == safeSpan && prev.unitSpan == safeSpan) {
                     prev
                 } else {
-                    val state = TimerUiState(entity = it, collapsedCount = collapsedCount, parsedColor = parsedCol, gridSpan = 4)
+                    val state = TimerUiState(entity = it, collapsedCount = collapsedCount, parsedColor = parsedCol, gridSpan = safeSpan, unitSpan = safeSpan)
                     cachedUiStateMap[it.id] = state
                     state
                 }
             }
             "rule" -> {
-                if (prev != null && prev.entity == it && prev.parsedColor == parsedCol && prev.gridSpan == 4) {
+                if (prev != null && prev.entity == it && prev.parsedColor == parsedCol && prev.gridSpan == safeSpan && prev.unitSpan == safeSpan) {
                     prev
                 } else {
-                    val state = TimerUiState(entity = it, parsedColor = parsedCol, gridSpan = 4)
+                    val state = TimerUiState(entity = it, parsedColor = parsedCol, gridSpan = safeSpan, unitSpan = safeSpan)
                     cachedUiStateMap[it.id] = state
                     state
                 }
             }
             "group" -> {
-                val span = if (it.layout == "2x2" && children.size > 2) 2 else children.size.coerceIn(1, 4)
-                if (prev != null && prev.entity == it && prev.children === children && prev.parsedColor == parsedCol && prev.gridSpan == span) {
+                val span = safeSpan
+                val uSpan = safeUnit
+                if (prev != null && prev.entity == it && prev.children === children && prev.parsedColor == parsedCol && prev.gridSpan == span && prev.unitSpan == uSpan) {
                     prev
                 } else {
-                    val state = TimerUiState(entity = it, children = children, parsedColor = parsedCol, gridSpan = span)
+                    val state = TimerUiState(entity = it, children = children, parsedColor = parsedCol, gridSpan = span, unitSpan = uSpan)
                     cachedUiStateMap[it.id] = state
                     state
                 }
             }
             "stam" -> {
+                val span = safeSpan
+                val uSpan = safeUnit
                 val waitChunk = pendingId == it.id
                 val info = TimerEngine.calculateStamInfo(it, now)
                 val shownCurrent = if (waitChunk) TimerEngine.remainingAfterUse(info.cur, it.useChunk ?: 1, it.type) else info.cur
@@ -141,7 +158,8 @@ class TimerViewModel(
                     prev.isWarn == isWarn &&
                     prev.isClaimPreview == waitChunk &&
                     prev.parsedColor == parsedCol &&
-                    prev.gridSpan == 1
+                    prev.gridSpan == span &&
+                    prev.unitSpan == uSpan
                 ) {
                     prev
                 } else {
@@ -154,13 +172,16 @@ class TimerViewModel(
                         isWarn = isWarn,
                         isClaimPreview = waitChunk,
                         parsedColor = parsedCol,
-                        gridSpan = 1
+                        gridSpan = span,
+                        unitSpan = uSpan
                     )
                     cachedUiStateMap[it.id] = state
                     state
                 }
             }
             "orb" -> {
+                val span = safeSpan
+                val uSpan = safeUnit
                 val waitChunk = pendingId == it.id
                 val info = TimerEngine.calculateOrbInfo(it, now)
                 val shownCurrent = if (waitChunk) TimerEngine.remainingAfterUse(info.cur, it.useChunk ?: 1, it.type) else info.cur
@@ -179,7 +200,8 @@ class TimerViewModel(
                     prev.isWarn == isWarn &&
                     prev.isClaimPreview == waitChunk &&
                     prev.parsedColor == parsedCol &&
-                    prev.gridSpan == 1
+                    prev.gridSpan == span &&
+                    prev.unitSpan == uSpan
                 ) {
                     prev
                 } else {
@@ -194,13 +216,16 @@ class TimerViewModel(
                         isWarn = isWarn,
                         isClaimPreview = waitChunk,
                         parsedColor = parsedCol,
-                        gridSpan = 1
+                        gridSpan = span,
+                        unitSpan = uSpan
                     )
                     cachedUiStateMap[it.id] = state
                     state
                 }
             }
             "idle", "exped" -> {
+                val span = safeSpan
+                val uSpan = safeUnit
                 val info = TimerEngine.calculateIdleInfo(it, now)
                 val isUp = it.countMode == "up"
                 val runningLabel = if (isUp) TimerEngine.formatElapsed(info.elapsed) else TimerEngine.formatCountdown(info.remainMs)
@@ -222,7 +247,8 @@ class TimerViewModel(
                     prev.isWarn == isWarn &&
                     prev.isClaimPreview == isClaim &&
                     prev.parsedColor == parsedCol &&
-                    prev.gridSpan == 1
+                    prev.gridSpan == span &&
+                    prev.unitSpan == uSpan
                 ) {
                     prev
                 } else {
@@ -238,17 +264,20 @@ class TimerViewModel(
                         isWarn = isWarn,
                         isClaimPreview = isClaim,
                         parsedColor = parsedCol,
-                        gridSpan = 1
+                        gridSpan = span,
+                        unitSpan = uSpan
                     )
                     cachedUiStateMap[it.id] = state
                     state
                 }
             }
             else -> {
-                if (prev != null && prev.entity == it && prev.parsedColor == parsedCol && prev.gridSpan == 1) {
+                val span = safeSpan
+                val uSpan = safeUnit
+                if (prev != null && prev.entity == it && prev.parsedColor == parsedCol && prev.gridSpan == span && prev.unitSpan == uSpan) {
                     prev
                 } else {
-                    val state = TimerUiState(entity = it, parsedColor = parsedCol, gridSpan = 1)
+                    val state = TimerUiState(entity = it, parsedColor = parsedCol, gridSpan = span, unitSpan = uSpan)
                     cachedUiStateMap[it.id] = state
                     state
                 }
@@ -257,22 +286,36 @@ class TimerViewModel(
     }
 
     private fun calculateUiSnapshot(dbList: List<ItemEntity>, pendingId: String?, now: Long): UiSnapshot {
-        lastCalculationTime = now
         if (dbList.isEmpty()) {
             lastSnapshot = UiSnapshot(emptyList(), emptyList())
+            lastDbList = dbList
+            lastTriggerTime = now
             return lastSnapshot
         }
 
+        // Fast-skip if everything is identical to the last calculated snapshot (data and trigger)
+        if (pendingId == lastPendingId && Math.abs(now - lastTriggerTime) < 1000L && (dbList === lastDbList || dbList == lastDbList)) {
+            return lastSnapshot
+        }
+
+        lastTriggerTime = now
+        lastPendingId = pendingId
+
         // Cache DB hierarchy, sort, and collapsed counts if dbList has not changed
         if (dbList !== lastDbList) {
-            val isStructuralSame = lastDbList != null &&
-                lastDbList!!.size == dbList.size &&
-                lastDbList!!.indices.all { idx ->
-                    val o = lastDbList!![idx]
+            var isStructuralSame = lastDbList != null && lastDbList!!.size == dbList.size
+            if (isStructuralSame) {
+                val oldList = lastDbList!!
+                for (idx in oldList.indices) {
+                    val o = oldList[idx]
                     val n = dbList[idx]
-                    o.id == n.id && o.parentId == n.parentId && o.position == n.position &&
-                    o.type == n.type && o.collapsed == n.collapsed && o.foldLock == n.foldLock
+                    if (o.id != n.id || o.parentId != n.parentId || o.position != n.position ||
+                        o.type != n.type || o.collapsed != n.collapsed || o.foldLock != n.foldLock || o.layout != n.layout) {
+                        isStructuralSame = false
+                        break
+                    }
                 }
+            }
 
             if (isStructuralSame) {
                 // Structural order is identical (e.g. state change or timestamp update on tap).
@@ -347,14 +390,41 @@ class TimerViewModel(
         val visibleList = ArrayList<TimerUiState>(cachedTopLevels.size)
         var skipUntilNextHeader = false
 
+        val gridTotalCols = 60
+        val defaultSectionCols = 5
+        var currentSectionCols = defaultSectionCols
+        var lineSlotsUsed = 0
+
+        fun finishCurrentLineIfNeeded() {
+            if (lineSlotsUsed > 0 && lineSlotsUsed < currentSectionCols) {
+                val remainder = currentSectionCols - lineSlotsUsed
+                val remainderGridSpan = remainder * (gridTotalCols / currentSectionCols)
+                val spacerEntity = ItemEntity(
+                    id = "spacer_${allList.size}",
+                    type = "spacer"
+                )
+                val spacerUi = TimerUiState(
+                    entity = spacerEntity,
+                    gridSpan = remainderGridSpan,
+                    unitSpan = remainderGridSpan
+                )
+                allList.add(spacerUi)
+                if (!skipUntilNextHeader) {
+                    visibleList.add(spacerUi)
+                }
+            }
+            lineSlotsUsed = 0
+        }
+
         for (top in cachedTopLevels) {
             val childrenEntities = cachedChildrenMap[top.id]
+            val itemUnitSpan = gridTotalCols / currentSectionCols
             val childrenUi: List<TimerUiState> = if (childrenEntities.isNullOrEmpty()) {
                 emptyList()
             } else {
                 val childList = ArrayList<TimerUiState>(childrenEntities.size)
                 for (ch in childrenEntities) {
-                    childList.add(getOrCreateItemUi(ch, now, pendingId, 0))
+                    childList.add(getOrCreateItemUi(ch, now, pendingId, 0, emptyList(), itemUnitSpan, itemUnitSpan))
                 }
                 val prevChildren = cachedUiStateMap[top.id]?.children
                 if (prevChildren != null && prevChildren.size == childList.size &&
@@ -365,18 +435,60 @@ class TimerViewModel(
                 }
             }
 
-            val topCollapsedCount = cachedCollapsedCountMap[top.id] ?: 0
-            val topUi = getOrCreateItemUi(top, now, pendingId, topCollapsedCount, childrenUi)
-
-            allList.add(topUi)
-
-            if (topUi.entity.type == "header") {
-                skipUntilNextHeader = topUi.entity.collapsed && !topUi.entity.foldLock
+            if (top.type == "header") {
+                finishCurrentLineIfNeeded()
+                val headerCols = parseHeaderColumns(top.layout)
+                currentSectionCols = headerCols
+                val topCollapsedCount = cachedCollapsedCountMap[top.id] ?: 0
+                val topUi = getOrCreateItemUi(top, now, pendingId, topCollapsedCount, emptyList(), gridTotalCols, gridTotalCols)
+                allList.add(topUi)
+                skipUntilNextHeader = top.collapsed && !top.foldLock
                 visibleList.add(topUi)
-            } else if (!skipUntilNextHeader) {
-                visibleList.add(topUi)
+                lineSlotsUsed = 0
+                continue
+            }
+
+            if (top.type == "rule") {
+                finishCurrentLineIfNeeded()
+                val topUi = getOrCreateItemUi(top, now, pendingId, 0, emptyList(), gridTotalCols, gridTotalCols)
+                allList.add(topUi)
+                if (!skipUntilNextHeader) {
+                    visibleList.add(topUi)
+                }
+                lineSlotsUsed = 0
+                continue
+            }
+
+            val cardSlots = when (top.type) {
+                "group" -> {
+                    val is2x2 = top.layout == "2x2" && childrenUi.size > 2
+                    when {
+                        is2x2 -> 2.coerceAtMost(currentSectionCols)
+                        childrenUi.isEmpty() -> 1
+                        else -> childrenUi.size.coerceIn(1, currentSectionCols)
+                    }
+                }
+                "vrule" -> top.max.coerceIn(1, 3)
+                else -> 1
+            }
+
+            if (lineSlotsUsed > 0 && lineSlotsUsed + cardSlots > currentSectionCols) {
+                finishCurrentLineIfNeeded()
+            }
+
+            val cardGridSpan = cardSlots * (gridTotalCols / currentSectionCols)
+            val itemUi = getOrCreateItemUi(top, now, pendingId, 0, childrenUi, cardGridSpan, itemUnitSpan)
+            allList.add(itemUi)
+            if (!skipUntilNextHeader) {
+                visibleList.add(itemUi)
+            }
+            lineSlotsUsed += cardSlots
+            if (lineSlotsUsed >= currentSectionCols) {
+                finishCurrentLineIfNeeded()
             }
         }
+
+        finishCurrentLineIfNeeded()
 
         val allMatches = lastSnapshot.allItems.size == allList.size &&
                 lastSnapshot.allItems.indices.all { idx -> lastSnapshot.allItems[idx] === allList[idx] }
@@ -396,13 +508,10 @@ class TimerViewModel(
 
     val pendingChunkUseId: StateFlow<String?> = _coreState
         .map { it.pendingChunkId }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
     
     val customColorsFlow: StateFlow<List<CustomColorEntity>> = repository.allCustomColorsFlow
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-
-    @Volatile
-    private var lastCalculationTime: Long = System.currentTimeMillis()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // Manual refresh pulse for lifecycle onResume (single trigger mechanism)
     private val _refreshTrigger = MutableStateFlow(System.currentTimeMillis())
@@ -434,7 +543,7 @@ class TimerViewModel(
         calculateUiSnapshot(items, pendingId, System.currentTimeMillis())
     }
     .flowOn(Dispatchers.Default)
-    .stateIn(viewModelScope, SharingStarted.Eagerly, initialSnapshot)
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), initialSnapshot)
 
     fun getItemEntity(id: String): ItemEntity? = _coreState.value.items.find { it.id == id }
 
@@ -443,15 +552,30 @@ class TimerViewModel(
         viewModelScope.launch {
             launch {
                 repository.allItemsFlow.distinctUntilChanged().collect { items ->
+                    // Auto-purge any temporary "vrule" items created during testing
+                    val vrules = items.filter { it.type == "vrule" }
+                    if (vrules.isNotEmpty()) {
+                        launch(Dispatchers.IO) {
+                            vrules.forEach { repository.deleteItem(it) }
+                        }
+                    }
+
+                    val cleanItems = items.filter { it.type != "vrule" }
                     val currentCore = _coreState.value
+                    if (cleanItems == currentCore.items) return@collect
+
                     // Protect transient in-memory UI preview states (e.g. claim wait state on idle/exped)
                     val claimItem = currentCore.items.find { (it.type == "idle" || it.type == "exped") && it.state == "claim" }
 
-                    val merged = items.map { dbItem ->
-                        if (claimItem != null && dbItem.id == claimItem.id) {
-                            claimItem
-                        } else {
-                            pendingUpdates[dbItem.id] ?: dbItem
+                    val merged = if (claimItem == null && pendingUpdates.isEmpty()) {
+                        cleanItems
+                    } else {
+                        cleanItems.map { dbItem ->
+                            if (claimItem != null && dbItem.id == claimItem.id) {
+                                claimItem
+                            } else {
+                                pendingUpdates[dbItem.id] ?: dbItem
+                            }
                         }
                     }
                     if (currentCore.items != merged) {
@@ -547,10 +671,18 @@ class TimerViewModel(
         val newItems = currentList.map { updatedMap[it.id] ?: it }
         _coreState.value = _coreState.value.copy(items = newItems)
         TimerRepository.updateCache(newItems)
+        
+        var hasChanges = false
         for (item in updatedList) {
-            pendingUpdates[item.id] = item
+            val orig = currentList.find { it.id == item.id }
+            if (orig == null || orig.position != item.position || orig.parentId != item.parentId) {
+                pendingUpdates[item.id] = item
+                hasChanges = true
+            }
         }
-        scheduleDebouncedPersist()
+        if (hasChanges) {
+            scheduleDebouncedPersist()
+        }
     }
 
     private fun deleteDbItemInMemoryAndPersist(item: ItemEntity) {
@@ -795,76 +927,81 @@ class TimerViewModel(
         val targetParentId = target.parentId
 
         if (sourceParentId == null && targetParentId == null) {
-            // Both are top-level items
             val topLevels = items.filter { it.parentId == null }.sortedBy { it.position }.toMutableList()
             val sIdx = topLevels.indexOfFirst { it.id == sourceId }
             val tIdx = topLevels.indexOfFirst { it.id == targetId }
             if (sIdx == -1 || tIdx == -1) return
 
-            val isFoldedHeaderSource = source.type == "header" && source.collapsed && !source.foldLock
+            val source = topLevels[sIdx]
+            val isSourceCollapsedHeader = source.type == "header" && source.collapsed && !source.foldLock
 
-            if (!isFoldedHeaderSource) {
-                // 通常の移動: 歯抜け・重複位置バグを完全に防ぐ厳格なリスト再構成＆連番正規化
-                val item = topLevels.removeAt(sIdx)
-                topLevels.add(tIdx, item)
-                val updatedTopLevels = topLevels.mapIndexed { idx, it -> it.copy(position = idx) }
-                updateDbItemsInMemoryAndPersist(updatedTopLevels)
-                return
-            }
-
-            // 折りたたまれている見出しの場合のみ、配下の要素を一括移動
-            var sourceSectionEnd = sIdx + 1
-            while (sourceSectionEnd < topLevels.size && topLevels[sourceSectionEnd].type != "header") {
-                sourceSectionEnd++
-            }
-
-            // 折りたたみ配下の要素自身への移動は無視
-            if (tIdx >= sIdx && tIdx < sourceSectionEnd) return
-
-            val sourceSection = topLevels.subList(sIdx, sourceSectionEnd).toList()
-            topLevels.subList(sIdx, sourceSectionEnd).clear()
-
-            val newTIdx = topLevels.indexOfFirst { it.id == targetId }
-            if (newTIdx == -1) return
-
-            val isFoldedHeaderTarget = target.type == "header" && target.collapsed && !target.foldLock
-            val insertIdx = if (sIdx < tIdx) {
-                if (isFoldedHeaderTarget) {
-                    var endTarget = newTIdx + 1
-                    while (endTarget < topLevels.size && topLevels[endTarget].type != "header") {
-                        endTarget++
-                    }
-                    endTarget
-                } else {
-                    newTIdx + 1
+            var sEndIdx = sIdx + 1
+            if (isSourceCollapsedHeader) {
+                while (sEndIdx < topLevels.size && topLevels[sEndIdx].type != "header") {
+                    sEndIdx++
                 }
+            }
+            val blockCount = sEndIdx - sIdx
+
+            // If target is inside source's own block, moving is a no-op
+            if (tIdx in sIdx until sEndIdx) return
+
+            val target = topLevels[tIdx]
+            val effectiveTargetIdx = if (isSourceCollapsedHeader && target.type == "header") {
+                // When moving a collapsed header to another header, place it after that header's entire section
+                var tEnd = tIdx + 1
+                while (tEnd < topLevels.size && topLevels[tEnd].type != "header") {
+                    tEnd++
+                }
+                tEnd - 1
             } else {
-                newTIdx
+                tIdx
             }
 
-            topLevels.addAll(insertIdx, sourceSection)
+            // If target is already the item immediately preceding source, moving after target is a no-op
+            if (effectiveTargetIdx == sIdx - 1) return
 
-            val updatedTopLevels = topLevels.mapIndexed { idx, it ->
-                it.copy(position = idx)
+            // Extract the moving block (header + all its collapsed items)
+            val movingBlock = ArrayList<ItemEntity>(blockCount)
+            repeat(blockCount) {
+                movingBlock.add(topLevels.removeAt(sIdx))
             }
+
+            // Calculate insert index in the modified list:
+            // Forward move: removing blockCount items shifted elements at effectiveTargetIdx left by blockCount.
+            // Backward move: effectiveTargetIdx is before sIdx, so its index did not shift.
+            val insertIdx = if (sIdx < effectiveTargetIdx) {
+                effectiveTargetIdx - blockCount + 1
+            } else {
+                effectiveTargetIdx + 1
+            }
+
+            topLevels.addAll(insertIdx.coerceIn(0, topLevels.size), movingBlock)
+
+            val updatedTopLevels = topLevels.mapIndexed { idx, it -> it.copy(position = idx) }
             updateDbItemsInMemoryAndPersist(updatedTopLevels)
         } else if (sourceParentId == targetParentId) {
             val siblings = items.filter { it.parentId == sourceParentId }.sortedBy { it.position }.toMutableList()
-            val sourceIdx = siblings.indexOfFirst { it.id == sourceId }
-            val targetIdx = siblings.indexOfFirst { it.id == targetId }
-            if (sourceIdx == -1 || targetIdx == -1) return
+            val sIdx = siblings.indexOfFirst { it.id == sourceId }
+            val tIdx = siblings.indexOfFirst { it.id == targetId }
+            if (sIdx == -1 || tIdx == -1) return
 
-            val item = siblings.removeAt(sourceIdx)
-            siblings.add(targetIdx, item)
+            if (sIdx == tIdx + 1) return
+
+            val item = siblings.removeAt(sIdx)
+            val insertIdx = if (sIdx < tIdx) tIdx else tIdx + 1
+            siblings.add(insertIdx.coerceIn(0, siblings.size), item)
+
             val updatedSiblings = siblings.mapIndexed { idx, it -> it.copy(position = idx) }
             updateDbItemsInMemoryAndPersist(updatedSiblings)
         } else {
-            // Move to different parent (グループ間または階層間移動)
+            // Group or cross-parent move
             val oldSiblings = items.filter { it.parentId == sourceParentId && it.id != sourceId }.sortedBy { it.position }
             val newSiblings = items.filter { it.parentId == targetParentId }.sortedBy { it.position }.toMutableList()
             val targetIdx = newSiblings.indexOfFirst { it.id == targetId }
-            val insertIdx = if (targetIdx != -1) targetIdx else newSiblings.size
-            newSiblings.add(insertIdx, source.copy(parentId = targetParentId))
+            val insertIdx = if (targetIdx != -1) targetIdx + 1 else newSiblings.size
+
+            newSiblings.add(insertIdx.coerceIn(0, newSiblings.size), source.copy(parentId = targetParentId))
 
             val normalizedOld = oldSiblings.mapIndexed { idx, it -> it.copy(position = idx) }
             val normalizedNew = newSiblings.mapIndexed { idx, it -> it.copy(position = idx) }
