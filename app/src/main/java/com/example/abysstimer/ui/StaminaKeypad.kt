@@ -1,6 +1,7 @@
 package com.example.abysstimer.ui
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -19,15 +20,24 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -180,6 +190,33 @@ fun StaminaKeypad(
     val currentOnClear by rememberUpdatedState(onClear)
     val currentOnDone by rememberUpdatedState(onDone)
 
+    val textMeasurer = rememberTextMeasurer()
+
+    // Pre-create TextLayoutResults for the 12 keys to eliminate all layout/measurement overhead during draw
+    val keyLayoutResults = remember(textMeasurer) {
+        KeypadRowsData.flatMap { row ->
+            row.map { key ->
+                val isConfirm = key == "確定"
+                val isClear = key == "AC"
+                val fontSize = if (isConfirm) 16.sp else if (isClear) 18.sp else 22.sp
+                val textColor = if (isConfirm) ColorKeyTextConfirm else if (isClear) ColorKeyTextClear else ColorKeyTextDefault
+                key to textMeasurer.measure(
+                    text = key,
+                    style = TextStyle(
+                        fontSize = fontSize,
+                        fontWeight = FontWeight.Bold,
+                        color = textColor,
+                        platformStyle = PlatformTextStyle(includeFontPadding = false)
+                    )
+                )
+            }
+        }.toMap()
+    }
+
+    val handleHeightDp = 8.dp
+    val rowHeightDp = 52.dp
+    val totalHeightDp = handleHeightDp + rowHeightDp * 4 // 216.dp
+
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -188,58 +225,92 @@ fun StaminaKeypad(
             .background(Color(0xFF13141F))
             .border(1.dp, Color(0xFF2C2F44), KeypadTopShape)
     ) {
-        Column(
+        Canvas(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 2.dp)
-        ) {
-            // Sleek grab handle indicator (8dp height)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(width = 32.dp, height = 3.dp)
-                        .background(Color(0xFF383B4F), RoundedCornerShape(1.5.dp))
-                )
-            }
+                .height(totalHeightDp)
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            if (event.type == PointerEventType.Press && !event.changes.any { it.isConsumed }) {
+                                val change = event.changes.first()
+                                val x = change.position.x
+                                val y = change.position.y
+                                val handleHeightPx = handleHeightDp.toPx()
 
-            // Keypad Grid (3 columns x 4 rows) - 0dp spacing for 100% active touch coverage
-            Column(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                PrecomputedKeypadGrid.forEach { rowKeys ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        rowKeys.forEach { spec ->
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(52.dp)
-                                    .background(spec.bgColor)
-                                    .border(0.5.dp, spec.borderColor)
-                                    .instantPointerTap {
-                                        when (spec.key) {
-                                            "AC" -> currentOnClear()
-                                            "確定" -> currentOnDone()
-                                            else -> currentOnDigit(spec.key)
-                                        }
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = spec.key,
-                                    fontSize = spec.fontSize,
-                                    fontWeight = FontWeight.Bold,
-                                    color = spec.textColor,
-                                    style = KeypadTextStyle
-                                )
+                                if (y >= handleHeightPx) {
+                                    val colWidthPx = size.width / 3f
+                                    val rowHeightPx = rowHeightDp.toPx()
+                                    val col = (x / colWidthPx).toInt().coerceIn(0, 2)
+                                    val row = ((y - handleHeightPx) / rowHeightPx).toInt().coerceIn(0, 3)
+
+                                    change.consume()
+                                    val key = KeypadRowsData[row][col]
+                                    when (key) {
+                                        "AC" -> currentOnClear()
+                                        "確定" -> currentOnDone()
+                                        else -> currentOnDigit(key)
+                                    }
+                                }
                             }
                         }
+                    }
+                }
+        ) {
+            val handleHeightPx = handleHeightDp.toPx()
+            val rowHeightPx = rowHeightDp.toPx()
+            val colWidthPx = size.width / 3f
+
+            // 1. Sleek grab handle indicator
+            val handleBarWidth = 32.dp.toPx()
+            val handleBarHeight = 3.dp.toPx()
+            val handleBarRadius = 1.5.dp.toPx()
+            val handleBarTop = (handleHeightPx - handleBarHeight) / 2f
+            val handleBarLeft = (size.width - handleBarWidth) / 2f
+            drawRoundRect(
+                color = Color(0xFF383B4F),
+                topLeft = Offset(handleBarLeft, handleBarTop),
+                size = Size(handleBarWidth, handleBarHeight),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(handleBarRadius, handleBarRadius)
+            )
+
+            // 2. Keypad Grid (3 columns x 4 rows)
+            val strokeWidthPx = 0.5.dp.toPx()
+            val halfStroke = strokeWidthPx / 2f
+
+            for (r in 0 until 4) {
+                val rowTop = handleHeightPx + r * rowHeightPx
+                for (c in 0 until 3) {
+                    val colLeft = c * colWidthPx
+                    val spec = PrecomputedKeypadGrid[r][c]
+
+                    // Cell Background
+                    drawRect(
+                        color = spec.bgColor,
+                        topLeft = Offset(colLeft, rowTop),
+                        size = Size(colWidthPx, rowHeightPx)
+                    )
+
+                    // Cell Border (0.5dp)
+                    drawRect(
+                        color = spec.borderColor,
+                        topLeft = Offset(colLeft + halfStroke, rowTop + halfStroke),
+                        size = Size(colWidthPx - strokeWidthPx, rowHeightPx - strokeWidthPx),
+                        style = Stroke(width = strokeWidthPx)
+                    )
+
+                    // Cell Text (Centered)
+                    val layoutResult = keyLayoutResults[spec.key]
+                    if (layoutResult != null) {
+                        val textWidth = layoutResult.size.width
+                        val textHeight = layoutResult.size.height
+                        val textLeft = colLeft + (colWidthPx - textWidth) / 2f
+                        val textTop = rowTop + (rowHeightPx - textHeight) / 2f
+                        drawText(
+                            textLayoutResult = layoutResult,
+                            topLeft = Offset(textLeft, textTop)
+                        )
                     }
                 }
             }

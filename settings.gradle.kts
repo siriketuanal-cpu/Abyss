@@ -21,4 +21,3 @@ dependencyResolutionManagement {
 
 rootProject.name = "Abyss Timer"
 include(":app")
-include(":webview_app")

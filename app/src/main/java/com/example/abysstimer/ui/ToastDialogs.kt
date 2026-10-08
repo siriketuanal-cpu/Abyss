@@ -60,6 +60,7 @@ fun DeleteConfirmDialog(
                     itemType == "group" -> "アカウント枠"
                     itemType == "header" -> "見出し"
                     itemType == "rule" -> "仕切り線"
+                    itemType == "space" -> "空白スペーサー"
                     itemType == "stam" -> "スタミナタイマー"
                     itemType == "orb" -> "オーブタイマー"
                     itemType == "idle" -> "放置タイマー"
@@ -358,11 +359,12 @@ fun HeaderToastDialog(
         BorderStroke(1.2.dp, headerColor.copy(alpha = 0.70f))
     }
 
+    val defaultCols = 5
     val maxCols = 6
-    val colOptions = remember { listOf(1, 2, 3, 4, 5, 6) }
+    val colOptions = remember { listOf(4, 5, 6) }
     var selectedCols by remember(entity.layout) {
         mutableStateOf(
-            entity.layout?.filter { it.isDigit() }?.toIntOrNull()?.coerceIn(1, maxCols) ?: maxCols
+            entity.layout?.filter { it.isDigit() }?.toIntOrNull()?.coerceIn(4, maxCols) ?: defaultCols
         )
     }
 
@@ -651,6 +653,46 @@ fun RuleToastDialog(
 }
 
 @Composable
+fun SpaceToastDialog(
+    entity: ItemEntity,
+    onDismiss: () -> Unit,
+    onDelete: () -> Unit,
+    onStartMove: () -> Unit
+) {
+    FastDialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = ToastCardShape,
+            color = Color(0xFF1B1D22),
+            border = BorderStroke(1.2.dp, Color(0xFF4A5568)),
+            modifier = Modifier.width(280.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "空白スペーサー (1行 / 48dp)",
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                ToastActionButton(
+                    text = "移動",
+                    color = Color(0xFFFBBF24),
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        onDismiss()
+                        onStartMove()
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun StaminaQuickIncrementRow(
     getMax: () -> String,
     onMaxChange: (String) -> Unit,
@@ -727,7 +769,7 @@ fun StaminaToastDialog(
     }) {
         ToastDialogContainer(
             groupName = groupName,
-            borderColor = Color(0xFF6FC7FF).copy(alpha = 0.70f)
+            borderColor = Color(0xFF90A0DD).copy(alpha = 0.70f)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),

@@ -77,34 +77,58 @@ object TimerEngine {
         return now - phase
     }
 
-    private val cachedTimeZone = java.util.TimeZone.getDefault()
+    private var cachedTimeZone: java.util.TimeZone = java.util.TimeZone.getDefault()
+
+    // Ultra-fast zero-allocation lookup table for all 1440 minutes of a 24-hour day (00:00 to 23:59)
+    private val TIME_OF_DAY_TABLE: Array<String> = Array(1440) { minuteOfDay ->
+        val h = minuteOfDay / 60
+        val m = minuteOfDay % 60
+        val hStr = if (h < 10) "0$h" else "$h"
+        val mStr = if (m < 10) "0$m" else "$m"
+        "$hStr:$mStr"
+    }
+
+    // Pre-computed lookup table for common countdown minutes (0 to 720 minutes = 12 hours)
+    private val COUNTDOWN_MINUTE_TABLE: Array<String> = Array(721) { totalMin ->
+        val h = totalMin / 60
+        val m = totalMin % 60
+        if (m < 10) "$h:0$m" else "$h:$m"
+    }
+
+    fun updateTimeZone() {
+        cachedTimeZone = java.util.TimeZone.getDefault()
+    }
 
     fun formatHM(timestamp: Long): String {
         val offset = cachedTimeZone.getOffset(timestamp)
         val localMillis = timestamp + offset
         val totalMinutes = localMillis / 60000L
-        val minuteOfDay = (totalMinutes % 1440L).toInt()
-        val h = minuteOfDay / 60
-        val m = minuteOfDay % 60
-        val hStr = if (h < 10) "0$h" else "$h"
-        val mStr = if (m < 10) "0$m" else "$m"
-        return "$hStr:$mStr"
+        val minuteOfDay = ((totalMinutes % 1440L) + 1440L) % 1440L
+        return TIME_OF_DAY_TABLE[minuteOfDay.toInt()]
     }
 
     fun formatCountdown(ms: Long): String {
         val clampedMs = ms.coerceAtLeast(0L)
-        val totalMin = Math.ceil(clampedMs / 60000.0).toLong()
-        val h = totalMin / 60
-        val m = totalMin % 60
-        return if (m < 10) "$h:0$m" else "$h:$m"
+        val totalMin = Math.ceil(clampedMs / 60000.0).toInt()
+        return if (totalMin in 0..720) {
+            COUNTDOWN_MINUTE_TABLE[totalMin]
+        } else {
+            val h = totalMin / 60
+            val m = totalMin % 60
+            if (m < 10) "$h:0$m" else "$h:$m"
+        }
     }
 
     fun formatElapsed(ms: Long): String {
         val clampedMs = ms.coerceAtLeast(0L)
-        val totalMin = Math.floor(clampedMs / 60000.0).toLong()
-        val h = totalMin / 60
-        val m = totalMin % 60
-        return if (m < 10) "$h:0$m" else "$h:$m"
+        val totalMin = Math.floor(clampedMs / 60000.0).toInt()
+        return if (totalMin in 0..720) {
+            COUNTDOWN_MINUTE_TABLE[totalMin]
+        } else {
+            val h = totalMin / 60
+            val m = totalMin % 60
+            if (m < 10) "$h:0$m" else "$h:$m"
+        }
     }
 
     /**

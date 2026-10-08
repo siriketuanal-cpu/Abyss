@@ -1,37 +1,87 @@
 package com.example.abysstimer.ui
 
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerEventTimeoutCancellationException
 import androidx.compose.ui.input.pointer.pointerInput
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 /**
- * Extension to trigger action instantly on pointerdown and consume event with zero coroutine recreation.
- * Single unified implementation shared across the entire app.
+ * Extension to trigger action on pointerdown when the event is unconsumed by children.
+ * Used for background preview dismissal without blocking child interactions.
  */
-@Composable
 fun Modifier.pointerDownTap(
     enabled: Boolean = true,
+    pass: PointerEventPass = PointerEventPass.Main,
     onTap: () -> Unit
-): Modifier {
+): Modifier = composed {
     val currentTap by rememberUpdatedState(onTap)
-    return if (!enabled) this else this.pointerInput(Unit) {
+    val currentEnabled by rememberUpdatedState(enabled)
+    this.pointerInput(Unit) {
+        awaitPointerEventScope {
+            while (true) {
+                val event = awaitPointerEvent(pass)
+                if (currentEnabled && event.type == PointerEventType.Press) {
+                    val isHandled = event.changes.any { it.isConsumed }
+                    if (!isHandled) {
+                        event.changes.forEach { it.consume() }
+                        currentTap()
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * High-performance tap + long press gesture detector.
+ * Uses awaitPointerEventScope to trigger onTap at exactly 0ms upon finger lift (PointerUp),
+ * completely bypassing Compose's detectTapGestures overhead/delays.
+ * If held past viewConfiguration.longPressTimeoutMillis (400ms), triggers onLongPress immediately.
+ */
+fun Modifier.snappyTapOrLongPress(
+    enabled: Boolean = true,
+    onTap: (() -> Unit)? = null,
+    onLongPress: (() -> Unit)? = null
+): Modifier = composed {
+    val currentTap by rememberUpdatedState(onTap)
+    val currentLongPress by rememberUpdatedState(onLongPress)
+    val currentEnabled by rememberUpdatedState(enabled)
+
+    if (!currentEnabled) return@composed this
+    this.pointerInput(Unit) {
         awaitPointerEventScope {
             while (true) {
                 val event = awaitPointerEvent(PointerEventPass.Main)
-                if (event.type == PointerEventType.Press && !event.changes.any { it.isConsumed }) {
+                if (event.type == PointerEventType.Press && event.changes.none { it.isConsumed }) {
+                    // Consume the initial press to claim the gesture and prevent background dismissal interference
                     event.changes.forEach { it.consume() }
-                    currentTap()
+                    
+                    val longPressTimeout = viewConfiguration.longPressTimeoutMillis
+                    try {
+                        val upOrCancel = withTimeout(longPressTimeout) {
+                            waitForUpOrCancellation()
+                        }
+                        if (upOrCancel != null) {
+                            upOrCancel.consume()
+                            currentTap?.invoke()
+                        }
+                    } catch (_: PointerEventTimeoutCancellationException) {
+                        // 400ms elapsed while held down: trigger long press immediately
+                        currentLongPress?.invoke()
+                        // Consume remaining events until all fingers are lifted
+                        while (true) {
+                            val nextEvent = awaitPointerEvent(PointerEventPass.Main)
+                            nextEvent.changes.forEach { it.consume() }
+                            if (nextEvent.changes.all { !it.pressed }) break
+                        }
+                    }
                 }
             }
         }
@@ -39,44 +89,68 @@ fun Modifier.pointerDownTap(
 }
 
 /**
- * Low-level pointer tap: intercepts and consumes press immediately at Initial pass,
- * completely bypassing gesture disambiguation delays and preventing parent container interference.
+ * Sequential PointerDown 0ms preview dismissal + exact system 400ms long-press menu modifier.
+ * - PointerDown (0ms): If preview is active (isPendingOrEditing), instantly dismisses preview!
+ * - Press & Hold (400ms exact timer): Opens edit toast menu while finger is still down.
+ * - Short Tap: Executes optional onTap callback on release if released before 400ms.
  */
-@Composable
-fun Modifier.instantPointerTap(
+fun Modifier.instantDismissOrLongPress(
     enabled: Boolean = true,
-    onTap: () -> Unit
-): Modifier {
-    val currentTap by rememberUpdatedState(onTap)
-    return if (!enabled) this else this.pointerInput(Unit) {
-        awaitPointerEventScope {
-            while (true) {
-                val event = awaitPointerEvent(PointerEventPass.Initial)
-                if (event.type == PointerEventType.Press && !event.changes.any { it.isConsumed }) {
-                    event.changes.forEach { it.consume() }
-                    currentTap()
-                }
-            }
-        }
-    }
-}
-
-/**
- * Zero-delay tap or long-press gesture modifier.
- * Shares unified detectTapGestures handling across the app.
- */
-@Composable
-fun Modifier.fastTapOrLongPress(
-    enabled: Boolean = true,
-    onTap: () -> Unit,
+    isPendingOrEditing: Boolean = false,
+    onDismissOutside: () -> Unit = {},
+    onTap: (() -> Unit)? = null,
     onLongPress: (() -> Unit)? = null
-): Modifier {
+): Modifier = composed {
+    val currentEnabled by rememberUpdatedState(enabled)
+    val currentIsPending by rememberUpdatedState(isPendingOrEditing)
+    val currentDismiss by rememberUpdatedState(onDismissOutside)
     val currentTap by rememberUpdatedState(onTap)
     val currentLongPress by rememberUpdatedState(onLongPress)
-    return if (!enabled) this else this.pointerInput(Unit) {
-        detectTapGestures(
-            onTap = { currentTap() },
-            onLongPress = currentLongPress?.let { lambda -> { lambda() } }
-        )
+
+    if (!currentEnabled) return@composed this
+    this.pointerInput(Unit) {
+        awaitPointerEventScope {
+            while (true) {
+                val event = awaitPointerEvent(PointerEventPass.Main)
+                if (event.type == PointerEventType.Press && event.changes.none { it.isConsumed }) {
+                    val wasPending = currentIsPending
+                    if (wasPending) {
+                        event.changes.forEach { it.consume() }
+                        currentDismiss()
+                        while (true) {
+                            val nextEvent = awaitPointerEvent(PointerEventPass.Main)
+                            nextEvent.changes.forEach { it.consume() }
+                            if (nextEvent.changes.all { !it.pressed }) break
+                        }
+                        continue
+                    }
+
+                    // Not pending: consume the press to claim the gesture and prevent background dismissal
+                    event.changes.forEach { it.consume() }
+                    val longPressTimeout = viewConfiguration.longPressTimeoutMillis
+
+                    try {
+                        val upOrCancel = withTimeout(longPressTimeout) {
+                            waitForUpOrCancellation()
+                        }
+                        if (upOrCancel != null) {
+                            upOrCancel.consume()
+                            currentTap?.invoke()
+                        }
+                    } catch (_: PointerEventTimeoutCancellationException) {
+                        // System long-press timer expired at exactly 400ms while finger is still held down!
+                        currentLongPress?.invoke()
+                        // Consume all remaining pointer events until release
+                        while (true) {
+                            val nextEvent = awaitPointerEvent(PointerEventPass.Main)
+                            nextEvent.changes.forEach { it.consume() }
+                            if (nextEvent.changes.all { !it.pressed }) break
+                        }
+                    }
+                }
+            }
+        }
     }
 }
+
+

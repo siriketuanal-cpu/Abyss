@@ -29,7 +29,7 @@ fun AddPanelDialog(
         Surface(
             shape = RoundedCornerShape(14.dp),
             color = Color(0xFF1B1D24),
-            border = BorderStroke(1.2.dp, Color(0xFF6FC7FF).copy(alpha = 0.65f)),
+            border = BorderStroke(1.2.dp, Color(0xFF90A0DD).copy(alpha = 0.65f)),
             modifier = Modifier.width(280.dp)
         ) {
             Column(
@@ -155,6 +155,19 @@ fun AddPanelDialog(
                         ) {
                             Text("仕切り線", color = Color(0xFF94A3B8), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
+
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(32.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color(0x1A64748B))
+                                .border(BorderStroke(1.dp, Color(0x6664748B)), RoundedCornerShape(6.dp))
+                                .pointerDownTap { onSelectType("space") },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("空白", color = Color(0xFF94A3B8), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
@@ -190,7 +203,7 @@ fun SetupDialog(
 
     val typeColor = remember(type, selectedColor) {
         when (type) {
-            "stam" -> Color(0xFF6FC7FF)
+            "stam" -> Color(0xFF90A0DD)
             "orb" -> Color(0xFFB48CFF)
             "idle" -> Color(0xFFFF9F68)
             "exped" -> Color(0xFF70D6B0)
@@ -916,6 +929,14 @@ fun EditItemDialog(
                 onDelete = onDelete,
                 onStartMove = { onStartMove?.invoke() },
                 onAddGroupBelow = { onAddGroupBelow?.invoke() }
+            )
+        }
+        "space" -> {
+            SpaceToastDialog(
+                entity = entity,
+                onDismiss = onDismiss,
+                onDelete = onDelete,
+                onStartMove = { onStartMove?.invoke() }
             )
         }
         "stam" -> {

@@ -13,8 +13,8 @@ android {
         applicationId = "com.aistudio.abysstimer.native.pxvwt"
         minSdk = 26
         targetSdk = 35
-        versionCode = 140
-        versionName = "1.0.140"
+        versionCode = 160
+        versionName = "1.0.160"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -57,9 +57,6 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
-
-    // For material icons
-    implementation("androidx.compose.material:material-icons-extended:1.7.5")
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

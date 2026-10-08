@@ -86,7 +86,7 @@ object TimerBackupManager {
                 val obj = itemsArray.optJSONObject(i) ?: continue
                 val id = obj.optString("id").ifEmpty { UUID.randomUUID().toString() }
                 val type = obj.optString("type", "stam").let {
-                    if (it in setOf("stam", "orb", "idle", "exped", "group", "header", "rule")) it else "stam"
+                    if (it in setOf("stam", "orb", "idle", "exped", "group", "header", "rule", "space")) it else "stam"
                 }
                 val name = obj.optString("name", "")
                 val current = obj.optInt("current", 0).coerceAtLeast(0)
@@ -101,7 +101,13 @@ object TimerBackupManager {
                 val color = if (obj.has("color") && !obj.isNull("color")) obj.optString("color") else null
                 val collapsed = obj.optBoolean("collapsed", false)
                 val foldLock = obj.optBoolean("foldLock", false)
-                val layout = if (obj.has("layout") && !obj.isNull("layout")) obj.optString("layout") else null
+                val layout = if (obj.has("layout") && !obj.isNull("layout")) {
+                    obj.optString("layout")
+                } else if (type == "header") {
+                    "5"
+                } else {
+                    null
+                }
                 val parentId = if (obj.has("parentId") && !obj.isNull("parentId")) obj.optString("parentId").ifEmpty { null } else null
                 val position = obj.optInt("position", i)
 

@@ -32,7 +32,10 @@ data class TimerUiState(
     val isClaimPreview: Boolean = false,
     val collapsedCount: Int = 0,
     val children: List<TimerUiState> = emptyList(),
+    val childRows: List<List<TimerUiState>> = emptyList(),
+    val itemsPerRow: Int = 1,
     val parsedColor: Color = Color.Unspecified,
+    val paleColor: Color = Color.Unspecified,
     val gridSpan: Int = 1,
     val unitSpan: Int = gridSpan
 )
@@ -40,14 +43,16 @@ data class TimerUiState(
 @Immutable
 data class UiSnapshot(
     val allItems: List<TimerUiState> = emptyList(),
-    val visibleItems: List<TimerUiState> = emptyList()
+    val visibleItems: List<TimerUiState> = emptyList(),
+    val hasPendingStates: Boolean = false
 )
 
 fun parseHeaderColumns(layout: String?): Int {
+    val defaultCols = 5
     val maxCols = 6
-    if (layout.isNullOrBlank()) return 5
-    val num = layout.filter { it.isDigit() }.toIntOrNull() ?: return 5
-    return num.coerceIn(1, maxCols)
+    if (layout.isNullOrBlank()) return defaultCols
+    val num = layout.filter { it.isDigit() }.toIntOrNull() ?: return defaultCols
+    return num.coerceIn(4, maxCols)
 }
 
 @Immutable
@@ -63,6 +68,7 @@ class TimerViewModel(
 
     // --- High-Performance Skippable UI Cache & Parser (Initialized first to prevent NPE) ---
     private val colorCache = java.util.concurrent.ConcurrentHashMap<String, Color>()
+    private val paleColorCache = java.util.concurrent.ConcurrentHashMap<String, Color>()
     private var lastDbList: List<ItemEntity>? = null
     private var cachedTopLevels: List<ItemEntity> = emptyList()
     private var cachedChildrenMap: Map<String, List<ItemEntity>> = emptyMap()
@@ -85,7 +91,7 @@ class TimerViewModel(
             }
         }
         return when (type) {
-            "stam" -> Color(0xFF5AA9FF)
+            "stam" -> Color(0xFF90A0DD)
             "orb" -> Color(0xFFA78BFA)
             "idle" -> Color(0xFFF0A85A)
             "exped" -> Color(0xFF34D399)
@@ -93,6 +99,28 @@ class TimerViewModel(
             "rule" -> Color(0xFF52617A)
             "group" -> Color(0xFF555B68)
             else -> Color.White
+        }
+    }
+
+    private fun computePaleColor(colorHex: String?, type: String, parsedColor: Color): Color {
+        if (!colorHex.isNullOrEmpty()) {
+            val cached = paleColorCache[colorHex]
+            if (cached != null) return cached
+            val pale = if (parsedColor == Color.Unspecified) Color(0xFFECEEF2) else Color(
+                red = parsedColor.red + (1f - parsedColor.red) * 0.55f,
+                green = parsedColor.green + (1f - parsedColor.green) * 0.55f,
+                blue = parsedColor.blue + (1f - parsedColor.blue) * 0.55f,
+                alpha = 1f
+            )
+            paleColorCache[colorHex] = pale
+            return pale
+        }
+        return when (type) {
+            "stam" -> Color(0xFF77ADCC)
+            "orb" -> Color(0xFFDCD0FF)
+            "idle" -> Color(0xFFFFE0B8)
+            "exped" -> Color(0xFFB6F3DD)
+            else -> Color(0xFFECEEF2)
         }
     }
 
@@ -106,6 +134,7 @@ class TimerViewModel(
         unitSpan: Int = customSpan
     ): TimerUiState {
         val parsedCol = parseItemColor(it.color, it.type)
+        val paleCol = computePaleColor(it.color, it.type, parsedCol)
         val prev = cachedUiStateMap[it.id]
         val safeSpan = customSpan.coerceIn(1, 60)
         val safeUnit = unitSpan.coerceIn(1, safeSpan)
@@ -115,7 +144,7 @@ class TimerViewModel(
                 if (prev != null && prev.entity == it && prev.collapsedCount == collapsedCount && prev.parsedColor == parsedCol && prev.gridSpan == safeSpan && prev.unitSpan == safeSpan) {
                     prev
                 } else {
-                    val state = TimerUiState(entity = it, collapsedCount = collapsedCount, parsedColor = parsedCol, gridSpan = safeSpan, unitSpan = safeSpan)
+                    val state = TimerUiState(entity = it, collapsedCount = collapsedCount, parsedColor = parsedCol, paleColor = paleCol, gridSpan = safeSpan, unitSpan = safeSpan)
                     cachedUiStateMap[it.id] = state
                     state
                 }
@@ -124,7 +153,16 @@ class TimerViewModel(
                 if (prev != null && prev.entity == it && prev.parsedColor == parsedCol && prev.gridSpan == safeSpan && prev.unitSpan == safeSpan) {
                     prev
                 } else {
-                    val state = TimerUiState(entity = it, parsedColor = parsedCol, gridSpan = safeSpan, unitSpan = safeSpan)
+                    val state = TimerUiState(entity = it, parsedColor = parsedCol, paleColor = paleCol, gridSpan = safeSpan, unitSpan = safeSpan)
+                    cachedUiStateMap[it.id] = state
+                    state
+                }
+            }
+            "space" -> {
+                if (prev != null && prev.entity == it && prev.gridSpan == safeSpan && prev.unitSpan == safeSpan) {
+                    prev
+                } else {
+                    val state = TimerUiState(entity = it, parsedColor = Color.Transparent, paleColor = Color.Transparent, gridSpan = safeSpan, unitSpan = safeSpan)
                     cachedUiStateMap[it.id] = state
                     state
                 }
@@ -132,10 +170,37 @@ class TimerViewModel(
             "group" -> {
                 val span = safeSpan
                 val uSpan = safeUnit
-                if (prev != null && prev.entity == it && prev.children === children && prev.parsedColor == parsedCol && prev.gridSpan == span && prev.unitSpan == uSpan) {
+                val is2x2Layout = it.layout == "2x2" && children.size > 2
+                val chunkCols = if (is2x2Layout) 2 else (span / uSpan.coerceAtLeast(1)).coerceIn(1, 6)
+                val itemsPerRow = if (is2x2Layout) 2 else if (children.isEmpty()) 1 else chunkCols
+                val childRows: List<List<TimerUiState>> = if (children.isEmpty()) {
+                    emptyList()
+                } else if (is2x2Layout) {
+                    children.chunked(2)
+                } else if (children.size > chunkCols) {
+                    children.chunked(chunkCols)
+                } else {
+                    listOf(children)
+                }
+
+                if (prev != null && prev.entity == it && prev.children === children &&
+                    prev.parsedColor == parsedCol && prev.gridSpan == span && prev.unitSpan == uSpan &&
+                    prev.itemsPerRow == itemsPerRow &&
+                    prev.isClaimPreview == children.any { it.isClaimPreview }
+                ) {
                     prev
                 } else {
-                    val state = TimerUiState(entity = it, children = children, parsedColor = parsedCol, gridSpan = span, unitSpan = uSpan)
+                    val state = TimerUiState(
+                        entity = it,
+                        children = children,
+                        childRows = childRows,
+                        itemsPerRow = itemsPerRow,
+                        isClaimPreview = children.any { it.isClaimPreview },
+                        parsedColor = parsedCol,
+                        paleColor = paleCol,
+                        gridSpan = span,
+                        unitSpan = uSpan
+                    )
                     cachedUiStateMap[it.id] = state
                     state
                 }
@@ -172,6 +237,7 @@ class TimerViewModel(
                         isWarn = isWarn,
                         isClaimPreview = waitChunk,
                         parsedColor = parsedCol,
+                        paleColor = paleCol,
                         gridSpan = span,
                         unitSpan = uSpan
                     )
@@ -187,16 +253,16 @@ class TimerViewModel(
                 val shownCurrent = if (waitChunk) TimerEngine.remainingAfterUse(info.cur, it.useChunk ?: 1, it.type) else info.cur
                 val fullAt = if (info.isFull) info.fullAt else now + info.remainMs
                 val fullAtText = TimerEngine.formatHM(fullAt)
-                val nextInSec = Math.max(0, info.nextInMs)
-                val nextCdText = TimerEngine.formatCountdown(nextInSec)
                 val isWarn = !info.isFull && (info.remainMs > 0 && info.remainMs < 7200000L)
+
+                val orbNextCdText = if (info.isFull) "" else TimerEngine.formatCountdown(info.nextInMs)
 
                 if (prev != null &&
                     prev.entity == it &&
                     prev.calculatedCurrent == shownCurrent &&
                     prev.isFull == info.isFull &&
                     prev.fullAtText == fullAtText &&
-                    prev.orbNextCdText == nextCdText &&
+                    prev.orbNextCdText == orbNextCdText &&
                     prev.isWarn == isWarn &&
                     prev.isClaimPreview == waitChunk &&
                     prev.parsedColor == parsedCol &&
@@ -212,10 +278,11 @@ class TimerViewModel(
                         isFull = info.isFull,
                         fullAtText = fullAtText,
                         orbNextInMs = info.nextInMs,
-                        orbNextCdText = nextCdText,
+                        orbNextCdText = orbNextCdText,
                         isWarn = isWarn,
                         isClaimPreview = waitChunk,
                         parsedColor = parsedCol,
+                        paleColor = paleCol,
                         gridSpan = span,
                         unitSpan = uSpan
                     )
@@ -264,6 +331,7 @@ class TimerViewModel(
                         isWarn = isWarn,
                         isClaimPreview = isClaim,
                         parsedColor = parsedCol,
+                        paleColor = paleCol,
                         gridSpan = span,
                         unitSpan = uSpan
                     )
@@ -277,7 +345,7 @@ class TimerViewModel(
                 if (prev != null && prev.entity == it && prev.parsedColor == parsedCol && prev.gridSpan == span && prev.unitSpan == uSpan) {
                     prev
                 } else {
-                    val state = TimerUiState(entity = it, parsedColor = parsedCol, gridSpan = span, unitSpan = uSpan)
+                    val state = TimerUiState(entity = it, parsedColor = parsedCol, paleColor = paleCol, gridSpan = span, unitSpan = uSpan)
                     cachedUiStateMap[it.id] = state
                     state
                 }
@@ -286,15 +354,16 @@ class TimerViewModel(
     }
 
     private fun calculateUiSnapshot(dbList: List<ItemEntity>, pendingId: String?, now: Long): UiSnapshot {
+        val hasPending = pendingId != null || dbList.any { (it.type == "idle" || it.type == "exped") && it.state == "claim" }
         if (dbList.isEmpty()) {
-            lastSnapshot = UiSnapshot(emptyList(), emptyList())
+            lastSnapshot = UiSnapshot(emptyList(), emptyList(), false)
             lastDbList = dbList
             lastTriggerTime = now
             return lastSnapshot
         }
 
         // Fast-skip if everything is identical to the last calculated snapshot (data and trigger)
-        if (pendingId == lastPendingId && Math.abs(now - lastTriggerTime) < 1000L && (dbList === lastDbList || dbList == lastDbList)) {
+        if (pendingId == lastPendingId && Math.abs(now - lastTriggerTime) < 500L && (dbList === lastDbList || dbList == lastDbList)) {
             return lastSnapshot
         }
 
@@ -358,7 +427,7 @@ class TimerViewModel(
                         var count = 0
                         var j = i + 1
                         while (j < topLevels.size && topLevels[j].type != "header") {
-                            if (topLevels[j].type != "rule") {
+                            if (topLevels[j].type != "rule" && topLevels[j].type != "space") {
                                 count++
                             }
                             j++
@@ -399,15 +468,21 @@ class TimerViewModel(
             if (lineSlotsUsed > 0 && lineSlotsUsed < currentSectionCols) {
                 val remainder = currentSectionCols - lineSlotsUsed
                 val remainderGridSpan = remainder * (gridTotalCols / currentSectionCols)
-                val spacerEntity = ItemEntity(
-                    id = "spacer_${allList.size}",
-                    type = "spacer"
-                )
-                val spacerUi = TimerUiState(
-                    entity = spacerEntity,
-                    gridSpan = remainderGridSpan,
-                    unitSpan = remainderGridSpan
-                )
+                val currIdx = allList.size
+                val prevSpacer = if (currIdx < lastSnapshot.allItems.size) lastSnapshot.allItems[currIdx] else null
+                val spacerUi = if (prevSpacer != null && prevSpacer.entity.type == "spacer" && prevSpacer.gridSpan == remainderGridSpan) {
+                    prevSpacer
+                } else {
+                    val spacerEntity = ItemEntity(
+                        id = "spacer_$currIdx",
+                        type = "spacer"
+                    )
+                    TimerUiState(
+                        entity = spacerEntity,
+                        gridSpan = remainderGridSpan,
+                        unitSpan = remainderGridSpan
+                    )
+                }
                 allList.add(spacerUi)
                 if (!skipUntilNextHeader) {
                     visibleList.add(spacerUi)
@@ -459,6 +534,17 @@ class TimerViewModel(
                 continue
             }
 
+            if (top.type == "space") {
+                finishCurrentLineIfNeeded()
+                val topUi = getOrCreateItemUi(top, now, pendingId, 0, emptyList(), gridTotalCols, gridTotalCols)
+                allList.add(topUi)
+                if (!skipUntilNextHeader) {
+                    visibleList.add(topUi)
+                }
+                lineSlotsUsed = 0
+                continue
+            }
+
             val cardSlots = when (top.type) {
                 "group" -> {
                     val is2x2 = top.layout == "2x2" && childrenUi.size > 2
@@ -468,7 +554,6 @@ class TimerViewModel(
                         else -> childrenUi.size.coerceIn(1, currentSectionCols)
                     }
                 }
-                "vrule" -> top.max.coerceIn(1, 3)
                 else -> 1
             }
 
@@ -498,7 +583,11 @@ class TimerViewModel(
         val finalAll = if (allMatches) lastSnapshot.allItems else allList
         val finalVisible = if (visibleMatches) lastSnapshot.visibleItems else visibleList
 
-        val snapshot = if (allMatches && visibleMatches) lastSnapshot else UiSnapshot(finalAll, finalVisible)
+        val snapshot = if (allMatches && visibleMatches && lastSnapshot.hasPendingStates == hasPending) {
+            lastSnapshot
+        } else {
+            UiSnapshot(finalAll, finalVisible, hasPending)
+        }
         lastSnapshot = snapshot
         return snapshot
     }
@@ -506,28 +595,29 @@ class TimerViewModel(
     // Unified Core State: items and pending preview managed atomically to avoid race conditions and double-emissions
     private val _coreState = MutableStateFlow(TimerCoreState(initialItems, null))
 
-    val pendingChunkUseId: StateFlow<String?> = _coreState
-        .map { it.pendingChunkId }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
-    
     val customColorsFlow: StateFlow<List<CustomColorEntity>> = repository.allCustomColorsFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Manual refresh pulse for lifecycle onResume (single trigger mechanism)
-    private val _refreshTrigger = MutableStateFlow(System.currentTimeMillis())
+    // High-performance single-channel refresh trigger for onResume (Zero redundant emission on launch)
+    private val _refreshTrigger = MutableSharedFlow<Long>(replay = 0, extraBufferCapacity = 1)
 
     fun refreshNow() {
-        _refreshTrigger.value = System.currentTimeMillis()
+        val now = System.currentTimeMillis()
+        // Fast guard: If refreshed or calculated within 400ms, skip duplicate execution
+        if (Math.abs(now - lastTriggerTime) >= 400L) {
+            _refreshTrigger.tryEmit(now)
+        }
     }
 
-    // Lifecycle-aware ticker flow: emits only on each exact minute boundary
+    // Lifecycle-aware ticker flow: emits only on each exact 1-second boundary when UI is active
     private val tickerFlow = flow {
+        // Emit immediately on start so the loop is active without waiting for the first boundary
+        emit(System.currentTimeMillis())
         while (true) {
             val now = System.currentTimeMillis()
-            val unit = 60000L
-            val delayTime = Math.max(1000L, unit - (now % unit))
+            val delayTime = Math.max(10L, 1000L - (now % 1000L))
             delay(delayTime)
-            emit(System.currentTimeMillis())
+            emit(now)
         }
     }
 
@@ -539,8 +629,8 @@ class TimerViewModel(
     val uiSnapshotFlow: StateFlow<UiSnapshot> = combine(
         _coreState.map { it.items to it.pendingChunkId }.distinctUntilChanged(),
         merge(_refreshTrigger, tickerFlow).distinctUntilChanged()
-    ) { (items, pendingId), _ ->
-        calculateUiSnapshot(items, pendingId, System.currentTimeMillis())
+    ) { (items, pendingId), now ->
+        calculateUiSnapshot(items, pendingId, now)
     }
     .flowOn(Dispatchers.Default)
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), initialSnapshot)
@@ -552,25 +642,16 @@ class TimerViewModel(
         viewModelScope.launch {
             launch {
                 repository.allItemsFlow.distinctUntilChanged().collect { items ->
-                    // Auto-purge any temporary "vrule" items created during testing
-                    val vrules = items.filter { it.type == "vrule" }
-                    if (vrules.isNotEmpty()) {
-                        launch(Dispatchers.IO) {
-                            vrules.forEach { repository.deleteItem(it) }
-                        }
-                    }
-
-                    val cleanItems = items.filter { it.type != "vrule" }
                     val currentCore = _coreState.value
-                    if (cleanItems == currentCore.items) return@collect
+                    if (items == currentCore.items) return@collect
 
                     // Protect transient in-memory UI preview states (e.g. claim wait state on idle/exped)
                     val claimItem = currentCore.items.find { (it.type == "idle" || it.type == "exped") && it.state == "claim" }
 
                     val merged = if (claimItem == null && pendingUpdates.isEmpty()) {
-                        cleanItems
+                        items
                     } else {
-                        cleanItems.map { dbItem ->
+                        items.map { dbItem ->
                             if (claimItem != null && dbItem.id == claimItem.id) {
                                 claimItem
                             } else {
@@ -630,7 +711,18 @@ class TimerViewModel(
      * - Refreshes UI snapshot instantly with the exact current timestamp
      */
     fun onAppForegrounded() {
+        TimerEngine.updateTimeZone()
         cancelPendingStates()
+        refreshNow()
+    }
+
+    /**
+     * System Time / Timezone change handler:
+     * - Immediately re-caches system default TimeZone from Android OS settings
+     * - Refreshes UI snapshot immediately with updated local clock
+     */
+    fun onSystemTimeOrTimezoneChanged() {
+        TimerEngine.updateTimeZone()
         refreshNow()
     }
 
@@ -836,10 +928,6 @@ class TimerViewModel(
         return true
     }
 
-    fun cancelPendingChunkUse() {
-        cancelPendingStates()
-    }
-
     /**
      * Resolves the parent group name for a child timer, or returns empty string if not found.
      */
@@ -1040,6 +1128,7 @@ class TimerViewModel(
             countMode = countMode,
             state = if (type == "idle" || type == "exped") "running" else null,
             color = color,
+            layout = if (type == "header") "5" else null,
             parentId = parentId,
             position = nextPos
         )
