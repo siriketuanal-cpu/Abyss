@@ -132,22 +132,37 @@ object TimerBackupManager {
      * Returns null if the data is malformed or invalid.
      */
     fun parseBackupJson(input: String): BackupData? {
-        return try {
-            val trimmed = input.trim()
-            val jsonString = if (trimmed.startsWith(PREFIX)) {
-                val base64Data = trimmed.substring(PREFIX.length).trim()
-                val compressedBytes = Base64.decode(base64Data, Base64.NO_WRAP)
-                val bis = ByteArrayInputStream(compressedBytes)
-                val decompressedBytes = GZIPInputStream(bis).use { gzip ->
-                    gzip.readBytes()
-                }
-                String(decompressedBytes, Charsets.UTF_8)
-            } else if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
-                trimmed
-            } else {
-                return null
-            }
+        val trimmed = input.trim()
 
+        // 圧縮形式（Plan B: Gzip + Base64, プレフィックス "ABYSS:"）
+        if (trimmed.startsWith(PREFIX)) {
+            val modern = parseModernCompressedBackup(trimmed)
+            if (modern != null && modern.items.isNotEmpty()) {
+                return modern
+            }
+        }
+
+        return null
+    }
+
+    private fun parseModernCompressedBackup(trimmed: String): BackupData? {
+        return try {
+            val base64Data = trimmed.substring(PREFIX.length).trim()
+            val compressedBytes = Base64.decode(base64Data, Base64.NO_WRAP)
+            val bis = ByteArrayInputStream(compressedBytes)
+            val decompressedBytes = GZIPInputStream(bis).use { gzip ->
+                gzip.readBytes()
+            }
+            val jsonString = String(decompressedBytes, Charsets.UTF_8)
+            parseModernJsonString(jsonString)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    private fun parseModernJsonString(jsonString: String): BackupData? {
+        return try {
             val root = JSONObject(jsonString)
             val itemsArray = root.optJSONArray("items") ?: return null
 

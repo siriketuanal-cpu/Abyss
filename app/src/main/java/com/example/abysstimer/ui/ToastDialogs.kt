@@ -1196,7 +1196,7 @@ fun BackupToastDialog(
                                 } else ""
 
                                 val trimmed = text.trim()
-                                if (trimmed.isNotBlank() && (trimmed.startsWith("ABYSS:") || trimmed.startsWith("{"))) {
+                                if (trimmed.isNotBlank() && trimmed.startsWith("ABYSS:")) {
                                     onPasteBackup(trimmed)
                                 } else {
                                     pasteText = text

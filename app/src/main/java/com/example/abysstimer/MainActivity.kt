@@ -963,9 +963,9 @@ fun HeaderCard(
                 .fillMaxHeight()
                 .then(
                     if (!isDeleteMode && !isMoveMode) {
-                        Modifier.snappyTapOrLongPress(
-                            onTap = { onToggleCollapse(ui.entity) }
-                        )
+                        Modifier.pointerDownTap {
+                            onToggleCollapse(ui.entity)
+                        }
                     } else {
                         Modifier
                     }
@@ -1165,52 +1165,42 @@ fun GroupCard(
     val isEmpty = ui.children.isEmpty()
     val isMultiChild = ui.children.size > 1
     
-    // Header colors: increased visibility and rich gradient (minimum 35% opacity to avoid washed out lines)
-    val leftLineBrush = remember(groupColor) {
-        Brush.horizontalGradient(
-            0.0f to groupColor.copy(alpha = 0.35f),
-            1.0f to groupColor.copy(alpha = 1.0f)
-        )
-    }
-    val rightLineBrush = remember(groupColor) {
-        Brush.horizontalGradient(
-            0.0f to groupColor.copy(alpha = 1.0f),
-            1.0f to groupColor.copy(alpha = 0.35f)
-        )
-    }
+    // Header colors: gradient only computed when needed for multi-child groups
+    val leftLineBrush = if (isMultiChild) {
+        remember(groupColor) {
+            Brush.horizontalGradient(
+                0.0f to groupColor.copy(alpha = 0.35f),
+                1.0f to groupColor
+            )
+        }
+    } else null
+    val rightLineBrush = if (isMultiChild) {
+        remember(groupColor) {
+            Brush.horizontalGradient(
+                0.0f to groupColor,
+                1.0f to groupColor.copy(alpha = 0.35f)
+            )
+        }
+    } else null
 
-    val actualBorder = remember(isMovingSource) {
-        if (isMovingSource) {
-            BorderStroke(2.dp, Color(0xFF4DA3FF))
-        } else {
-            null
-        }
+    val sectionCols = if (ui.unitSpan > 0) (60 / ui.unitSpan).coerceIn(1, 6) else 5
+    val cardHeight = when (sectionCols) {
+        1 -> 68.dp
+        2 -> 60.dp
+        3 -> 54.dp
+        4 -> 48.dp
+        6 -> 38.dp
+        else -> 42.dp
     }
-
-    val sectionCols = remember(ui.unitSpan) {
-        if (ui.unitSpan > 0) (60 / ui.unitSpan).coerceIn(1, 6) else 5
+    val extraHorizontalPadding = when (sectionCols) {
+        1 -> 8.dp
+        2 -> 5.dp
+        3 -> 3.dp
+        4 -> 1.5.dp
+        else -> 0.dp
     }
-    val cardHeight = remember(sectionCols) {
-        when (sectionCols) {
-            1 -> 68.dp
-            2 -> 60.dp
-            3 -> 54.dp
-            4 -> 48.dp
-            6 -> 38.dp
-            else -> 42.dp
-        }
-    }
-    val extraHorizontalPadding = remember(sectionCols) {
-        when (sectionCols) {
-            1 -> 8.dp
-            2 -> 5.dp
-            3 -> 3.dp
-            4 -> 1.5.dp
-            else -> 0.dp
-        }
-    }
-    val tagFontSize = remember(sectionCols) { if (sectionCols >= 5) 10.sp else 11.sp }
-    val tagHorizPadding = remember(sectionCols) { if (sectionCols >= 5) 4.dp else 6.dp }
+    val tagFontSize = if (sectionCols >= 5) 10.sp else 11.sp
+    val tagHorizPadding = if (sectionCols >= 5) 4.dp else 6.dp
 
     Box(
         modifier = Modifier
@@ -1218,17 +1208,15 @@ fun GroupCard(
             .padding(top = 7.dp)
             .padding(horizontal = extraHorizontalPadding)
     ) {
-        Surface(
-            shape = GroupCardShape,
-            color = Color.Transparent,
-            border = actualBorder,
-            modifier = Modifier.fillMaxWidth()
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(
+                    if (isMovingSource) Modifier.border(2.dp, Color(0xFF4DA3FF), GroupCardShape) else Modifier
+                )
+                .clip(GroupCardShape)
+                .padding(top = 10.dp, bottom = 1.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 10.dp, bottom = 1.dp)
-            ) {
                 if (isEmpty) {
                     Surface(
                         shape = RoundedCornerShape(8.dp),
@@ -1282,7 +1270,6 @@ fun GroupCard(
                     }
                 }
             }
-        }
 
         // Header Overlay: Flawless symmetrical centering & Straight horizontal baseline gradient lines
         Row(
@@ -1294,7 +1281,7 @@ fun GroupCard(
         ) {
             val strokeW = 1.8.dp
 
-            if (isMultiChild) {
+            if (isMultiChild && leftLineBrush != null) {
                 // Left Straight Baseline Gradient Line
                 Spacer(
                     modifier = Modifier
@@ -1322,9 +1309,9 @@ fun GroupCard(
                     .background(Color.Black, RoundedCornerShape(4.dp))
                     .padding(horizontal = tagHorizPadding, vertical = 0.dp)
                     .height(18.dp)
-                    .snappyTapOrLongPress(
-                        onTap = { onEditGroup(ui.entity) }
-                    ),
+                    .pointerDownTap {
+                        onEditGroup(ui.entity)
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -1338,7 +1325,7 @@ fun GroupCard(
                 )
             }
 
-            if (isMultiChild) {
+            if (isMultiChild && rightLineBrush != null) {
                 // Right Straight Baseline Gradient Line
                 Spacer(
                     modifier = Modifier
@@ -1417,24 +1404,18 @@ fun TimerCard(
         ui.entity.type == "stam" || ui.entity.type == "orb"
     }
 
-    val sectionCols = remember(ui.unitSpan) {
-        if (ui.unitSpan > 0) (60 / ui.unitSpan).coerceIn(4, 6) else 5
+    val sectionCols = if (ui.unitSpan > 0) (60 / ui.unitSpan).coerceIn(4, 6) else 5
+    val cardHeight = when (sectionCols) {
+        4 -> 48.dp
+        6 -> 38.dp
+        else -> 42.dp
     }
-    val cardHeight = remember(sectionCols) {
+    val extraHorizontalPadding = if (isGroupChild) {
+        0.dp
+    } else {
         when (sectionCols) {
-            4 -> 48.dp
-            6 -> 38.dp
-            else -> 42.dp
-        }
-    }
-    val extraHorizontalPadding = remember(isGroupChild, sectionCols) {
-        if (isGroupChild) {
-            0.dp
-        } else {
-            when (sectionCols) {
-                4 -> 1.5.dp
-                else -> 0.dp
-            }
+            4 -> 1.5.dp
+            else -> 0.dp
         }
     }
 

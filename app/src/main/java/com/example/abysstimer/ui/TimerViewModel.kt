@@ -372,22 +372,22 @@ class TimerViewModel(
 
         // Cache DB hierarchy, sort, and collapsed counts if dbList has not changed
         if (dbList !== lastDbList) {
-            var isStructuralSame = lastDbList != null && lastDbList!!.size == dbList.size
-            if (isStructuralSame) {
+            var isHierarchySame = lastDbList != null && lastDbList!!.size == dbList.size
+            if (isHierarchySame) {
                 val oldList = lastDbList!!
                 for (idx in oldList.indices) {
                     val o = oldList[idx]
                     val n = dbList[idx]
                     if (o.id != n.id || o.parentId != n.parentId || o.position != n.position ||
-                        o.type != n.type || o.collapsed != n.collapsed || o.foldLock != n.foldLock || o.layout != n.layout) {
-                        isStructuralSame = false
+                        o.type != n.type || o.layout != n.layout) {
+                        isHierarchySame = false
                         break
                     }
                 }
             }
 
-            if (isStructuralSame) {
-                // Structural order is identical (e.g. state change or timestamp update on tap).
+            if (isHierarchySame) {
+                // Hierarchy & ordering is identical (state update, timer tick, or header collapsed/foldLock toggle).
                 // Zero-allocation fast path: replace entities in existing hierarchy without re-sorting or re-bucketing
                 val entityMap = HashMap<String, ItemEntity>(dbList.size)
                 for (item in dbList) entityMap[item.id] = item
@@ -397,9 +397,29 @@ class TimerViewModel(
                     newChildrenMap[pid] = children.map { entityMap[it.id] ?: it }
                 }
                 cachedChildrenMap = newChildrenMap
+
+                // Recompute collapsed counts efficiently without re-sorting hierarchy
+                val collapsedCounts = HashMap<String, Int>()
+                var i = 0
+                while (i < cachedTopLevels.size) {
+                    val top = cachedTopLevels[i]
+                    if (top.type == "header" && top.collapsed && !top.foldLock) {
+                        var count = 0
+                        var j = i + 1
+                        while (j < cachedTopLevels.size && cachedTopLevels[j].type != "header") {
+                            if (cachedTopLevels[j].type != "rule" && cachedTopLevels[j].type != "space") {
+                                count++
+                            }
+                            j++
+                        }
+                        collapsedCounts[top.id] = count
+                    }
+                    i++
+                }
+                cachedCollapsedCountMap = collapsedCounts
                 lastDbList = dbList
             } else {
-                // Structural change (item added, removed, reordered, or header collapsed)
+                // Structural change (item added, removed, or reordered)
                 val topLevels = ArrayList<ItemEntity>()
                 val childrenMap = HashMap<String, ArrayList<ItemEntity>>()
                 
