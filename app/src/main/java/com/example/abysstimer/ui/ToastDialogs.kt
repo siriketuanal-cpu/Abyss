@@ -133,8 +133,7 @@ fun GroupToastDialog(
     onDelete: () -> Unit,
     onStartMove: () -> Unit,
     onCloneGroup: () -> Unit,
-    onAddChildTimer: () -> Unit,
-    onAddGroupBelow: () -> Unit
+    onAddChildTimer: () -> Unit
 ) {
     var isEditingName by remember { mutableStateOf(false) }
     var showColorPicker by remember { mutableStateOf(false) }
@@ -142,9 +141,13 @@ fun GroupToastDialog(
 
     val currentLayout = entity.layout ?: "regular"
 
-    BackHandler(enabled = isEditingName || isConfirmingDelete) {
-        if (isEditingName) isEditingName = false
-        else if (isConfirmingDelete) isConfirmingDelete = false
+    BackHandler(enabled = true) {
+        when {
+            showColorPicker -> showColorPicker = false
+            isEditingName -> isEditingName = false
+            isConfirmingDelete -> isConfirmingDelete = false
+            else -> onDismiss()
+        }
     }
 
     if (showColorPicker) {
@@ -257,30 +260,15 @@ fun GroupToastDialog(
                         }
                     }
 
-                    Row(
+                    ToastActionButton(
+                        text = "タイマー追加",
+                        color = Color(0xFF5EEAD4),
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        ToastActionButton(
-                            text = "タイマー追加",
-                            color = Color(0xFF5EEAD4),
-                            modifier = Modifier.weight(1f),
-                            onClick = {
-                                onDismiss()
-                                onAddChildTimer()
-                            }
-                        )
-
-                        ToastActionButton(
-                            text = "枠を追加",
-                            color = Color(0xFF34D399),
-                            modifier = Modifier.weight(1f),
-                            onClick = {
-                                onDismiss()
-                                onAddGroupBelow()
-                            }
-                        )
-                    }
+                        onClick = {
+                            onDismiss()
+                            onAddChildTimer()
+                        }
+                    )
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -325,8 +313,7 @@ fun HeaderToastDialog(
     onToggleFoldLock: (Boolean) -> Unit,
     onUpdateLayout: (String) -> Unit,
     onDelete: () -> Unit,
-    onStartMove: () -> Unit,
-    onAddGroupBelow: () -> Unit
+    onStartMove: () -> Unit
 ) {
     var isEditingName by remember { mutableStateOf(false) }
     var showColorPicker by remember { mutableStateOf(false) }
@@ -523,30 +510,15 @@ fun HeaderToastDialog(
                         }
                     }
 
-                    Row(
+                    ToastActionButton(
+                        text = "移動",
+                        color = Color(0xFFFBBF24),
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        ToastActionButton(
-                            text = "枠を追加",
-                            color = Color(0xFF34D399),
-                            modifier = Modifier.weight(1f),
-                            onClick = {
-                                onDismiss()
-                                onAddGroupBelow()
-                            }
-                        )
-
-                        ToastActionButton(
-                            text = "移動",
-                            color = Color(0xFFFBBF24),
-                            modifier = Modifier.weight(1f),
-                            onClick = {
-                                onDismiss()
-                                onStartMove()
-                            }
-                        )
-                    }
+                        onClick = {
+                            onDismiss()
+                            onStartMove()
+                        }
+                    )
                 }
             }
         }
@@ -561,8 +533,7 @@ fun RuleToastDialog(
     onSaveColor: (String) -> Unit,
     onSaveCustomColors: (List<String>) -> Unit,
     onDelete: () -> Unit,
-    onStartMove: () -> Unit,
-    onAddGroupBelow: () -> Unit
+    onStartMove: () -> Unit
 ) {
     var showColorPicker by remember { mutableStateOf(false) }
 
@@ -623,30 +594,15 @@ fun RuleToastDialog(
                     }
                 }
 
-                Row(
+                ToastActionButton(
+                    text = "移動",
+                    color = Color(0xFFFBBF24),
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    ToastActionButton(
-                        text = "枠を追加",
-                        color = Color(0xFF34D399),
-                        modifier = Modifier.weight(1f),
-                        onClick = {
-                            onDismiss()
-                            onAddGroupBelow()
-                        }
-                    )
-
-                    ToastActionButton(
-                        text = "移動",
-                        color = Color(0xFFFBBF24),
-                        modifier = Modifier.weight(1f),
-                        onClick = {
-                            onDismiss()
-                            onStartMove()
-                        }
-                    )
-                }
+                    onClick = {
+                        onDismiss()
+                        onStartMove()
+                    }
+                )
             }
         }
     }
@@ -1239,8 +1195,9 @@ fun BackupToastDialog(
                                     clipData.getItemAt(0).text?.toString() ?: ""
                                 } else ""
 
-                                if (text.isNotBlank() && text.trim().startsWith("{")) {
-                                    onPasteBackup(text)
+                                val trimmed = text.trim()
+                                if (trimmed.isNotBlank() && (trimmed.startsWith("ABYSS:") || trimmed.startsWith("{"))) {
+                                    onPasteBackup(trimmed)
                                 } else {
                                     pasteText = text
                                     showPasteInput = true

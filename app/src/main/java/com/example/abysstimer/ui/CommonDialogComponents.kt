@@ -1,6 +1,7 @@
 @file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 package com.example.abysstimer.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -17,6 +18,9 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.PlatformTextStyle
@@ -47,13 +51,17 @@ fun FastDialog(
 ) {
     val currentOnDismiss by rememberUpdatedState(onDismissRequest)
 
+    BackHandler(enabled = true) {
+        currentOnDismiss()
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .systemBarsPadding(),
         contentAlignment = DialogBiasAlignment
     ) {
-        // Transparent backdrop capturing outside taps instantly on press (0ms response)
+        // Transparent backdrop capturing outside taps instantly using common pointerDownTap
         Box(
             modifier = Modifier
                 .fillMaxSize()

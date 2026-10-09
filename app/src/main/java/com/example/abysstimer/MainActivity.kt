@@ -5,6 +5,7 @@
 package com.example.abysstimer
 
 import android.os.Bundle
+import android.os.SystemClock
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -24,6 +25,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
@@ -221,9 +223,20 @@ fun AbyssTimerTheme(content: @Composable () -> Unit) {
 @Composable
 fun AbyssTimerApp(viewModel: TimerViewModel) {
     val uiSnapshot by viewModel.uiSnapshotFlow.collectAsStateWithLifecycle()
-    val allItems = uiSnapshot.allItems
-    val visibleItems = uiSnapshot.visibleItems
-    val hasPendingStates = uiSnapshot.hasPendingStates
+    val gridState = rememberLazyGridState()
+    val isScrolling by remember { derivedStateOf { gridState.isScrollInProgress } }
+    val canScrollForward by remember { derivedStateOf { gridState.canScrollForward } }
+    val canScrollBackward by remember { derivedStateOf { gridState.canScrollBackward } }
+    val isOverflowing by remember { derivedStateOf { canScrollForward || canScrollBackward } }
+
+    var lastRenderedSnapshot by remember { mutableStateOf(uiSnapshot) }
+    if (!isScrolling) {
+        lastRenderedSnapshot = uiSnapshot
+    }
+    val renderedSnapshot = if (isScrolling) lastRenderedSnapshot else uiSnapshot
+    val visibleItems = renderedSnapshot.visibleItems
+    val allItems = renderedSnapshot.allItems
+    val hasPendingStates = renderedSnapshot.hasPendingStates
     val customColors by viewModel.customColorsFlow.collectAsStateWithLifecycle()
 
     var showAddDialog by remember { mutableStateOf(false) }
@@ -231,6 +244,7 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
     var activeSetupType by remember { mutableStateOf<String?>(null) }
     var activeSetupGroupId by remember { mutableStateOf<String?>(null) }
     var itemToEdit by remember { mutableStateOf<ItemEntity?>(null) }
+    var lastEditDismissTime by remember { mutableLongStateOf(0L) }
     var movingItemId by remember { mutableStateOf<String?>(null) }
     var isDeleteMode by remember { mutableStateOf(false) }
     var itemToDelete by remember { mutableStateOf<ItemEntity?>(null) }
@@ -272,6 +286,13 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
         }
     }
 
+    val onDismissEditAction: () -> Unit = remember {
+        {
+            itemToEdit = null
+            lastEditDismissTime = SystemClock.uptimeMillis()
+        }
+    }
+
     // Predictive Back Handling: Dismiss keypad, cancel preview, delete mode, moving mode or close dialogs
     BackHandler(enabled = isBackHandlerEnabled) {
         when {
@@ -288,7 +309,10 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
             itemToDelete != null -> itemToDelete = null
             isDeleteMode -> isDeleteMode = false
             movingItemId != null -> movingItemId = null
-            itemToEdit != null -> itemToEdit = null
+            itemToEdit != null -> {
+                itemToEdit = null
+                lastEditDismissTime = SystemClock.uptimeMillis()
+            }
             activeSetupType != null -> {
                 activeSetupType = null
                 activeSetupGroupId = null
@@ -307,10 +331,17 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
 
     val openEditDialog: (ItemEntity) -> Unit = remember(viewModel, commitAndDismissKeypad, keypadState) {
         { entity: ItemEntity ->
+            val now = SystemClock.uptimeMillis()
             if (keypadState.isEditing) {
                 commitAndDismissKeypad()
             } else if (viewModel.cancelPendingStates()) {
                 // プレビュー表示中だった場合はプレビューを閉じるのみ（ダイアログは開かない）
+            } else if (itemToEdit?.id == entity.id) {
+                // 既にこのアイテムのトーストが開いている場合は安全に閉じる（トグル動作）
+                itemToEdit = null
+                lastEditDismissTime = now
+            } else if (now - lastEditDismissTime < 200L) {
+                // 極小さい連打防止・多重タップ抑止（直前の閉じる操作から200ms以内は再オープンしない）
             } else {
                 itemToEdit = entity
             }
@@ -537,13 +568,15 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
                 // List content (Grid) - Stable persistent container renders instantly without node replacement
                 val totalGridColumns = 60
                 LazyVerticalGrid(
+                    state = gridState,
                     columns = GridCells.Fixed(totalGridColumns),
+                    userScrollEnabled = isOverflowing,
                     modifier = Modifier.fillMaxSize(),
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                     contentPadding = PaddingValues(
                         top = 0.dp,
-                        bottom = 120.dp
+                        bottom = 16.dp
                     )
                 ) {
                     items(
@@ -567,8 +600,6 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
                                 .then(
                                     if (isMovingSource && ui.entity.type != "group" && ui.entity.type != "space") {
                                         Modifier.border(2.dp, Color(0xFF4DA3FF), RoundedCornerShape(10.dp))
-                                    } else if (isDeleteMode && ui.entity.type != "group" && ui.entity.type != "space") {
-                                        Modifier.border(1.2.dp, Color(0x66FF5252), RoundedCornerShape(8.dp))
                                     } else {
                                         Modifier
                                     }
@@ -588,6 +619,7 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
                                         HeaderCard(
                                             ui = ui,
                                             collapsedCount = ui.collapsedCount,
+                                            isDeleteMode = isDeleteMode,
                                             isMoveMode = movingItemId != null,
                                             onToggleCollapse = onItemClickAction,
                                             onEdit = onItemEditAction
@@ -596,6 +628,7 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
                                     "rule" -> {
                                         RuleCard(
                                             ui = ui,
+                                            isDeleteMode = isDeleteMode,
                                             isMoveMode = movingItemId != null,
                                             onEdit = onItemEditAction
                                         )
@@ -668,21 +701,6 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
                             }
                         }
                     }
-
-                    // Add a large empty area at the bottom that also dismisses preview
-                    item(span = { GridItemSpan(totalGridColumns) }) {
-                        Spacer(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(400.dp)
-                                .pointerDownTap(
-                                    enabled = isPendingOrEditing,
-                                    pass = PointerEventPass.Initial
-                                ) {
-                                    onDismissOutside()
-                                }
-                        )
-                    }
                 }
             }
         }
@@ -705,7 +723,7 @@ fun AbyssTimerApp(viewModel: TimerViewModel) {
             activeSetupGroupId = null
         },
         itemToEdit = itemToEdit,
-        onDismissEditDialog = { itemToEdit = null },
+        onDismissEditDialog = onDismissEditAction,
         onUpdateItemToEdit = { itemToEdit = it },
         showBackupDialog = showBackupDialog,
         onDismissBackupDialog = { showBackupDialog = false },
@@ -867,10 +885,6 @@ private fun DialogLayer(
                 onDismissEditDialog()
                 onTriggerAddChild(entity.id)
             },
-            onAddGroupBelow = {
-                viewModel.addGroup()
-                onDismissEditDialog()
-            },
             onRequestKeypad = { field, initial, onCommit ->
                 keypadState.start(entity.id, field, initial, onCommit)
             },
@@ -907,6 +921,7 @@ private fun DialogLayer(
 fun HeaderCard(
     ui: TimerUiState,
     collapsedCount: Int,
+    isDeleteMode: Boolean = false,
     isMoveMode: Boolean = false,
     onToggleCollapse: (ItemEntity) -> Unit,
     onEdit: (ItemEntity) -> Unit
@@ -928,7 +943,16 @@ fun HeaderCard(
                     end = Offset(size.width, lineY),
                     strokeWidth = strokePx
                 )
-            },
+            }
+            .then(
+                if (isDeleteMode || isMoveMode) {
+                    Modifier.snappyTapOrLongPress(
+                        onTap = { onEdit(ui.entity) }
+                    )
+                } else {
+                    Modifier
+                }
+            ),
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Left Title + Badge Area
@@ -937,8 +961,14 @@ fun HeaderCard(
             modifier = Modifier
                 .wrapContentWidth()
                 .fillMaxHeight()
-                .snappyTapOrLongPress(
-                    onTap = { onToggleCollapse(ui.entity) }
+                .then(
+                    if (!isDeleteMode && !isMoveMode) {
+                        Modifier.snappyTapOrLongPress(
+                            onTap = { onToggleCollapse(ui.entity) }
+                        )
+                    } else {
+                        Modifier
+                    }
                 )
         ) {
             Text(
@@ -977,21 +1007,24 @@ fun HeaderCard(
         // Center space (allows background preview dismissal)
         Spacer(modifier = Modifier.weight(1f))
 
-        // Right-edge compact 24dp target: Long-press edit menu
-        Box(
-            modifier = Modifier
-                .width(24.dp)
-                .fillMaxHeight()
-                .snappyTapOrLongPress(
-                    onLongPress = { onEdit(ui.entity) }
-                )
-        )
+        // Right-edge compact 16dp target: Short-tap edit menu
+        if (!isDeleteMode && !isMoveMode) {
+            Box(
+                modifier = Modifier
+                    .width(16.dp)
+                    .fillMaxHeight()
+                    .pointerDownTap {
+                        onEdit(ui.entity)
+                    }
+            )
+        }
     }
 }
 
 @Composable
 fun RuleCard(
     ui: TimerUiState,
+    isDeleteMode: Boolean = false,
     isMoveMode: Boolean = false,
     onEdit: (ItemEntity) -> Unit
 ) {
@@ -1010,18 +1043,29 @@ fun RuleCard(
                     topLeft = Offset(0f, lineY),
                     size = Size(size.width, strokeH)
                 )
-            },
+            }
+            .then(
+                if (isDeleteMode || isMoveMode) {
+                    Modifier.snappyTapOrLongPress(
+                        onTap = { onEdit(ui.entity) }
+                    )
+                } else {
+                    Modifier
+                }
+            ),
         contentAlignment = Alignment.CenterEnd
     ) {
-        // Right-edge compact 24dp target
-        Box(
-            modifier = Modifier
-                .width(24.dp)
-                .fillMaxHeight()
-                .snappyTapOrLongPress(
-                    onLongPress = { onEdit(ui.entity) }
-                )
-        )
+        if (!isDeleteMode && !isMoveMode) {
+            // Right-edge compact 16dp target: Short-tap edit menu
+            Box(
+                modifier = Modifier
+                    .width(16.dp)
+                    .fillMaxHeight()
+                    .pointerDownTap {
+                        onEdit(ui.entity)
+                    }
+            )
+        }
     }
 }
 
@@ -1086,16 +1130,16 @@ fun SpaceCard(
             )
         }
 
-        // Right-edge compact 24dp target
+        // Right-edge compact 16dp target: Short-tap edit menu
         if (!isDeleteMode && !isMoveMode) {
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
-                    .width(24.dp)
+                    .width(16.dp)
                     .fillMaxHeight()
-                    .snappyTapOrLongPress(
-                        onLongPress = { onEdit(ui.entity) }
-                    )
+                    .pointerDownTap {
+                        onEdit(ui.entity)
+                    }
             )
         }
     }
@@ -1143,27 +1187,35 @@ fun GroupCard(
         }
     }
 
-    val sectionCols = if (ui.unitSpan > 0) (60 / ui.unitSpan).coerceIn(1, 6) else 5
-    val cardHeight = when (sectionCols) {
-        1 -> 68.dp
-        2 -> 60.dp
-        3 -> 54.dp
-        4 -> 48.dp
-        6 -> 38.dp
-        else -> 42.dp
+    val sectionCols = remember(ui.unitSpan) {
+        if (ui.unitSpan > 0) (60 / ui.unitSpan).coerceIn(1, 6) else 5
     }
-    val extraHorizontalPadding = when (sectionCols) {
-        1 -> 8.dp
-        2 -> 5.dp
-        3 -> 3.dp
-        4 -> 1.5.dp
-        else -> 0.dp
+    val cardHeight = remember(sectionCols) {
+        when (sectionCols) {
+            1 -> 68.dp
+            2 -> 60.dp
+            3 -> 54.dp
+            4 -> 48.dp
+            6 -> 38.dp
+            else -> 42.dp
+        }
     }
+    val extraHorizontalPadding = remember(sectionCols) {
+        when (sectionCols) {
+            1 -> 8.dp
+            2 -> 5.dp
+            3 -> 3.dp
+            4 -> 1.5.dp
+            else -> 0.dp
+        }
+    }
+    val tagFontSize = remember(sectionCols) { if (sectionCols >= 5) 10.sp else 11.sp }
+    val tagHorizPadding = remember(sectionCols) { if (sectionCols >= 5) 4.dp else 6.dp }
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 3.dp)
+            .padding(top = 7.dp)
             .padding(horizontal = extraHorizontalPadding)
     ) {
         Surface(
@@ -1172,10 +1224,6 @@ fun GroupCard(
             border = actualBorder,
             modifier = Modifier.fillMaxWidth()
         ) {
-            val is2x2Layout = ui.entity.layout == "2x2" && ui.children.size > 2
-            val chunkCols = if (is2x2Layout) 2 else (ui.gridSpan / ui.unitSpan.coerceAtLeast(1)).coerceIn(1, 6)
-            val itemsPerRow = if (is2x2Layout) 2 else if (isEmpty) 1 else chunkCols
-            
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1189,7 +1237,6 @@ fun GroupCard(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(cardHeight)
-                            .snappyTapOrLongPress { onAddChild(ui.entity) }
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Text(
@@ -1273,17 +1320,16 @@ fun GroupCard(
             Box(
                 modifier = Modifier
                     .background(Color.Black, RoundedCornerShape(4.dp))
-                    .padding(horizontal = 6.dp, vertical = 0.dp)
+                    .padding(horizontal = tagHorizPadding, vertical = 0.dp)
                     .height(18.dp)
                     .snappyTapOrLongPress(
-                        onTap = { onEditGroup(ui.entity) },
-                        onLongPress = { onEditGroup(ui.entity) }
+                        onTap = { onEditGroup(ui.entity) }
                     ),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = ui.entity.name.ifEmpty { "アカウント" },
-                    fontSize = 11.sp,
+                    fontSize = tagFontSize,
                     fontWeight = FontWeight.Bold,
                     color = if (ui.entity.name.isEmpty()) Color(0xFF8A8EA3) else Color(0xFFE8EAEF),
                     maxLines = 1,

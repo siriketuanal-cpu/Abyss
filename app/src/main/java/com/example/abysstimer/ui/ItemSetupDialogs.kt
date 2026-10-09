@@ -876,7 +876,6 @@ fun EditItemDialog(
     onStartMove: (() -> Unit)? = null,
     onCloneGroup: (() -> Unit)? = null,
     onAddChildTimer: (() -> Unit)? = null,
-    onAddGroupBelow: (() -> Unit)? = null,
     onRequestKeypad: (field: String, initial: String, onCommit: (String) -> Unit) -> Unit = { _, _, _ -> },
     isKeypadActive: (field: String) -> Boolean = { false }
 ) {
@@ -895,8 +894,7 @@ fun EditItemDialog(
                 onDelete = onDelete,
                 onStartMove = { onStartMove?.invoke() },
                 onCloneGroup = { onCloneGroup?.invoke() },
-                onAddChildTimer = { onAddChildTimer?.invoke() },
-                onAddGroupBelow = { onAddGroupBelow?.invoke() }
+                onAddChildTimer = { onAddChildTimer?.invoke() }
             )
         }
         "header" -> {
@@ -915,8 +913,7 @@ fun EditItemDialog(
                     onUpdateSettings(TimerSettingsUpdate(layout = newLayout))
                 },
                 onDelete = onDelete,
-                onStartMove = { onStartMove?.invoke() },
-                onAddGroupBelow = { onAddGroupBelow?.invoke() }
+                onStartMove = { onStartMove?.invoke() }
             )
         }
         "rule" -> {
@@ -927,8 +924,7 @@ fun EditItemDialog(
                 onSaveColor = onSaveColor,
                 onSaveCustomColors = onSaveCustomColors,
                 onDelete = onDelete,
-                onStartMove = { onStartMove?.invoke() },
-                onAddGroupBelow = { onAddGroupBelow?.invoke() }
+                onStartMove = { onStartMove?.invoke() }
             )
         }
         "space" -> {

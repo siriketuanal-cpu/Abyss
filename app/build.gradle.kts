@@ -13,8 +13,8 @@ android {
         applicationId = "com.aistudio.abysstimer.native.pxvwt"
         minSdk = 26
         targetSdk = 35
-        versionCode = 160
-        versionName = "1.0.160"
+        versionCode = 171
+        versionName = "1.0.171"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
